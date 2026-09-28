@@ -6,6 +6,9 @@ Version 0.1 has one job: make a DSSAT-CSM executable easy to locate, install, an
 
 It is **not** yet a DSSAT experiment editor, FileX parser, plotting package, calibration system, or replacement for DSSATTools.
 
+[![Open In Colab](https://colab.research.google.com/assets/colab/badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_walkthrough.ipynb)
+Try it on Colab: a step-by-step walkthrough of detection, installation, and connection.
+
 ## Intended API
 
 ```python
