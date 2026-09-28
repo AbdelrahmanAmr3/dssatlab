@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dssatlab"
-version = "0.1.0.dev0"
-description = "Python integration for DSSAT-CSM (under development)."
+version = "0.1.0"
+description = "Basic environment diagnostics for DSSATLab users."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
 dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "build>=1", "twine>=6"]
 
 [project.urls]
 Source = "https://github.com/AbdelrahmanAmr3/dssatlab"

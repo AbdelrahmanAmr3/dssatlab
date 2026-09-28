@@ -1,27 +1,78 @@
-# dssatlab
+﻿# dssatlab
 
-This is the public source repository for the planned `dssatlab` Python package.
-The package will help Python users find and install DSSAT-CSM.
+DSSATLab 0.1.0 provides basic environment diagnostics for Python users preparing
+to work with DSSAT-CSM. It reports the operating system, machine architecture,
+and Python version with zero runtime dependencies. Requires Python 3.10 or newer.
 
-This repository currently contains packaging and release setup only. It does
-not yet provide working DSSAT functionality and has not been published to PyPI.
-The first release will follow implementation and release checks.
+## Install and use
 
-## Build and release
+```bash
+python -m pip install dssatlab
+```
 
-To check packaging on GitHub, open **Actions > Publish to PyPI > Run workflow**
-and choose `master`. This builds the wheel and source archive, checks them with
-Twine, and saves them as a workflow artifact. A manual run does not upload to PyPI.
+```python
+import dssatlab
 
-For a functional release, update `version` in `pyproject.toml`, commit the change,
-and publish a GitHub release using a new tag on that commit. For example, package
-version `0.1.0` uses tag `v0.1.0`. Publishing the release starts the PyPI workflow;
-saving a draft or pushing a tag alone does not. Development versions (`.dev`)
-are currently blocked from publication.
+info = dssatlab.detect()
+print(info)
+print(info.os_name)
+```
 
-The PyPI Trusted Publisher must use owner `AbdelrahmanAmr3`, repository `dssatlab`,
-workflow `release.yml`, and environment `pypi`.
+Example output on Linux:
 
-Existing tags keep their original source and workflow. The existing `0.1` tag
-predates this release trigger and does not match the package version. Prepare
-a new release from the updated source when the package is ready.
+```text
+EnvironmentInfo(os_name='linux', architecture='x86_64', python_version='3.12.10')
+linux
+```
+
+`detect()` returns an immutable `EnvironmentInfo` dataclass:
+
+| Field | Meaning |
+| --- | --- |
+| `os_name` | Lowercase OS name, such as `windows`, `linux`, or `darwin` (macOS). |
+| `architecture` | Machine architecture as reported by Python, such as `AMD64`, `x86_64`, or `arm64`. |
+| `python_version` | Version of the running Python interpreter. |
+
+Unavailable OS or architecture values are reported as `unknown`. Importing the
+package and calling `detect()` do not prompt, download, or change files.
+
+This first release only reports the Python environment. DSSAT executable
+discovery, installation, connection, Colab detection, and simulation support
+are not implemented. No DSSAT software or data is bundled.
+
+## Source and development
+
+```text
+src/dssatlab/
+  __init__.py       # Public exports
+  core.py           # EnvironmentInfo and detect()
+tests/
+  test_detect.py    # OS normalization and unknown-platform cases
+pyproject.toml      # Package metadata and development dependencies
+.github/workflows/release.yml
+README.md
+LICENSE
+.gitignore
+```
+
+```bash
+python -m pip install -e '.[dev]'
+python -m pytest
+python -m build
+python -m twine check dist/*
+```
+
+## Release
+
+For a packaging check on GitHub, open **Actions > Publish to PyPI > Run workflow**
+and choose `master`. This runs tests, builds and validates the wheel and source
+archive, and saves them as an artifact. Manual runs do not upload to PyPI.
+
+To publish, update `version` in `pyproject.toml`, pass the tests and build checks,
+and commit the source. Publish a GitHub release using a new matching tag on that
+commit: version `0.1.0` uses tag `v0.1.0`. Publishing the release starts the PyPI
+workflow; saving a draft or pushing a tag alone does not. Development versions
+(`.dev`) are currently blocked by the workflow.
+
+The PyPI Trusted Publisher uses owner `AbdelrahmanAmr3`, repository `dssatlab`,
+workflow `release.yml`, and environment `pypi`. No API token is required.
