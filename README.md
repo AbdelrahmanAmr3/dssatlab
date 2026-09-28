@@ -49,7 +49,7 @@ src/dssatlab/
 tests/
   test_detect.py    # OS normalization and unknown-platform cases
 pyproject.toml      # Package metadata and development dependencies
-.github/workflows/release.yml
+.github/workflows/workflow.yml
 README.md
 LICENSE
 .gitignore
@@ -65,8 +65,11 @@ python -m twine check dist/*
 ## Release
 
 For a packaging check on GitHub, open **Actions > Publish to PyPI > Run workflow**
-and choose `master`. This runs tests, builds and validates the wheel and source
-archive, and saves them as an artifact. Manual runs do not upload to PyPI.
+and choose `master`, leaving **Publish the package to PyPI** unchecked. This runs
+tests, builds and validates the wheel and source archive, and saves them as an
+artifact. To retry a failed upload using updated workflow configuration, run
+the workflow with **Publish the package to PyPI** checked. This publishes the
+version in the selected source after all checks pass; it does not create a tag.
 
 To publish, update `version` in `pyproject.toml`, pass the tests and build checks,
 and commit the source. Publish a GitHub release using a new matching tag on that
@@ -75,4 +78,4 @@ workflow; saving a draft or pushing a tag alone does not. Development versions
 (`.dev`) are currently blocked by the workflow.
 
 The PyPI Trusted Publisher uses owner `AbdelrahmanAmr3`, repository `dssatlab`,
-workflow `release.yml`, and environment `pypi`. No API token is required.
+workflow `workflow.yml`, and environment `pypi`. No API token is required.
