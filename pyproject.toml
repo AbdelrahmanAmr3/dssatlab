@@ -4,11 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dssatlab"
-version = "0.1.0"
-description = "Basic environment diagnostics for DSSATLab users."
+version = "0.1.1"
+description = "A small Python connection and installer layer for DSSAT-CSM."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
+keywords = ["DSSAT", "crop-model", "agriculture", "simulation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
 dependencies = []
 
 [project.optional-dependencies]
@@ -19,3 +31,7 @@ Source = "https://github.com/AbdelrahmanAmr3/dssatlab"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

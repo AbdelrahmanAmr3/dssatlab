@@ -1,81 +1,74 @@
-﻿# dssatlab
+# dssatlab
 
-DSSATLab 0.1.0 provides basic environment diagnostics for Python users preparing
-to work with DSSAT-CSM. It reports the operating system, machine architecture,
-and Python version with zero runtime dependencies. Requires Python 3.10 or newer.
+`dssatlab` is intentionally starting small.
 
-## Install and use
+Version 0.1 has one job: make a DSSAT-CSM executable easy to locate, install, and reuse from Python on Windows, Linux, Jupyter, and Google Colab.
 
-```bash
-python -m pip install dssatlab
-```
+It is **not** yet a DSSAT experiment editor, FileX parser, plotting package, calibration system, or replacement for DSSATTools.
+
+## Intended API
 
 ```python
-import dssatlab
+import dssatlab as dl
 
-info = dssatlab.detect()
+dssat = dl.connect()
+print(dssat)
+```
+
+Advanced/non-interactive use:
+
+```python
+dssat = dl.connect(executable="/opt/dssat/bin/dscsm048", interactive=False)
+```
+
+Inspection without side effects:
+
+```python
+info = dl.detect()
 print(info)
-print(info.os_name)
 ```
 
-Example output on Linux:
+Linux/Colab managed installation:
 
-```text
-EnvironmentInfo(os_name='linux', architecture='x86_64', python_version='3.12.10')
-linux
+```python
+dssat = dl.install()                 # latest stable DSSAT release
+# or
+dssat = dl.install("4.8.6.0")
 ```
 
-`detect()` returns an immutable `EnvironmentInfo` dataclass:
+## v0.1 behavior
 
-| Field | Meaning |
-| --- | --- |
-| `os_name` | Lowercase OS name, such as `windows`, `linux`, or `darwin` (macOS). |
-| `architecture` | Machine architecture as reported by Python, such as `AMD64`, `x86_64`, or `arm64`. |
-| `python_version` | Version of the running Python interpreter. |
+### Windows
 
-Unavailable OS or architecture values are reported as `unknown`. Importing the
-package and calling `detect()` do not prompt, download, or change files.
+1. Use an explicit `executable=` or `path=` if supplied.
+2. Reuse saved configuration if valid.
+3. Check `DSSAT_HOME` if set.
+4. Check the usual `C:\\DSSAT48` installation.
+5. If still missing and interactive, ask the user for the DSSAT folder/executable.
+6. Save a successful choice for future calls.
 
-This first release only reports the Python environment. DSSAT executable
-discovery, installation, connection, Colab detection, and simulation support
-are not implemented. No DSSAT software or data is bundled.
+Windows v0.1 should **not** compile DSSAT automatically.
 
-## Source and development
+### Linux
 
-```text
-src/dssatlab/
-  __init__.py       # Public exports
-  core.py           # EnvironmentInfo and detect()
-tests/
-  test_detect.py    # OS normalization and unknown-platform cases
-pyproject.toml      # Package metadata and development dependencies
-.github/workflows/workflow.yml
-README.md
-LICENSE
-.gitignore
-```
+1. Use an explicit executable/path if supplied.
+2. Reuse saved configuration if valid.
+3. Check `DSSAT_HOME` and `PATH`.
+4. Reuse a previous dssatlab-managed build if present.
+5. If missing and interactive, offer to install the latest stable DSSAT release.
+6. Build with Git + CMake + a Fortran compiler and cache the resulting installation.
 
-```bash
-python -m pip install -e '.[dev]'
-python -m pytest
-python -m build
-python -m twine check dist/*
-```
+### Google Colab
 
-## Release
+Colab is treated as Linux plus a detected notebook environment. On a fresh runtime, `connect()` may offer to install DSSAT automatically. The installation should be cached for the current runtime and must not be rebuilt repeatedly within the same runtime.
 
-For a packaging check on GitHub, open **Actions > Publish to PyPI > Run workflow**
-and choose `master`, leaving **Publish the package to PyPI** unchecked. This runs
-tests, builds and validates the wheel and source archive, and saves them as an
-artifact. To retry a failed upload using updated workflow configuration, run
-the workflow with **Publish the package to PyPI** checked. This publishes the
-version in the selected source after all checks pass; it does not create a tag.
+## Upstream DSSAT
 
-To publish, update `version` in `pyproject.toml`, pass the tests and build checks,
-and commit the source. Publish a GitHub release using a new matching tag on that
-commit: version `0.1.0` uses tag `v0.1.0`. Publishing the release starts the PyPI
-workflow; saving a draft or pushing a tag alone does not. Development versions
-(`.dev`) are currently blocked by the workflow.
+Official source repository:
+https://github.com/DSSAT/dssat-csm-os
 
-The PyPI Trusted Publisher uses owner `AbdelrahmanAmr3`, repository `dssatlab`,
-workflow `workflow.yml`, and environment `pypi`. No API token is required.
+The upstream project uses CMake, recommends out-of-source builds, and places the compiled executable under the build `bin/` directory. This package should use the latest stable release by default, not the upstream development branch.
+
+## Scope rule
+
+If a proposed feature is not directly necessary to **detect, install, validate, remember, or connect to DSSAT**, it does not belong in v0.1.

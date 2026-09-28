@@ -7,3 +7,15 @@ build/
 dist/
 .coverage
 .DS_Store
+*.bkp
+
+# agent files (local only)
+AGENTS.md
+AGENT_PROMPT.md
+SKILLS.md
+START_HERE.md
+CONTEXT.md
+docs/agents/
+docs/adr/
+docs/Diagrams/
+.claude/
