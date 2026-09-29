@@ -22,12 +22,15 @@ def config_file() -> Path:
     
     if os.name == "nt": # Windows
         base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
-    else:
+    else: # Linux, MacOS, and others
         base = os.getenv("XDG_CONFIG_HOME")
-
-    return Path(base) / "dssatlab" / "config.json" if base else (
-        Path.home() / ".config" / "dssatlab" / "config.json"
-    )
+    
+    dir = Path(base) / "dssatlab" if base else Path.home() / ".config" / "dssatlab"
+    # return:
+    ## Win: %LOCALAPPDATA%\dssatlab\config.json
+    ## Linux/MacOS: $XDG_CONFIG_HOME/dssatlab/config.json or 
+    ## Other: ~/.config/dssatlab/config.json
+    return dir / "config.json"
 
 
 def load_config() -> dict[str, Any]:
