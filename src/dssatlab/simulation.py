@@ -12,7 +12,20 @@ from .weather import _parse_weather, write_weather_file
 
 
 class Simulation:
-    """One FileX treatment and its weather data; construction only stores inputs."""
+    """One FileX treatment and its weather data; construction only stores inputs.
+
+    Represents a single simulation run configuring one treatment from a FileX
+    experiment file with user-provided weather data. Construction records inputs
+    without reading files or altering disk state. Validation and execution are
+    performed by check() and run().
+
+    Args:
+        filex (str | Path): Path to the FileX experiment file (*.MZX, *.SBX, etc.).
+        treatment (int | str): Treatment number (int or digit string) within the FileX.
+        weather (str | Path | list[dict] | DataFrame): Weather data as a CSV file path, a list of dicts, or a pandas
+            DataFrame conforming to the weather template.
+        executable (str | Path | None): Optional explicit path to the DSSAT executable or directory.
+    """
 
     def __init__(self, filex, treatment, weather, executable=None):
         self.filex = filex
@@ -21,7 +34,18 @@ class Simulation:
         self.executable = executable
 
     def check(self) -> list[str]:
-        """Return weather/FileX problems; check SDATE coverage only for START S."""
+        """Return weather and FileX problems without running DSSAT.
+
+        Performs strict validation: checks weather data column names, value
+        ranges, date order, duplicates, and gaps; reads the FileX for treatment
+        validity, field station code (WSTA), and start controls (START, SDATE);
+        ensures FileX filename is at most 12 characters; verifies station code
+        equality; and verifies that weather data covers SDATE when START is 'S'.
+
+        Returns:
+            list[str]: Descriptive problem messages found by the checks.
+                An empty list indicates all checks passed.
+        """
         rows, problems = _parse_weather(self.weather)
         values, filex_problems = _read_filex(self.filex, self.treatment)
         problems.extend(filex_problems)
@@ -50,10 +74,22 @@ class Simulation:
         return problems
 
     def run(self) -> RunResult:
-        """Check inputs, copy them into a fresh simulation folder and run DSSAT.
+        """Check inputs, copy them into a fresh simulation folder, and run DSSAT.
 
-        Keep the simulation folder on failure. Missing-weather warnings are
-        run errors even when DSSAT returns zero; all other run errors propagate.
+        Runs check() and raises DSSATCheckError if any problems are found.
+        Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
+        FileX, copies the FileX and sibling model files (*.SOL, *.CUL, *.ECO, *.SPE),
+        generates the weather file (*.WTH), invokes the DSSAT executable for the
+        treatment, and scans WARNING.OUT for missing weather records.
+
+        Returns:
+            RunResult: Run results including returncode, run directory, outputs,
+                and stdout_tail.
+
+        Raises:
+            DSSATCheckError: If pre-run input checks identify one or more problems.
+            DSSATRunError: If execution fails, DSSAT returns non-zero, ERROR.OUT is
+                produced, or WARNING.OUT reports missing weather records.
         """
         problems = self.check()
         if problems:
