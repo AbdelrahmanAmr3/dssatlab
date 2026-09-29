@@ -17,7 +17,6 @@ ELEVATION_RANGE = (-500, 9000)  # Station elevation, m.
 REQUIRED = ("station", "latitude", "longitude", "elevation", "date",
             "srad", "tmax", "tmin", "rain")
 OPTIONAL = ("tav", "amp", "refht", "wndht")
-MESSAGE_LIMIT = 10
 
 
 def write_weather_template(path: str | Path) -> None:
@@ -158,16 +157,8 @@ def _check_dates(dated_rows, problems):
                              "Supply one row for each missing calendar day."))
 
 
-def _limited_messages(problems):
-    grouped = {}
-    for kind, message in problems:
-        grouped.setdefault(kind, []).append(message)
-    result = []
-    for kind, messages in grouped.items():
-        result.extend(messages[:MESSAGE_LIMIT])
-        if len(messages) > MESSAGE_LIMIT:
-            result.append(f"{kind}: ... and {len(messages) - MESSAGE_LIMIT} more rows.")
-    return result
+def _all_messages(problems):
+    return [message for _, message in problems]
 
 
 def _parse_weather(source) -> tuple[list[dict], list[str]]:
@@ -181,7 +172,7 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
     """
     rows, columns, problems = _read_weather(source)
     if problems and problems[0][0] == "source":
-        return [], _limited_messages(problems)
+        return [], _all_messages(problems)
     if columns is not None:
         for column in dict.fromkeys(columns):
             if columns.count(column) > 1:
@@ -278,4 +269,4 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                                  f"{name} values on every row."))
         parsed.append(result)
     _check_dates(dated_rows, problems)
-    return parsed, _limited_messages(problems)
+    return parsed, _all_messages(problems)

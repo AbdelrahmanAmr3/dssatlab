@@ -207,14 +207,13 @@ def test_bad_rows_and_csv_column_counts(tmp_path, rows):
     assert any("row 5" in p and "columns" in p for p in check(path))
 
 
-def test_multiple_kinds_and_message_caps(rows):
+def test_multiple_kinds_report_every_problem(rows):
     weather = [dict(rows[0], date=(date(2021, 1, 1) + timedelta(days=i)).isoformat(),
                     rain=-1, srad="bad") for i in range(47)]
     problems = check(weather)
-    assert sum("rain" in p and "row " in p for p in problems) == 10
-    assert sum("srad" in p and "row " in p for p in problems) == 10
-    assert sum("... and 37 more rows" in p for p in problems) == 2
-    assert len(problems) == 22
+    assert sum("rain" in p and "row " in p for p in problems) == 47
+    assert sum("srad" in p and "row " in p for p in problems) == 47
+    assert len(problems) == 94
 
 
 def test_write_weather_template_passes_and_never_overwrites(tmp_path):
@@ -269,15 +268,15 @@ def test_duplicate_headers_and_physical_csv_lines(tmp_path, rows):
 
 
 @pytest.mark.parametrize("kind", ["date", "duplicate", "gap"])
-def test_date_problem_caps(rows, kind):
+def test_every_date_problem_is_reported(rows, kind):
     days = [(date(2021, 1, 1) + timedelta(days=2 * i)).isoformat() for i in range(48)]
     if kind == "date":
         days = ["bad"] * 47
     elif kind == "duplicate":
         days = ["2021-01-01"] * 48
     problems = check([dict(rows[0], date=day) for day in days])
-    assert len(problems) == 11
-    assert "... and 37 more rows" in problems[-1]
+    assert len(problems) >= 47
+    assert not any("more rows" in p for p in problems)
 
 
 @pytest.mark.parametrize("column", ["rain", "station", "date", "unknown"])

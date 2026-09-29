@@ -39,6 +39,10 @@ class Simulation:
                                 f"{expected!r}, but the weather template has station "
                                 f"{station!r}. Make the station codes exactly equal; "
                                 "filenames are case-sensitive on Linux.")
+        if values.get("START", "S") != "S":
+            problems.append(f"FileX start option {values['START']!r} is not a start "
+                            "date (S), so the weather year cannot be known. Set START "
+                            "to S with an SDATE in the FileX.")
         days = [row["date"] for row in rows if "date" in row]
         if values.get("START") == "S" and "SDATE" in values and days:
             start = values["SDATE"]
