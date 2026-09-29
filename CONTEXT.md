@@ -61,6 +61,23 @@ _Avoid_: input format, schema
 **Weather file**:
 The DSSAT `*.WTH` file generated from weather data. DSSAT finds it beside the FileX.
 
+**Soil data**:
+A user's own soil profile, as they hold it (a table of layers), before it is converted
+into a DSSAT soil file.
+
+**Soil template**:
+The one fixed CSV shape (named columns, DSSAT's own units) a user must put their soil
+data in. Soil data that does not follow it is rejected by the checks, never guessed at.
+_Avoid_: soil input, soil schema
+
+**Soil file**:
+The DSSAT `*.SOL` file generated from soil data. Not the same as a `.SOL` file the user
+already keeps beside their FileX.
+
+**Soil profile**:
+One named set of soil layers in a soil file, identified by the FileX's `ID_SOIL`. The
+soil template describes exactly one.
+
 **Checks**:
 The strict validation of a simulation's inputs, done before any DSSAT files are written or
 DSSAT is run, reporting every problem at once.

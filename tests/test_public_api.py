@@ -13,6 +13,6 @@ def test_public_api_is_importable():
 
 
 def test_weather_public_api_is_exported():
-    for name in ("Simulation", "write_weather_template", "DSSATCheckError"):
+    for name in ("Simulation", "write_weather_template", "write_soil_template", "DSSATCheckError"):
         assert name in dssatlab.__all__
         assert callable(getattr(dssatlab, name))

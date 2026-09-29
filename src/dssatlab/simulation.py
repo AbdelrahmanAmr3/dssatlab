@@ -8,15 +8,16 @@ import shutil
 from .errors import DSSATCheckError, DSSATRunError
 from .filex import _read_filex, _weather_filename
 from .runner import RunResult, _create_dated_folder, run
+from .soil import _parse_soil
 from .weather import _parse_weather, write_weather_file
 
 
 class Simulation:
-    """One FileX treatment and its weather data; construction only stores inputs.
+    """One FileX treatment with weather data and optional soil data.
 
     Represents a single simulation run configuring one treatment from a FileX
-    experiment file with user-provided weather data. Construction records inputs
-    without reading files or altering disk state. Validation and execution are
+    with user-provided weather data and optional soil data. Construction only
+    stores inputs without reading files or altering disk state. Checks and execution are
     performed by check() and run().
 
     Args:
@@ -25,22 +26,27 @@ class Simulation:
         weather (str | Path | list[dict] | DataFrame): Weather data as a CSV file path, a list of dicts, or a pandas
             DataFrame conforming to the weather template.
         executable (str | Path | None): Optional explicit path to the DSSAT executable or directory.
+        soil (str | Path | list[dict] | DataFrame | None): Keyword-only. Soil data following the
+            soil template, describing one soil profile. None skips soil checks.
     """
 
-    def __init__(self, filex, treatment, weather, executable=None):
+    def __init__(self, filex, treatment, weather, executable=None, *, soil=None):
         self.filex = filex
         self.treatment = treatment
         self.weather = weather
+        self.soil = soil
         self.executable = executable
 
     def check(self) -> list[str]:
-        """Return weather and FileX problems without running DSSAT.
+        """Return weather, soil and FileX problems without writing or running DSSAT.
 
         Performs strict validation: checks weather data column names, value
         ranges, date order, duplicates, and gaps; reads the FileX for treatment
         validity, field station code (WSTA), and start controls (START, SDATE);
         ensures FileX filename is at most 12 characters; verifies station code
         equality; and verifies that weather data covers SDATE when START is 'S'.
+        When soil data is given, checks its columns, values, soil profile and
+        layers, and requires its soil_id to equal the selected field's ID_SOIL.
 
         Returns:
             list[str]: Descriptive problem messages found by the checks.
@@ -71,6 +77,22 @@ class Simulation:
                 problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                 f"covered by weather data ({min(days)} to {max(days)}). "
                                 "Supply weather for the simulation's start date.")
+        if self.soil is not None:
+            soil_rows, soil_problems = _parse_soil(self.soil)
+            problems.extend(soil_problems)
+            soil_ids = {row["soil_id"] for row in soil_rows if "soil_id" in row}
+            soil_id = values.get("ID_SOIL")
+            if not soil_id or soil_id == "-99":
+                problems.append("FileX has no readable ID_SOIL in the selected "
+                                "treatment's FIELDS row. Supply ID_SOIL "
+                                "equal to the soil template's soil_id.")
+            elif len(soil_ids) == 1:
+                template_id = soil_ids.pop()
+                if soil_id != template_id:
+                    problems.append(f"FileX ID_SOIL {soil_id!r} for treatment "
+                                    f"{self.treatment} differs from the soil template's "
+                                    f"soil_id {template_id!r}. Make the IDs exactly equal; "
+                                    "filenames are case-sensitive on Linux.")
         return problems
 
     def run(self) -> RunResult:

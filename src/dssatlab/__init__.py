@@ -5,11 +5,12 @@ from .errors import (DSSATCheckError, DSSATError, DSSATInstallError,
                      DSSATNotFoundError, DSSATRunError)
 from .runner import run
 from .simulation import Simulation
+from .soil import write_soil_template
 from .weather import write_weather_template
 
 __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunError",
            "connect", "detect", "install", "run",
-           "Simulation", "write_weather_template", "DSSATCheckError",
+           "Simulation", "write_weather_template", "write_soil_template", "DSSATCheckError",
            ]
 
 __version__ = "0.3.0"
