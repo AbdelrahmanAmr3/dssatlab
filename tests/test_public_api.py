@@ -10,3 +10,9 @@ def test_public_api_is_importable():
     assert issubclass(DSSATRunError, DSSATError)
     assert "run" in dssatlab.__all__
     assert "DSSATRunError" in dssatlab.__all__
+
+
+def test_weather_public_api_is_exported():
+    for name in ("Simulation", "write_weather_template", "DSSATCheckError"):
+        assert name in dssatlab.__all__
+        assert callable(getattr(dssatlab, name))
