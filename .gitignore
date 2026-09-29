@@ -14,8 +14,7 @@ AGENTS.md
 AGENT_PROMPT.md
 SKILLS.md
 START_HERE.md
-CONTEXT.md
 docs/agents/
-docs/adr/
 docs/Diagrams/
 .claude/
+site/
