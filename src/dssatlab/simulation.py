@@ -1,4 +1,4 @@
-"""Check and run one Simulation using a copy of its FileX and weather data."""
+"""Check and run one Simulation with a copied FileX, weather and optional soil data."""
 
 from datetime import date, timedelta
 from pathlib import Path
@@ -8,7 +8,7 @@ import shutil
 from .errors import DSSATCheckError, DSSATRunError
 from .filex import _read_filex, _weather_filename
 from .runner import RunResult, _create_dated_folder, run
-from .soil import _parse_soil
+from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
 
@@ -27,7 +27,9 @@ class Simulation:
             DataFrame conforming to the weather template.
         executable (str | Path | None): Optional explicit path to the DSSAT executable or directory.
         soil (str | Path | list[dict] | DataFrame | None): Keyword-only. Soil data following the
-            soil template, describing one soil profile. None skips soil checks.
+            soil template, describing one soil profile. When given, run() writes
+            SOIL.SOL instead of copying sibling soil files. None skips soil checks
+            and keeps copying sibling soil files.
     """
 
     def __init__(self, filex, treatment, weather, executable=None, *, soil=None):
@@ -100,9 +102,12 @@ class Simulation:
 
         Runs check() and raises DSSATCheckError if any problems are found.
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
-        FileX, copies the FileX and sibling model files (*.SOL, *.CUL, *.ECO, *.SPE),
-        generates the weather file (*.WTH), invokes the DSSAT executable for the
-        treatment, and scans WARNING.OUT for missing weather records.
+        FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
+        and generates the weather file (*.WTH). When soil data is given, writes
+        its soil profile to SOIL.SOL and copies no sibling .SOL files; otherwise
+        copies all sibling .SOL files. Invokes the DSSAT executable for the
+        treatment and scans WARNING.OUT for missing weather records. Soil
+        failures use the existing run error, keeping ERROR.OUT in the run directory.
 
         Returns:
             RunResult: Run results including returncode, run directory, outputs,
@@ -124,9 +129,14 @@ class Simulation:
         sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
         shutil.copy2(filex, sim_folder / filex.name)
         for sibling in filex.parent.iterdir():
+            if self.soil is not None and sibling.suffix.upper() == ".SOL":
+                continue
             if sibling.is_file() and sibling.suffix.upper() in (".SOL", ".CUL", ".ECO", ".SPE"):
                 shutil.copy2(sibling, sim_folder / sibling.name)
         write_weather_file(rows, sim_folder / weather_name)
+        if self.soil is not None:
+            soil_rows, _ = _parse_soil(self.soil)
+            write_soil_file(soil_rows, sim_folder / "SOIL.SOL")
 
         result = run(sim_folder / filex.name, treatment=int(self.treatment),
                      executable=self.executable)
