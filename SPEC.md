@@ -35,19 +35,18 @@ A candidate connection is valid only when:
 - its filename is compatible with DSSAT 4.8 (`dscsm048`, `DSCSM048.EXE`, case-insensitive)
 - a small version/probe command is used only if DSSAT supports one reliably
 
-If a reliable version-only command cannot be confirmed, do not invent one. It is acceptable for v0.1 to infer version from a managed-install manifest or leave `version=None` for a manual installation.
+If a reliable version-only command cannot be confirmed, do not invent one. It is acceptable for v0.1 not to report a version at all: a managed build records its version in `manifest.json`, and user-supplied installations have none.
 
 Never run a crop simulation merely to validate a path.
 
 ## 3. Search order for `connect()`
 
 Explicit choices always win:
-1. `executable=`
-2. `path=`
-3. saved config
-4. `DSSAT_HOME`
-5. platform defaults
-6. interactive fallback
+1. `path=` (the file, or a directory directly containing it)
+2. saved config
+3. `DSSAT_HOME`
+4. platform defaults
+5. interactive fallback
 
 ### Windows defaults
 
@@ -55,7 +54,7 @@ At minimum inspect:
 - `C:\\DSSAT48`
 - `C:\\DSSAT48\\DSCSM048.EXE`
 
-When `path=` is a directory, look for `DSCSM048.EXE` inside it.
+When `DSSAT_HOME` (or the interactive prompt) gives a directory, look for `DSCSM048.EXE` inside it.
 
 If no installation is found and `interactive=True`, ask for a path using normal text input. Keep the prompt simple and notebook-safe.
 
@@ -143,10 +142,7 @@ Store one selected/default connection in `config.json` with a simple schema, e.g
 
 ```json
 {
-  "executable": "/path/to/dscsm048",
-  "root": "/path/to/dssat",
-  "version": "4.8.6.0",
-  "source": "managed"
+  "executable": "/path/to/dscsm048"
 }
 ```
 
@@ -189,7 +185,7 @@ Tests must not require network access, a real DSSAT installation, or a Fortran c
 Required unit tests:
 - OS/Colab detection with monkeypatching
 - explicit executable precedence
-- directory path resolves executable
+- directory in `DSSAT_HOME` resolves executable
 - saved config is reused
 - invalid config is ignored
 - `DSSAT_HOME` is respected
@@ -218,10 +214,10 @@ finds a normal `C:\\DSSAT48` installation or clearly asks for a path and remembe
 ### Linux with existing DSSAT
 
 ```python
-x = dl.connect(executable="/path/to/dscsm048")
+x = dl.connect(path="/path/to/dscsm048")
 ```
 
-returns a validated `DSSATConnection` with no network access.
+returns the validated executable `Path` with no network access.
 
 ### Fresh Linux/Colab
 
