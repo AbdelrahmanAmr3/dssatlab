@@ -5,7 +5,7 @@ It's helps to store and retrieve the last executable DSSAT path.
 Without it, every new python session would require re-finding the DSSAT executable.
 
 History:
-- 2024-06-05: Initial version and refactored by Abdelrahman Saleh <
+- 28/09/2026: Initial version and refactored by Abdelrahman Saleh <
 """
 
 import json
