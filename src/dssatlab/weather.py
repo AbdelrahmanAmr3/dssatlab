@@ -1,7 +1,7 @@
 """The fixed weather template, its reader and strict weather data checks."""
 
 import csv
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import math
 from pathlib import Path
 import re
@@ -75,21 +75,30 @@ def write_weather_file(rows: list[dict], path: str | Path) -> Path:
 
 
 def _read_weather(source):
-    """Return (line-numbered raw rows, CSV columns or None, problems)."""
+    """Read a CSV path, plain rows or DataFrame without importing pandas.
+
+    Return (line-numbered raw rows, declared columns or None, problems).
+    """
     if isinstance(source, list):
         return list(enumerate(source, 2)), None, []
     if not isinstance(source, (str, Path)):
+        try:
+            if hasattr(source, "columns") and callable(getattr(source, "to_dict", None)):
+                columns = list(source.columns)
+                rows = source.to_dict("records")
+                return list(enumerate(rows, 2)), columns, []
+        except Exception as error:
+            return [], None, [("source", f"Cannot read weather data DataFrame: "
+                               f"{error}. Supply a DataFrame convertible to plain "
+                               "rows with to_dict('records').")]
         return [], None, [("source", "Cannot read weather data: expected a CSV "
-                           "path or plain rows. Pass a str/Path or a list of dicts.")]
+                           "path, plain rows or a DataFrame. Pass a str/Path, "
+                           "a list of dicts or a DataFrame with template columns.")]
     try:
         with Path(source).open(encoding="utf-8-sig", newline="") as stream:
             reader = csv.reader(stream, strict=True)
             columns = next(reader, [])
             rows, problems = [], []
-            for column in dict.fromkeys(columns):
-                if columns.count(column) > 1:
-                    problems.append(("columns", f"Weather template column {column!r} "
-                                     "is repeated in line 1. Keep one column per name."))
             while True:
                 line = reader.line_num + 1
                 values = next(reader, None)
@@ -164,7 +173,9 @@ def _limited_messages(problems):
 def _parse_weather(source) -> tuple[list[dict], list[str]]:
     """Read and check weather data, returning parsed rows and all problem kinds.
 
-    Dates become date objects, numbers become floats, absent optional values -99.
+    CSV paths, plain rows and DataFrames share the same checks. Dates may be
+    YYYY-MM-DD text, date objects or midnight datetimes; they become date objects.
+    Numbers become floats, absent optional values -99.
     Invalid fields are omitted; consumers must require no problems before using
     parsed rows. The source is never mutated, sorted, repaired or written.
     """
@@ -172,6 +183,10 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
     if problems and problems[0][0] == "source":
         return [], _limited_messages(problems)
     if columns is not None:
+        for column in dict.fromkeys(columns):
+            if columns.count(column) > 1:
+                problems.append(("columns", f"Weather template column {column!r} "
+                                 "is repeated in line 1. Keep one column per name."))
         _check_columns(columns, "line 1", problems)
     if not rows:
         problems.append(("empty", "Weather data has no daily rows. Supply at least "
@@ -209,13 +224,23 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                 result[name] = value
             elif name == "date":
                 try:
-                    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+                    if isinstance(value, datetime) and any((
+                            value.hour, value.minute, value.second, value.microsecond,
+                            getattr(value, "nanosecond", 0))):
+                        problems.append(("date", f"{where}: found {_show_value(value)}; "
+                                         "date has a time part; use a whole date."))
+                        continue
+                    if isinstance(value, date):
+                        result[name] = date(value.year, value.month, value.day)
+                    elif isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+                        result[name] = date.fromisoformat(value)
+                    else:
                         raise ValueError
-                    result[name] = date.fromisoformat(value)
                     dated_rows.append((line, result[name]))
-                except ValueError:
+                except (TypeError, ValueError):
                     problems.append(("date", f"{where}: found {_show_value(value)}. "
-                                     "Use a valid calendar date in YYYY-MM-DD form."))
+                                     "Use a valid calendar date: YYYY-MM-DD text, "
+                                     "a date object or a midnight datetime."))
             else:
                 if name in OPTIONAL and (value is None or
                                          isinstance(value, str) and not value.strip()):
@@ -223,6 +248,7 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                 try:
                     number = float(value)
                     if not math.isfinite(number):
+                        value = number  # Report CSV and numeric NaN/inf identically.
                         raise ValueError
                 except (TypeError, ValueError, OverflowError):
                     problems.append((f"numeric {name}", f"{where}: found {_show_value(value)}. "
