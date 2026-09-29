@@ -8,3 +8,7 @@ class DSSATNotFoundError(DSSATError):
 
 class DSSATInstallError(DSSATError):
     """Raised when DSSAT installation or compilation fails."""
+
+
+class DSSATRunError(DSSATError):
+    """Raised when a DSSAT run cannot be performed."""
