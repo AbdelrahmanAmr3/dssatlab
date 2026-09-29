@@ -10,7 +10,7 @@ The codebase under `src/dssatlab/` consists of nine modules:
 - `config.py`: Reads and writes persistent JSON configuration storing the remembered DSSAT executable path.
 - `core.py`: Discovers, validates, and installs the DSSAT executable (`connect`, `detect`, `install`).
 - `errors.py`: Defines the exception hierarchy for discovery, installation, input checks, and run failures.
-- `filex.py`: Parses FileX experiment files to extract field station codes (`WSTA`) and simulation controls (`START`, `SDATE`) for a treatment.
+- `filex.py`: Reads a FileX to extract field station codes (`WSTA`) and simulation controls (`START`, `SDATE`) for a treatment.
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
 - `runner.py`: Executes the DSSAT executable on a FileX and moves generated output files into a dated run directory.
 - `simulation.py`: Coordinates pre-run checks, staging, weather file generation, execution, and output scanning for a single simulation.

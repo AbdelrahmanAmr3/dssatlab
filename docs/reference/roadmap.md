@@ -21,6 +21,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 | Soil and management inputs | Weather comes first. Soil files beside the FileX are copied but not created. |
 | Unit converters | The weather template is in DSSAT's own units, and nothing is converted silently. |
 | Gap filling or any automatic repair | `check()` reports problems and the user decides how to treat missing data. |
+| Warnings | `check()` either reports a problem or passes; there is no softer level yet. |
 | Optional weather columns beyond the template | The template is one fixed shape so it can be checked strictly. |
 | Model selection | Not needed to run one FileX treatment. |
 | Batch mode and timeouts | One `Simulation` is one treatment; more than one per object is later. |

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Each entry is taken from the release notes of that version on GitHub.
+All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
 ## [0.3.0] - 2026-09-29
 
@@ -10,9 +10,8 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Weather input as a CSV path, a list of dicts, or a pandas DataFrame. pandas is never required.
 - `check()` reports every problem at once, with what is wrong, where and what to do: wrong or unknown columns, empty or non-numeric values, bad dates, gaps, duplicates, impossible values, and, by reading the FileX, a station that does not match or weather that misses the start date. Nothing is fixed or converted automatically.
 - `run()` raises `DSSATCheckError` listing all problems before writing anything. Otherwise it creates a `dssat_sim_<date>` folder beside the FileX with a copy of the FileX, the `.SOL`, `.CUL`, `.ECO` and `.SPE` files beside it, and the generated weather file, then runs DSSAT there. The user's own files and folder are not changed.
-
-### Fixed
 - Silent weather shortages are caught. DSSAT exits normally and gives -99 results when weather is missing, so after the run `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
+
 
 ### Notes
 - Upgrading from 0.2.0 needs no changes.
@@ -41,7 +40,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - `detect()` reports the OS, Python version, and the Git, CMake and gfortran tools it finds.
 - `connect()` finds an existing DSSAT installation and checks that the DSSAT executable works, looking in this order: the path passed in, the saved configuration, the `DSSAT_HOME` environment variable, `PATH`, the managed cache.
 - `install()` builds the latest stable DSSAT-CSM release from the official repository on Linux with explicit Git and CMake commands, and reuses the build if it is already cached. It never uses `sudo` and never edits shell startup files.
-- The connection is saved in a small JSON config so later calls to `connect()` are quick.
+- The DSSAT executable path is saved in the saved config so later calls to `connect()` are quick.
 
 ### Notes
 - Replaces the 0.1.0 placeholder. No runtime dependencies; Python 3.10 or newer.
@@ -54,7 +53,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Python 3.10 or newer, with zero runtime dependencies.
 
 ### Notes
-- Environment diagnostics only. DSSAT discovery, installation, connection and simulation support were deferred.
+- Environment diagnostics only. DSSAT discovery, connecting, installation and simulation support were deferred.
 
 [0.3.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.0
 [0.2.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.2.0

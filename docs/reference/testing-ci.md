@@ -65,7 +65,7 @@ A full end-to-end integration test is provided in `tests/test_manual_integration
 
 Because it takes several minutes and requires `git`, `cmake`, and `gfortran`, it is skipped by default during normal test runs and in CI.
 
-To run the manual integration test, supply a real FileX experiment file (and optional weather template CSV), and use throwaway cache and configuration directories to avoid altering saved settings:
+To run the manual integration test, supply a real FileX (and optional weather template CSV), and use throwaway cache and configuration directories to avoid altering saved settings:
 
 ```bash
 XDG_CACHE_HOME=/tmp/dl/cache XDG_CONFIG_HOME=/tmp/dl/config \
