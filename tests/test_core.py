@@ -73,14 +73,39 @@ def test_detect_and_connect_share_read_only_discovery(tmp_path, monkeypatch, cap
 
 def test_linux_managed_cache_prefers_highest_version(tmp_path, monkeypatch):
     monkeypatch.setattr(installer, "find_cached_install", _real_find_cached_install)
-    older = executable_at(tmp_path, "cache/4.8.6.0/dssat")
-    newer = executable_at(tmp_path, "cache/4.8.10.0/dssat")
+    older = executable_at(tmp_path, "cache/4.8.6.0")
+    newer = executable_at(tmp_path, "cache/4.8.10.0")
     for version, executable in (("4.8.6.0", older), ("4.8.10.0", newer)):
         manifest = tmp_path / "cache" / version / "manifest.json"
         manifest.write_text(json.dumps({
             "prefix": str(executable.parent), "executable": str(executable)}))
     connection = core.connect(interactive=False)
     assert connection == newer
+
+
+@pytest.mark.parametrize("folder", ["work", "installs"])
+def test_linux_managed_cache_skips_reserved_directories(tmp_path, monkeypatch, folder):
+    executable = executable_at(tmp_path, f"cache/{folder}/4.8.6.0/build/bin")
+    manifest = json.dumps({"prefix": str(executable.parent), "executable": str(executable)})
+    reserved = tmp_path / "cache" / folder
+    (reserved / "4.8.6.0" / "manifest.json").write_text(manifest)
+    # Even a manifest directly in a reserved directory must never be considered.
+    (reserved / "manifest.json").write_text(manifest)
+    lookup = Mock(wraps=_real_find_cached_install)
+    monkeypatch.setattr(installer, "find_cached_install", lookup)
+    assert core._discover("linux") is None
+    lookup.assert_not_called()
+
+
+def test_install_reuses_valid_manifest_without_build_tools(tmp_path, monkeypatch):
+    executable = executable_at(tmp_path, "cache/4.8.6.0")
+    (executable.parent / "manifest.json").write_text(json.dumps({
+        "version": "4.8.6.0", "tag": "v4.8.6.0", "platform": "linux",
+        "prefix": str(executable.parent), "executable": str(executable)}))
+    monkeypatch.setattr(installer, "find_cached_install", _real_find_cached_install)
+    monkeypatch.setattr(installer, "resolve_version", lambda version: version)
+    assert core.install("4.8.6.0") == executable
+    assert config.load_config() == {"executable": str(executable)}
 
 
 def test_explicit_executable_wins_and_is_saved(tmp_path, monkeypatch):
@@ -218,7 +243,7 @@ def test_install_rejects_non_linux(monkeypatch, system):
 
 @pytest.mark.parametrize("cached", [False, True])
 def test_install_builds_once_and_reuses_cache(tmp_path, monkeypatch, cached):
-    executable = executable_at(tmp_path, "cache/4.8.6.0/dssat")
+    executable = executable_at(tmp_path, "cache/4.8.6.0")
     install_dir = tmp_path / "cache" / "4.8.6.0"
     lookup = Mock(side_effect=[executable if cached else None, executable])
     resolve = Mock(return_value="4.8.6.0")

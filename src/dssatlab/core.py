@@ -203,7 +203,7 @@ def _discover(os_name: str) -> Path | None:
             return candidate
         try:
             installs = [d for d in installer.cache_root().iterdir()
-                        if d.is_dir()]
+                        if d.name not in ("work", "installs") and d.is_dir()]
         except OSError:
             installs = []
         installs.sort(key=lambda d: _version_sort_key(d.name), reverse=True)

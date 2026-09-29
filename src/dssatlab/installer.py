@@ -12,11 +12,15 @@ import urllib.request
 from .errors import DSSATInstallError
 
 
+# DSSAT cannot read DSSATPRO.L48 with longer prefixes (measured on v4.8.6.0).
+MAX_PREFIX_LENGTH = 51
+
+
 def cache_root() -> Path:
     """Compute the managed-install cache path without creating directories."""
     location = os.environ.get("XDG_CACHE_HOME")
     base = Path(location) if location else Path.home() / ".cache"
-    return base / "dssatlab" / "installs"
+    return base / "dssatlab"
 
 
 def resolve_version(version: str) -> str:
@@ -72,16 +76,23 @@ def find_cached_install(version: str, install_dir: Path) -> Path | None:
 
 def build_dssat(version: str, install_dir: Path) -> Path:
     """Clone, build and install a release, recording its installed executable."""
-    install_dir = install_dir.resolve()
-    source = install_dir / "source"
-    build = install_dir / "build"
-    prefix = install_dir / "dssat"
+    prefix = install_dir.resolve()
+    if len(str(prefix)) > MAX_PREFIX_LENGTH:
+        raise DSSATInstallError(
+            f"Cannot install DSSAT: prefix {prefix} is {len(str(prefix))} characters long; "
+            f"the limit is {MAX_PREFIX_LENGTH}. "
+            "Set the XDG_CACHE_HOME environment variable to a shorter folder "
+            "(for example ~/dl) and try again."
+        )
+    work = prefix.parent / "work" / version
+    source = work / "source"
+    build = work / "build"
     tag = f"v{version}"
     try:
-        install_dir.mkdir(parents=True, exist_ok=True)
+        work.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise DSSATInstallError(
-            f"Could not create install directory {install_dir}: {exc}. "
+            f"Could not create work directory {work}: {exc}. "
             "Choose a writable installation directory and retry."
         ) from exc
 
@@ -94,7 +105,7 @@ def build_dssat(version: str, install_dir: Path) -> Path:
         ("CMake install", ["cmake", "--install", str(build)]),
     ]
     for step, command in commands:
-        # A v0.1 managed install already has source; cloning into it would fail.
+        # Reuse source from a previous build; cloning into it would fail.
         if step == "Git clone" and (source / "CMakeLists.txt").is_file():
             continue
         try:
@@ -142,7 +153,7 @@ def build_dssat(version: str, install_dir: Path) -> Path:
             manifest["commit"] = commit.stdout.strip()
     except OSError:
         pass  # Optional provenance must not turn a successful build into a failure.
-    manifest_path = install_dir / "manifest.json"
+    manifest_path = prefix / "manifest.json"
     try:
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
