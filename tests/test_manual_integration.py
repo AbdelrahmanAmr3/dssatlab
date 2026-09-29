@@ -33,3 +33,18 @@ def test_install_then_run():
 
     assert result.returncode == 0
     assert (result.run_dir / "Summary.OUT").is_file()
+
+
+WEATHER = os.environ.get("DSSATLAB_MANUAL_WEATHER")
+
+
+@pytest.mark.skipif(not WEATHER, reason="also set DSSATLAB_MANUAL_WEATHER (a weather template CSV)")
+def test_simulation_from_the_weather_template():
+    """A Simulation from your own template CSV: FileX treatment 1, station and dates must match it."""
+    sim = dl.Simulation(FILEX, 1, WEATHER)
+
+    assert sim.check() == []
+    result = sim.run()
+
+    assert result.returncode == 0
+    assert (result.run_dir / "Summary.OUT").is_file()
