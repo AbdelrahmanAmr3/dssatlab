@@ -43,6 +43,37 @@ def write_weather_template(path: str | Path) -> None:
         raise DSSATError(exists_message) from error
 
 
+def write_weather_file(rows: list[dict], path: str | Path) -> Path:
+    """Write valid parsed weather rows to the caller's chosen weather file.
+
+    Require nonempty rows from _parse_weather with no problems. Station values
+    come from the first row, including -99 for unset optional values. The parent
+    folder must exist; an existing file is overwritten.
+    """
+    path = Path(path)
+    first = rows[0]
+    station_fields = (("latitude", 9, 3), ("longitude", 9, 3),
+                      ("elevation", 6, 0), ("tav", 6, 1), ("amp", 6, 1),
+                      ("refht", 6, 2), ("wndht", 6, 2))
+    with path.open("w", encoding="ascii", newline="\n") as stream:
+        stream.write(f"*WEATHER DATA : {first['station']} (written by dssatlab)\n\n")
+        stream.write("@ INSI      LAT     LONG  ELEV   TAV   AMP REFHT WNDHT\n")
+        stream.write(f"  {first['station']}")
+        for name, width, decimals in station_fields:
+            # Adding positive zero after rounding removes negative zero on 3.10.
+            value = round(first[name], decimals) + 0.0
+            stream.write(f"{value:{width}.{decimals}f}")
+        stream.write("\n@DATE  SRAD  TMAX  TMIN  RAIN\n")
+        for row in rows:
+            day = row["date"]
+            stream.write(f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}")
+            for name in ("srad", "tmax", "tmin", "rain"):
+                value = round(row[name], 1) + 0.0
+                stream.write(f"{value:6.1f}")
+            stream.write("\n")
+    return path
+
+
 def _read_weather(source):
     """Return (line-numbered raw rows, CSV columns or None, problems)."""
     if isinstance(source, list):
