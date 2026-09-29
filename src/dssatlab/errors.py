@@ -12,3 +12,12 @@ class DSSATInstallError(DSSATError):
 
 class DSSATRunError(DSSATError):
     """Raised when a DSSAT run cannot be performed."""
+
+
+class DSSATCheckError(DSSATError):
+    """Problems found by the checks before a Simulation can run."""
+
+    def __init__(self, problems: list[str]):
+        self.problems = list(problems)
+        super().__init__(f"Simulation checks found {len(self.problems)} problems:\n"
+                         + "\n".join(self.problems))

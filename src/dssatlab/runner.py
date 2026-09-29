@@ -24,6 +24,26 @@ class RunResult:
     stdout_tail: str
 
 
+def _create_dated_folder(parent: Path, prefix: str, label: str) -> Path:
+    """Create a fresh dated folder, adding a suffix for each existing name."""
+    directory_name = prefix + datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    folder = parent / directory_name
+    suffix = 2
+    while True:
+        try:
+            folder.mkdir(exist_ok=False)
+            return folder
+        except FileExistsError:
+            folder = parent / f"{directory_name}-{suffix}"
+            suffix += 1
+        except OSError as error:
+            raise DSSATRunError(
+                f"Cannot create {label} {folder}: the FileX folder "
+                f"{parent} is not writable ({error}). "
+                "Move the FileX somewhere writable and try again."
+            ) from error
+
+
 def run(
     filex: str | Path,
     treatment: int | None = None,
@@ -55,22 +75,7 @@ def run(
         if executable is None:
             raise core._invalid_path(path)
 
-    directory_name = "dssat_run_" + datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    run_dir = filex.parent / directory_name
-    suffix = 2
-    while True:
-        try:
-            run_dir.mkdir(exist_ok=False)
-            break
-        except FileExistsError:
-            run_dir = filex.parent / f"{directory_name}-{suffix}"
-            suffix += 1
-        except OSError as error:
-            raise DSSATRunError(
-                f"Cannot create run directory {run_dir}: the FileX folder "
-                f"{filex.parent} is not writable ({error}). "
-                "Move the FileX somewhere writable and try again."
-            ) from error
+    run_dir = _create_dated_folder(filex.parent, "dssat_run_", "run directory")
 
     before = {path.name: path.stat().st_mtime_ns
               for path in filex.parent.iterdir() if path.is_file()}
