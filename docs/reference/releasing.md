@@ -68,6 +68,10 @@ python -m twine upload dist/*
 
 Do not store PyPI credentials or API tokens in the repository.
 
+## After every release: update the docs
+
+Every new version is followed by a docs update through a pull request: the `CHANGELOG.md` entry for that version, the Guide pages and Roadmap it changes, the API reference if exported names changed, and the Architecture page if modules changed. `python -m mkdocs build --strict` must pass, and the site deploys from `master` after the merge. This is step 7 of `RELEASING.md`.
+
 ## Automated CI publishing
 
 Publishing can also be triggered via GitHub Actions using the `.github/workflows/workflow.yml` workflow:
