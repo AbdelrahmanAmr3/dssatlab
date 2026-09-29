@@ -1,0 +1,29 @@
+site_name: DSSATLab
+site_description: Run the DSSAT crop model from Python, starting from your own weather data.
+site_url: https://abdelrahmanamr3.github.io/dssatlab/
+repo_url: https://github.com/AbdelrahmanAmr3/dssatlab
+repo_name: AbdelrahmanAmr3/dssatlab
+
+# Agent-facing folders must never be published, even if present.
+exclude_docs: |
+  agents/
+  Diagrams/
+
+theme:
+  name: material
+
+plugins:
+  - search
+  - include-markdown
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+
+# Only the pages listed here are published. Specs and agent files are never listed.
+nav:
+  - Home: index.md
+  - Guide:
+      - guide/index.md
+  - Reference and Architecture:
+      - reference/index.md
