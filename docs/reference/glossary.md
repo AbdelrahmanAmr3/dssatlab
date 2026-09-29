@@ -1,3 +1,3 @@
 # Glossary
 
-To be written (ticket #24).
+{% include "../../CONTEXT.md" start="## Language" %}

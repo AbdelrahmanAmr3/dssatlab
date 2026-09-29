@@ -42,7 +42,15 @@ log = logging.getLogger(__name__)
 def detect() -> dict:
     """Inspect the current environment without changing anything.
 
-    Returns {"os_name", "architecture", "dssat_path"}; dssat_path is None if DSSAT is not found.
+    Performs read-only discovery for the DSSAT executable without prompting
+    the user or updating saved configuration.
+
+    Returns:
+        dict: A dictionary containing:
+            - os_name (str): Operating system identifier ("windows", "linux", or "other").
+            - architecture (str): Machine architecture.
+            - dssat_path (Path | None): Path to the discovered DSSAT executable,
+              or None if not found.
     """
 
     os_name = _os_name()
@@ -56,7 +64,22 @@ def detect() -> dict:
 def install(version: str = "latest") -> Path:
     """Install/build DSSAT-CSM on Linux, remembering and reusing managed builds.
 
-    Never prompts. Missing build tools are reported, never installed automatically.
+    Clones and compiles the official DSSAT release using Git, CMake, and gfortran.
+    Reuses cached managed builds if already present. Never prompts. Missing build
+    tools are reported, never installed automatically.
+
+    Args:
+        version: Version tag to build, or "latest" to resolve the latest stable
+            release from GitHub. Defaults to "latest".
+
+    Returns:
+        Path: Validated path to the installed DSSAT executable (dscsm048).
+            The path is saved to configuration.
+
+    Raises:
+        DSSATInstallError: If called on a non-Linux platform, if required build tools
+            (git, cmake, gfortran) are missing from PATH, if the installation prefix
+            exceeds the 51-character limit, or if the build fails.
     """
 
     # Raise an error on non-Linux and MacOS platforms
@@ -86,7 +109,27 @@ def connect(
     *,
     interactive: bool = True,
 ) -> Path:
-    """Find or configure DSSAT and return the validated path to its executable."""
+    """Find or configure DSSAT and return the validated path to its executable.
+
+    When path is not specified, searches in order: saved config, DSSAT_HOME
+    environment variable, platform default location (PATH, or C:\\DSSAT48 on Windows),
+    and managed install cache on Linux. If not found and interactive is True,
+    prompts for a path (Windows) or offers to build a managed install (Linux).
+
+    Args:
+        path: Explicit path to the DSSAT executable (dscsm048 or DSCSM048.EXE)
+            or the directory containing it. If None, automatic discovery is performed.
+        interactive: Whether to prompt for input if DSSAT cannot be found
+            automatically. Defaults to True.
+
+    Returns:
+        Path: Validated path to the DSSAT executable. The path is saved to config
+            for future sessions.
+
+    Raises:
+        DSSATNotFoundError: If a valid DSSAT executable cannot be located or the
+            provided path is invalid.
+    """
 
     if path is not None:
         # Accepts the executable file, or a directory that directly contains it.

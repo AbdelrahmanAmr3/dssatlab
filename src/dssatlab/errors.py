@@ -15,7 +15,11 @@ class DSSATRunError(DSSATError):
 
 
 class DSSATCheckError(DSSATError):
-    """Problems found by the checks before a Simulation can run."""
+    """Problems found by the checks before a Simulation can run.
+
+    Attributes:
+        problems: List of descriptive problem messages identified by the checks.
+    """
 
     def __init__(self, problems: list[str]):
         self.problems = list(problems)
