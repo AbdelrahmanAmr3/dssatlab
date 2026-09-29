@@ -101,10 +101,22 @@ cmake --build <build> --parallel
 cmake --install <build>
 ```
 
-with `<prefix>` = `installs/<version>/dssat`. The executable is then `<prefix>/dscsm048`
-(verify against the tag). `manifest.json` records the prefix. A v0.1 cache entry with
-no prefix is a cache miss and is rebuilt. `dssat-csm-data` is not fetched: it holds
-sample experiments, weather and soil, which the user's FileX supplies itself.
+with `<prefix>` = `<cache>/dssatlab/<version>`, where `<cache>` is `$XDG_CACHE_HOME` or
+`~/.cache`, and `<source>` and `<build>` under `<cache>/dssatlab/work/<version>/`. The
+executable is then `<prefix>/dscsm048`. `manifest.json` sits in the prefix and records the
+prefix. `dssat-csm-data` is not fetched: it holds sample experiments, weather and soil,
+which the user's FileX supplies itself.
+
+**Prefix length limit (verified on a real build).** DSSAT cannot read its own
+`DSSATPRO.L48` when the install prefix is longer than **51 characters**: `run()` fails with a
+Fortran "Substring out of bounds" error (exit 2) or exit 99. Tested on `v4.8.6.0`
+(aarch64): 40, 50 and 51 characters work; 52 and longer fail. That is why the prefix is
+short and `source/` and `build/` live elsewhere: `~/.cache/dssatlab/installs/<v>/dssat`
+would fail for any home directory longer than 12 characters, such as `/home/abdosaleh`.
+Before building, if the prefix is longer than 51 characters, raise `DSSATInstallError`
+saying the length, the limit, and to set `XDG_CACHE_HOME` to a shorter folder. Cache
+entries from v0.1 (`<cache>/dssatlab/installs/...`) are ignored; they could not run
+anyway.
 
 ## Windows
 
@@ -133,7 +145,8 @@ Mock `subprocess.run`; no real DSSAT. Use `tmp_path` and `monkeypatch`.
 - a second run in the same second gets a `-2` directory
 - `run()` uses `connect(interactive=False)` when no executable is given
 - managed build issues the four commands including the install prefix
-- v0.1 cache entry without a prefix is rebuilt
+- a prefix longer than 51 characters raises `DSSATInstallError` before any build command
+- v0.1 cache entries under the old `installs/` folder are ignored
 
 One optional manual test runs a sample FileX on a real build.
 
