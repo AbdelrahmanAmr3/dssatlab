@@ -78,6 +78,20 @@ already keeps beside their FileX.
 One named set of soil layers in a soil file, identified by the FileX's `ID_SOIL`. The
 soil template describes exactly one.
 
+**Level**:
+One numbered entry of a FileX section (a planting, an irrigation schedule, a fertilizer
+schedule). A treatment points at its levels by number; level 0 means none.
+
+**Management data**:
+A user's own planting, irrigation and fertilizer for each treatment, as they hold it,
+before it is written into the FileX.
+
+**Management template**:
+The one fixed shape (named fields, DSSAT's own units and codes) a user must put their
+management data in. Management data that does not follow it is rejected by the checks,
+never guessed at.
+_Avoid_: management input, management schema
+
 **Checks**:
 The strict validation of a simulation's inputs, done before any DSSAT files are written or
 DSSAT is run, reporting every problem at once.
