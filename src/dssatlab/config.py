@@ -1,9 +1,12 @@
-"""Tiny JSON configuration helper.
-
-Keep this module boring. It stores only the selected DSSAT executable/root/version.
-Do not turn it into a general settings framework.
 """
-from __future__ import annotations
+A JSON configuration helper for the build cache, last executable path, and more.
+
+It's helps to store and retrieve the last executable DSSAT path.
+Without it, every new python session would require re-finding the DSSAT executable.
+
+History:
+- 2024-06-05: Initial version and refactored by Abdelrahman Saleh <
+"""
 
 import json
 import os
@@ -11,27 +14,25 @@ from pathlib import Path
 from typing import Any
 
 
-def config_dir() -> Path:
-    if os.name == "nt":
-        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-        if base:
-            return Path(base) / "dssatlab"
-    base = os.environ.get("XDG_CONFIG_HOME")
-    if base:
-        return Path(base) / "dssatlab"
-    return Path.home() / ".config" / "dssatlab"
-
-
 def config_file() -> Path:
-    return config_dir() / "config.json"
+    """
+    Return the path to the dssatlab configuration file. Based
+    on the os.name.
+    """
+    
+    if os.name == "nt": # Windows
+        base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+    else:
+        base = os.getenv("XDG_CONFIG_HOME")
+
+    return Path(base) / "dssatlab" / "config.json" if base else (
+        Path.home() / ".config" / "dssatlab" / "config.json"
+    )
 
 
 def load_config() -> dict[str, Any]:
-    path = config_file()
-    if not path.exists():
-        return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(config_file().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 
