@@ -206,10 +206,9 @@ def test_column_positions_come_from_headers_and_latin1_is_accepted(filex, weathe
 
 
 @pytest.mark.parametrize("start", ["P", "E", "I", "A", "s", " "])
-def test_other_start_options_are_reported(filex, weather, start):
-    problems = Simulation(filex(start=start, sdate="81014"), 1, weather()).check()
-    assert len(problems) == 1
-    assert "start option" in problems[0] and "(S)" in problems[0]
+def test_other_start_options_allow_weather_after_sdate(filex, weather, start):
+    # Verified on real DSSAT: the weather file name uses the year of SDATE for every START option.
+    assert Simulation(filex(start=start, sdate="81014"), 1, weather()).check() == []
 
 
 def test_weather_filename_uses_the_sdate_year():
@@ -220,8 +219,8 @@ def test_weather_filename_uses_the_sdate_year():
 @pytest.mark.parametrize("sdate", ["82x56", "8205", "", "-9956"])
 def test_bad_sdate(filex, weather, sdate, start):
     problems = Simulation(filex(sdate=sdate, start=start), 1, weather()).check()
-    assert sum("five digits" in p for p in problems) == 1
-    assert len(problems) == (1 if start == "S" else 2)
+    assert len(problems) == 1
+    assert "SDATE" in problems[0] and "five digits" in problems[0]
 
 
 @pytest.mark.parametrize("station", ["", "UFG", "UFGA82"])
