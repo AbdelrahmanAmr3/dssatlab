@@ -27,6 +27,28 @@ def _unknown_keys(data, allowed, where):
             for key in data if key not in allowed]
 
 
+def _check_date(value, location):
+    try:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+            raise ValueError
+        date.fromisoformat(value)
+    except ValueError:
+        return [f"{location}: found {_show_value(value)}. Supply a "
+                'valid ISO calendar date as a quoted YYYY-MM-DD string '
+                '(for example "2024-05-10"); quote the date, even in a dict.']
+    return []
+
+
+def _check_number(value, location):
+    try:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError
+    except (ValueError, OverflowError):
+        return [f"{location}: found {_show_value(value)}. Supply a "
+                "finite number in DSSAT's units, not a string or boolean."]
+    return []
+
+
 def _check_planting(planting, where):
     if not isinstance(planting, dict) or not planting:
         return [f"{where}: planting must be a non-empty dict. Supply the required "
@@ -42,25 +64,15 @@ def _check_planting(planting, where):
         value = planting[field]
         location = f"{where}, field {field!r}"
         if field in ("date", "emergence_date"):
-            try:
-                if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
-                    raise ValueError
-                date.fromisoformat(value)
-            except ValueError:
-                problems.append(f"{location}: found {_show_value(value)}. Supply a "
-                                'valid ISO calendar date as a quoted YYYY-MM-DD string '
-                                '(for example "2024-05-10"); quote the date, even in a dict.')
+            problems.extend(_check_date(value, location))
         elif field in ("method", "distribution"):
             if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]", value):
                 problems.append(f"{location}: found {_show_value(value)}. Supply a "
                                 "single ASCII letter for the DSSAT code.")
         else:
-            try:
-                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-                    raise ValueError
-            except (ValueError, OverflowError):
-                problems.append(f"{location}: found {_show_value(value)}. Supply a "
-                                "finite number in DSSAT's units, not a string or boolean.")
+            number_problems = _check_number(value, location)
+            if number_problems:
+                problems.extend(number_problems)
                 continue
             if field in ("population", "row_spacing") and value <= 0:
                 unit = "plants per m2" if field == "population" else "cm"
@@ -72,12 +84,62 @@ def _check_planting(planting, where):
     return problems
 
 
+def _check_events(events, section, where):
+    label = f"    {section}"
+    where = f"{where}, {section}"
+    if not isinstance(events, list):
+        problems = [f"{where}, field {section!r}: expected a list of event dicts. "
+                    "Supply a list, an empty list for none, or omit the section "
+                    "to keep the FileX Level."]
+        return problems, _report_lines(label, problems)
+    if not events:
+        return [], [f"{label}: OK (empty list; none for this treatment)"]
+    required = (("date", "amount", "method") if section == "irrigation" else
+                ("date", "material", "application", "depth", "n"))
+    optional = () if section == "irrigation" else ("p", "k")
+    problems, report = [], []
+    for number, event in enumerate(events, 1):
+        location = f"{where}, event {number}"
+        if not isinstance(event, dict):
+            event_problems = [f"{location}: expected a dict of event fields. "
+                              f"Supply the required fields: {', '.join(required)}."]
+        else:
+            event_problems = _unknown_keys(event, required + optional, location)
+            for field in required:
+                if field not in event:
+                    event_problems.append(f"{location}: missing required field {field!r}. "
+                                          f"Add {field!r} following the Management template.")
+            for field in required + optional:
+                if field not in event:
+                    continue
+                value = event[field]
+                field_location = f"{location}, field {field!r}"
+                if field == "date":
+                    event_problems.extend(_check_date(value, field_location))
+                elif field in ("method", "material", "application"):
+                    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}[0-9]{3}", value):
+                        event_problems.append(f"{field_location}: found {_show_value(value)}. "
+                                              "Supply two ASCII letters followed by three digits "
+                                              "for the DSSAT code.")
+                else:
+                    number_problems = _check_number(value, field_location)
+                    event_problems.extend(number_problems)
+                    if not number_problems and value < 0:
+                        unit = "mm" if field == "amount" else "cm" if field == "depth" else "kg per ha"
+                        event_problems.append(f"{field_location}: found {_show_value(value)}. "
+                                              f"Supply a nonnegative number in {unit}.")
+        problems.extend(event_problems)
+        report.extend(_report_lines(f"      event {number}", event_problems))
+    status = "REJECTED" if problems else "OK"
+    return problems, [f"{label}: {status}"] + report
+
+
 def _check_management(source, filex):
     """Check every treatment, returning problems and report lines without mutation.
 
     Only treatment membership is read from the FileX. When it is unreadable,
     Simulation's FileX checks report that failure and shape checks still run.
-    Optional numeric fields pass through without crop-specific range checks.
+    Optional planting numbers pass through without crop-specific range checks.
     """
     label = "Management data"
     if not isinstance(source, dict):
@@ -90,7 +152,7 @@ def _check_management(source, filex):
                         "dict keyed by treatment number.")
     elif not isinstance(source["treatments"], dict):
         problems.append("Management data 'treatments' must be a dict. Supply "
-                        "treatment numbers mapped to dicts of planting fields.")
+                        "treatment numbers mapped to dicts of management sections.")
     if not isinstance(source.get("treatments"), dict):
         return problems, _report_lines(label, problems)
     root_problems = list(problems)
@@ -121,14 +183,24 @@ def _check_management(source, filex):
                 entry_problems.append(f"{where}: FileX {filex}: {error}")
         if not isinstance(entry, dict):
             entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
-                                  "with optional planting, or an empty dict to keep the FileX Levels.")
+                                  "with optional planting, irrigation and fertilizer, "
+                                  "or an empty dict to keep the FileX Levels.")
         else:
-            entry_problems.extend(_unknown_keys(entry, ("planting",), where))
+            entry_problems.extend(_unknown_keys(entry, ("planting", "irrigation", "fertilizer"), where))
         planting_problems = []
         has_planting = isinstance(entry, dict) and "planting" in entry
         if has_planting:
             planting_problems = _check_planting(entry["planting"], f"{where}, planting")
         treatment_problems = entry_problems + planting_problems
+        event_report = []
+        if isinstance(entry, dict):
+            for section in ("irrigation", "fertilizer"):
+                if section in entry:
+                    event_problems, lines = _check_events(entry[section], section, where)
+                    treatment_problems.extend(event_problems)
+                    event_report.extend(lines)
+                else:
+                    event_report.append(f"    {section}: OK (omitted; keeps the FileX Level)")
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         status = "REJECTED" if treatment_problems else "OK"
         report.append(f"{treatment_label}: {status}")
@@ -137,6 +209,7 @@ def _check_management(source, filex):
             report.extend(_report_lines("    planting", planting_problems))
         elif isinstance(entry, dict):
             report.append("    planting: OK (omitted; keeps the FileX Level)")
+        report.extend(event_report)
         problems.extend(treatment_problems)
     status = "REJECTED" if problems else "OK"
     return problems, [f"{label}: {status}"] + [f"  {p}" for p in root_problems] + report

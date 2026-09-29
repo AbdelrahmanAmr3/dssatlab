@@ -71,8 +71,6 @@ def test_missing_required_field_names_location_and_action(simulation, planting, 
     ({"treatments": []}, "dict"), ({"treatments": None}, "dict"),
     ({"treatments": {1: []}}, "dict"), ({"treatments": {1: None}}, "dict"),
     ({"treatments": {1: {"plantng": {}}}}, "plantng"),
-    ({"treatments": {1: {"irrigation": []}}}, "irrigation"),
-    ({"treatments": {1: {"fertilizer": []}}}, "fertilizer"),
     ({"treatments": {1: {}}, "extra": 1}, "extra"),
 ])
 def test_wrong_structure_is_rejected(simulation, capsys, data, word):
@@ -218,3 +216,153 @@ def test_construction_defers_reads_and_checks_write_nothing(simulation, tmp_path
     simulation.management["treatments"][1]["planting"]["depth"] = -1
     assert any("depth" in p for p in simulation.check())
     assert {p: p.read_bytes() for p in tmp_path.rglob("*")} == before
+
+
+@pytest.fixture(params=["irrigation", "fertilizer"])
+def events(request, simulation):
+    section = request.param
+    event = (dict(date="1982-02-25", amount=12.5, method="IR001")
+             if section == "irrigation" else
+             dict(date="1982-02-25", material="FE001", application="AP001", depth=0, n=30))
+    simulation.management["treatments"][1][section] = [event]
+    return section, event
+
+
+def test_events_report_every_event_without_mutation(simulation, events, capsys, tmp_path, monkeypatch):
+    section, event = events
+    # Dates deliberately run backwards, repeat, and fall outside weather coverage.
+    simulation.management["treatments"][1][section] += [
+        dict(event, date="1980-01-01"), dict(event, date="1980-01-01")]
+    before = deepcopy(simulation.management)
+    files = {p: p.read_bytes() for p in tmp_path.rglob("*")}
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Checks must not write files or run DSSAT")
+
+    monkeypatch.setattr(subprocess, "run", forbidden)
+    monkeypatch.setattr(Path, "write_text", forbidden)
+    assert simulation.check() == []
+    report = capsys.readouterr().out
+    assert f"{section}: OK" in report
+    for number in (1, 2, 3):
+        assert f"event {number}: OK" in report
+    assert simulation.management == before
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*")} == files
+
+
+def test_event_missing_fields_all_reported(simulation, events, capsys):
+    section, event = events
+    required = list(event)
+    event.clear()
+    problems = simulation.check()
+    assert len(problems) == len(required)
+    for field in required:
+        assert any(all(word in p for word in ("treatment 1", section, "event 1", field,
+                                              "missing", "Add")) for p in problems)
+    report = capsys.readouterr().out
+    assert "event 1: REJECTED" in report
+    assert all(p in report for p in problems)
+
+
+@pytest.mark.parametrize("value", [None, {}, "events", 1, ()])
+def test_event_section_requires_list(simulation, events, capsys, value):
+    section, _ = events
+    simulation.management["treatments"][1][section] = value
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert all(word in problems[0] for word in ("treatment 1", section, "list", "Supply"))
+    assert problems[0] in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("value", [None, [], "event", 1])
+def test_event_requires_dict_and_later_events_are_checked(simulation, events, capsys, value):
+    section, event = events
+    simulation.management["treatments"][1][section] = [value, dict(event)]
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert all(word in problems[0] for word in ("treatment 1", section, "event 1", "dict"))
+    report = capsys.readouterr().out
+    assert "event 1: REJECTED" in report and "event 2: OK" in report
+
+
+@pytest.mark.parametrize("field", ["extra", "Amount", 3])
+def test_event_unknown_fields(simulation, events, field):
+    section, event = events
+    event[field] = 1
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert all(word in problems[0] for word in ("treatment 1", section, "event 1", str(field), "unknown"))
+
+
+@pytest.mark.parametrize("value", ["19820225", "1982-W08-4", "1982-2-25", "1982-02-30",
+    "1982-02-25T00:00:00", " 1982-02-25", "", None, False, 19820225,
+    date(1982, 2, 25), datetime(1982, 2, 25)])
+def test_event_dates_are_quoted_iso_strings(simulation, events, value):
+    section, event = events
+    event["date"] = value
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert all(word in problems[0] for word in ("treatment 1", section, "event 1", "date",
+                                               "YYYY-MM-DD", "quote"))
+
+
+@pytest.mark.parametrize("value", ["", "I001", "IR01", "IR0001", "IR\u0660\u0660\u0661", "\u00e9R001", "IR001\n",
+                                  " IR001", "IR001 ", None, True, 1])
+def test_event_codes_require_two_ascii_letters_and_three_digits(simulation, events, value):
+    section, event = events
+    fields = ("method",) if section == "irrigation" else ("material", "application")
+    for field in fields:
+        event[field] = value
+    problems = simulation.check()
+    assert len(problems) == len(fields)
+    for field in fields:
+        assert any(all(word in p for word in ("treatment 1", section, "event 1", field,
+                                              "two ASCII letters", "three digits")) for p in problems)
+
+
+@pytest.mark.parametrize("value", [-0.1, None, True, "8", float("nan"), float("inf"),
+                                  -float("inf"), pytest.param(10 ** 5000, id="huge-int")])
+def test_event_numbers_reject_negative_or_nonfinite_values(simulation, events, value):
+    section, event = events
+    fields = ("amount",) if section == "irrigation" else ("depth", "n", "p", "k")
+    for field in fields:
+        event[field] = value
+    problems = simulation.check()
+    assert len(problems) == len(fields)
+    for field in fields:
+        assert any(all(word in p for word in ("treatment 1", section, "event 1", field, "Supply"))
+                   for p in problems)
+
+
+@pytest.mark.parametrize("value", [0, 0.5])
+def test_event_numeric_boundaries_and_optional_nutrients(simulation, events, value):
+    section, event = events
+    fields = ("amount",) if section == "irrigation" else ("depth", "n", "p", "k")
+    event.update(dict.fromkeys(fields, value))
+    assert simulation.check() == []
+
+
+def test_event_empty_and_omitted_sections_have_distinct_meanings(simulation, events, capsys):
+    section, _ = events
+    simulation.management["treatments"][1][section] = []
+    simulation.management["treatments"][2] = {}
+    assert simulation.check() == []
+    report = capsys.readouterr().out
+    assert f"{section}: OK (empty list; none for this treatment)" in report
+    assert f"{section}: OK (omitted; keeps the FileX Level)" in report
+
+
+def test_event_and_planting_problems_reported_across_treatments(simulation, planting, capsys):
+    planting["depth"] = -1
+    simulation.management["treatments"][2] = {
+        "irrigation": [dict(date="bad", amount=-1, method="IR001"),
+                       dict(date="1982-02-25", amount=1, method="IR001")],
+        "fertilizer": [dict(date="1982-02-25", material="bad", application="AP001", depth=0, n=-1)],
+    }
+    problems = simulation.check()
+    assert len(problems) == 5
+    report = capsys.readouterr().out
+    for label in ("Management data", "Treatment 1", "Treatment 2", "planting", "irrigation", "fertilizer"):
+        assert f"{label}: REJECTED" in report
+    assert "event 2: OK" in report
+    assert all(p in report for p in problems)
