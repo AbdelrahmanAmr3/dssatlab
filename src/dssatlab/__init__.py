@@ -13,4 +13,4 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "Simulation", "write_weather_template", "write_soil_template", "DSSATCheckError",
            ]
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

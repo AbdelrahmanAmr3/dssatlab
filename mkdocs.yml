@@ -28,6 +28,7 @@ nav:
       - Install and connect: guide/install.md
       - Run a FileX: guide/run-filex.md
       - Run a Simulation: guide/simulation.md
+      - Run with soil data: guide/soil.md
       - Troubleshooting: guide/troubleshooting.md
   - Reference and Architecture:
       - reference/index.md
