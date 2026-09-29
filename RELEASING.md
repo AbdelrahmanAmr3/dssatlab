@@ -25,6 +25,13 @@ python -m build
 python -m twine check dist/*
 ```
 
+Before tagging, `CHANGELOG.md` must have an entry for this version (added, changed, fixed), and the docs must build:
+
+```bash
+python -m pip install -e '.[docs]'
+python -m mkdocs build --strict
+```
+
 Use the PowerShell/Explorer equivalent for removing build folders on Windows if needed.
 
 ## 4. Inspect
@@ -55,3 +62,12 @@ python -m twine upload dist/*
 ```
 
 Do not store API tokens in the repository. Trusted Publishing can be added later; it is not required for v0.1.
+
+## 7. Docs update (after every release)
+
+Every new version is followed by an update of the docs site, through a pull request like any other change:
+
+- `CHANGELOG.md`: the entry for the new version, copied from the GitHub release notes.
+- The Guide pages the release changes, and the Roadmap (move items from deferred to done).
+- The API reference, if the exported names or their docstrings changed, and the Architecture page, if modules changed.
+- `python -m mkdocs build --strict` passes; the site deploys from `master` after the pull request is merged.
