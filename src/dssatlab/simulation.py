@@ -7,6 +7,7 @@ import shutil
 
 from .errors import DSSATCheckError, DSSATRunError
 from .filex import _read_filex, _weather_filename
+from .management import _check_management, _report_lines
 from .runner import RunResult, _create_dated_folder, run
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
@@ -30,17 +31,37 @@ class Simulation:
             soil template, describing one soil profile. When given, run() writes
             SOIL.SOL instead of copying sibling soil files. None skips soil checks
             and keeps copying sibling soil files.
+        management (dict | None): Keyword-only. Management data keyed by
+            'treatments', with optional planting per treatment. Construction
+            only stores it; check() checks every entry and prints a report.
     """
 
-    def __init__(self, filex, treatment, weather, executable=None, *, soil=None):
+    def __init__(self, filex, treatment, weather, executable=None, *, soil=None, management=None):
         self.filex = filex
         self.treatment = treatment
         self.weather = weather
         self.soil = soil
+        self.management = management
         self.executable = executable
 
-    def check(self) -> list[str]:
-        """Return weather, soil and FileX problems without writing or running DSSAT.
+    def check(self, verbose: bool = False) -> list[str]:
+        """Return all input problems without writing files or running DSSAT.
+
+        Print Checks in weather, soil (if given), FileX and management order
+        when management is given or verbose=True. Management checks cover
+        every treatment's planting shape and values, including ISO date syntax;
+        they do not compare planting dates with weather or the FileX start.
+        An empty returned list means all checks passed.
+        """
+        problems, report = self._check_inputs()
+        if self.management is not None or verbose:
+            print("Checks")
+            print("\n".join(report))
+            print("Crop-specific fields are checked by DSSAT at run time.")
+        return problems
+
+    def _check_inputs(self):
+        """Collect weather, soil, FileX and management problems and report lines.
 
         Performs strict validation: checks weather data column names, value
         ranges, date order, duplicates, and gaps; reads the FileX for treatment
@@ -49,58 +70,63 @@ class Simulation:
         equality; and verifies that weather data covers SDATE when START is 'S'.
         When soil data is given, checks its columns, values, soil profile and
         layers, and requires its soil_id to equal the selected field's ID_SOIL.
-
-        Returns:
-            list[str]: Descriptive problem messages found by the checks.
-                An empty list indicates all checks passed.
         """
-        rows, problems = _parse_weather(self.weather)
+        rows, weather_problems = _parse_weather(self.weather)
         values, filex_problems = _read_filex(self.filex, self.treatment)
-        problems.extend(filex_problems)
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
         if len(name) > 12:
-            problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
-                            "accepts at most 12. Rename the FileX to at most 12 "
-                            "characters, including the extension (DSSAT's 8.3 style).")
+            filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
+                                  "accepts at most 12. Rename the FileX to at most 12 "
+                                  "characters, including the extension (DSSAT's 8.3 style).")
         stations = {row["station"] for row in rows if "station" in row}
         if "WSTA" in values and len(stations) == 1:
             station = stations.pop()
             expected = values["WSTA"][:4]
             if station != expected:
-                problems.append(f"FileX WSTA {values['WSTA']!r} expects station "
-                                f"{expected!r}, but the weather template has station "
-                                f"{station!r}. Make the station codes exactly equal; "
-                                "filenames are case-sensitive on Linux.")
+                filex_problems.append(f"FileX WSTA {values['WSTA']!r} expects station "
+                                     f"{expected!r}, but the weather template has station "
+                                     f"{station!r}. Make the station codes exactly equal; "
+                                     "filenames are case-sensitive on Linux.")
         days = [row["date"] for row in rows if "date" in row]
         if values.get("START") == "S" and "SDATE" in values and days:
             start = values["SDATE"]
             wanted = (int(start[:2]), int(start[2:]))
             if not any((day.year % 100, day.timetuple().tm_yday) == wanted for day in days):
-                problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
-                                f"covered by weather data ({min(days)} to {max(days)}). "
-                                "Supply weather for the simulation's start date.")
+                filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
+                                     f"covered by weather data ({min(days)} to {max(days)}). "
+                                     "Supply weather for the simulation's start date.")
+        soil_problems = []
         if self.soil is not None:
             soil_rows, soil_problems = _parse_soil(self.soil)
-            problems.extend(soil_problems)
             soil_ids = {row["soil_id"] for row in soil_rows if "soil_id" in row}
             soil_id = values.get("ID_SOIL")
             if not soil_id or soil_id == "-99":
-                problems.append("FileX has no readable ID_SOIL in the selected "
-                                "treatment's FIELDS row. Supply ID_SOIL "
-                                "equal to the soil template's soil_id.")
+                soil_problems.append("FileX has no readable ID_SOIL in the selected "
+                                     "treatment's FIELDS row. Supply ID_SOIL "
+                                     "equal to the soil template's soil_id.")
             elif len(soil_ids) == 1:
                 template_id = soil_ids.pop()
                 if soil_id != template_id:
-                    problems.append(f"FileX ID_SOIL {soil_id!r} for treatment "
-                                    f"{self.treatment} differs from the soil template's "
-                                    f"soil_id {template_id!r}. Make the IDs exactly equal; "
-                                    "filenames are case-sensitive on Linux.")
-        return problems
+                    soil_problems.append(f"FileX ID_SOIL {soil_id!r} for treatment "
+                                         f"{self.treatment} differs from the soil template's "
+                                         f"soil_id {template_id!r}. Make the IDs exactly equal; "
+                                         "filenames are case-sensitive on Linux.")
+        problems = weather_problems + filex_problems + soil_problems
+        report = _report_lines("Weather data", weather_problems)
+        if self.soil is not None:
+            report.extend(_report_lines("Soil data", soil_problems))
+        report.extend(_report_lines("FileX", filex_problems))
+        if self.management is not None:
+            management_problems, management_report = _check_management(self.management, self.filex)
+            problems.extend(management_problems)
+            report.extend(management_report)
+        return problems, report
 
     def run(self) -> RunResult:
         """Check inputs, copy them into a fresh simulation folder, and run DSSAT.
 
-        Runs check() and raises DSSATCheckError if any problems are found.
+        Runs the same checks as check(), quietly, and raises DSSATCheckError
+        if any problems are found.
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
         FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
         and generates the weather file (*.WTH). When soil data is given, writes
@@ -118,7 +144,7 @@ class Simulation:
             DSSATRunError: If execution fails, DSSAT returns non-zero, ERROR.OUT is
                 produced, or WARNING.OUT reports missing weather records.
         """
-        problems = self.check()
+        problems, _ = self._check_inputs()
         if problems:
             raise DSSATCheckError(problems)
 
