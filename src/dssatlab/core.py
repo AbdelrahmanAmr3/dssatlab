@@ -1,14 +1,34 @@
-"""Public DSSAT discovery/install/connect API.
-
-The implementation agent should keep this file easy to read. The public surface for
-v0.1 is deliberately limited to detect(), install(), and connect().
 """
+DSSAT core: finds, validates and installs the DSSAT-CSM executable.
+
+Most users only need connect():
+
+    import dssatlab as dl
+    dssat = dl.connect()     # Path to the DSSAT executable, remembered for next time
+
+connect() looks for DSSAT in this order: an explicit path, saved config, DSSAT_HOME,
+the platform default (PATH, or C:\\DSSAT48 on Windows), then a dssatlab-managed build.
+If nothing is found it offers to install (Linux/Colab) or asks for a path (Windows).
+
+Other public functions:
+    detect()   report the OS, architecture and DSSAT path, without changing anything
+    install()  build DSSAT from the official release on Linux (never prompts)
+
+Everything else here (validate_dssat_path, find_dssat_path, _discover, ...) is
+internal discovery machinery shared by these three functions.
+
+History:
+- 28/09/2026: Initial version and refactored by Abdelrahman Saleh
+
+TODO: review install -> linstaller.py
+"""
+
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
 
 from . import config, installer
@@ -16,105 +36,96 @@ from .errors import DSSATInstallError, DSSATNotFoundError
 
 _WINDOWS_DEFAULT = Path(r"C:\DSSAT48")
 
-
-@dataclass(frozen=True)
-class PlatformInfo:
-    os_name: str
-    architecture: str
-    dssat_executable: Path | None = None
+log = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class DSSATConnection:
-    executable: Path
-    root: Path
-    version: str | None
-    source: str
+def detect() -> dict:
+    """Inspect the current environment without changing anything.
 
-    def __repr__(self) -> str:
-        version = self.version or "unknown"
-        return f"DSSATConnection(version={version!r}, executable={str(self.executable)!r})"
+    Returns {"os_name", "architecture", "dssat_path"}; dssat_path is None if DSSAT is not found.
+    """
 
-
-def detect() -> PlatformInfo:
-    """Inspect the current environment without changing anything."""
-    
     os_name = _os_name()
-    connection = _discover(os_name)
-    
-    return PlatformInfo(
-        os_name=os_name,
-        architecture=platform.machine(),
-        dssat_executable=connection.executable if connection else None,
-    )
+    return {
+        "os_name": os_name,
+        "architecture": platform.machine(),
+        "dssat_path": _discover(os_name),
+    }
 
 
-def install(version: str = "latest") -> DSSATConnection:
+def install(version: str = "latest") -> Path:
     """Install/build DSSAT-CSM on Linux, remembering and reusing managed builds.
 
     Never prompts. Missing build tools are reported, never installed automatically.
     """
+
+    # Raise an error on non-Linux and MacOS platforms
     if platform.system() != "Linux":
         raise DSSATInstallError(
             "DSSAT installation is only supported on Linux/Colab in v0.1. "
-            "Pass connect(executable=...) to use an existing installation."
+            "Pass connect(path=...) to use an existing installation."
         )
+
     resolved = installer.resolve_version(version)
     install_dir = installer.cache_root() / resolved
     executable = installer.find_cached_install(resolved, install_dir)
+
     if executable is None:
         installer.check_prerequisites()
         executable = installer.build_dssat(resolved, install_dir)
-    connection = DSSATConnection(executable, install_dir, resolved, "managed")
-    _save_connection(connection)
-    return connection
+
+    log.info("Found DSSAT %s via managed install: %s", resolved, executable)
+
+    _save_path(executable)
+
+    return executable
 
 
 def connect(
     path: str | Path | None = None,
     *,
-    executable: str | Path | None = None,
     interactive: bool = True,
-) -> DSSATConnection:
-    """Find or configure DSSAT and return a validated connection."""
-    if executable is not None:
-        candidate = Path(executable).expanduser()
-        if not _validate_executable(candidate):
-            raise _invalid_path(candidate)
-        candidate = candidate.resolve()
-        connection = DSSATConnection(
-            candidate, candidate.parent, None, "explicit")
-    elif path is not None:
-        candidate = _find_executable(Path(path))
-        if candidate is None:
+) -> Path:
+    """Find or configure DSSAT and return the validated path to its executable."""
+
+    if path is not None:
+        # Accepts the executable file, or a directory that directly contains it.
+        dssat_path = find_dssat_path(Path(path))
+        if dssat_path is None:
             raise _invalid_path(Path(path))
-        connection = DSSATConnection(
-            candidate, candidate.parent, None, "explicit")
+        log.info("Found DSSAT via explicit path: %s", dssat_path)
+
     else:
         os_name = _os_name()
-        connection = _discover(os_name)
-        if connection is None and interactive:
+        dssat_path = _discover(os_name)
+
+        if dssat_path is None and interactive:
+
             if os_name == "windows":
                 answer = input(
                     "Enter the DSSAT directory or executable path: ").strip()
-                candidate = _find_executable(Path(answer)) if answer else None
-                if candidate is None:
+                dssat_path = find_dssat_path(Path(answer)) if answer else None
+
+                if dssat_path is None:
                     raise _invalid_path(Path(answer))
-                connection = DSSATConnection(
-                    candidate, candidate.parent, None, "manual")
+                log.info("Found DSSAT via prompt: %s", dssat_path)
+
             elif os_name == "linux":
                 answer = input(
                     "Install the latest stable DSSAT release? [y/N]: ").strip().lower()
+
                 if answer in ("y", "yes"):
                     return install()
-        if connection is None:
+
+        if dssat_path is None:
             raise DSSATNotFoundError(
                 "DSSAT was not found. Checked saved configuration, DSSAT_HOME, "
                 "and PATH/platform defaults (including the managed cache on Linux). "
-                'Pass connect(executable="/path/to/dscsm048") or call install() on Linux.'
+                'Pass connect(path="/path/to/dscsm048") or call install() on Linux.'
             )
-    _save_connection(connection)
-    return connection
+
+    _save_path(dssat_path)
+    return dssat_path
 
 
 def _os_name() -> str:
@@ -123,7 +134,7 @@ def _os_name() -> str:
     return name if name in ("windows", "linux") else "other"
 
 
-def _validate_executable(path: Path) -> bool:
+def validate_dssat_path(path: Path) -> bool:
     """Check the filename and permissions without running DSSAT."""
     try:
         return (
@@ -135,63 +146,61 @@ def _validate_executable(path: Path) -> bool:
         return False
 
 
-def _find_executable(path: Path) -> Path | None:
-    """Accept an executable or search the immediate contents of a directory."""
+def find_dssat_path(path: Path) -> Path | None:
+    """
+    Accept an executable or search the immediate contents of a directory.
+    """
+
     try:
         path = path.expanduser()
-        if _validate_executable(path):
+
+        if validate_dssat_path(path):
             return path.resolve()
-        if path.is_dir():
-            for name in ("DSCSM048.EXE", "dscsm048"):
-                candidate = path / name
-                if _validate_executable(candidate):
-                    return candidate.resolve()
-            # Also honor case-insensitive filenames on case-sensitive filesystems.
-            for candidate in sorted(path.iterdir()):
-                if _validate_executable(candidate):
-                    return candidate.resolve()
+
+        # Case-insensitive match; sorted() tries DSCSM048.EXE before dscsm048.
+        # iterdir() raises OSError on a non-directory, which is handled below.
+        for candidate in sorted(path.iterdir()):
+            if validate_dssat_path(candidate):
+                return candidate.resolve()
     except (OSError, ValueError):
         pass
     return None
 
 
-def _discover(os_name: str) -> DSSATConnection | None:
-    """Read-only discovery shared by detect() and connect(), in precedence order."""
+def _discover(os_name: str) -> Path | None:
+    """
+    Read-only discovery shared by detect() and connect(), in precedence order.
+    """
+
     try:
         saved = config.load_config()
         if isinstance(saved, dict) and isinstance(saved.get("executable"), str):
             candidate = Path(saved["executable"]).expanduser()
-            root = saved.get("root")
-            version = saved.get("version")
-            if (
-                _validate_executable(candidate)
-                and (root is None or isinstance(root, str))
-                and (version is None or isinstance(version, str))
-            ):
+            if validate_dssat_path(candidate):
                 candidate = candidate.resolve()
-                return DSSATConnection(
-                    candidate, Path(root).expanduser(
-                    ).resolve() if root else candidate.parent,
-                    version, "config",
-                )
+                log.info("Found DSSAT via saved config: %s", candidate)
+                return candidate
     except (OSError, ValueError):
         pass
 
     home = os.environ.get("DSSAT_HOME")
     if home:
-        candidate = _find_executable(Path(home))
+        candidate = find_dssat_path(Path(home))
         if candidate is not None:
-            return DSSATConnection(candidate, candidate.parent, None, "env")
+            log.info("Found DSSAT via DSSAT_HOME: %s", candidate)
+            return candidate
 
     if os_name == "windows":
-        candidate = _find_executable(_WINDOWS_DEFAULT)
+        candidate = find_dssat_path(_WINDOWS_DEFAULT)
         if candidate is not None:
-            return DSSATConnection(candidate, candidate.parent, None, "default")
+            log.info("Found DSSAT via default location: %s", candidate)
+            return candidate
     elif os_name == "linux":
         on_path = shutil.which("dscsm048")
-        if on_path and _validate_executable(Path(on_path)):
+        if on_path and validate_dssat_path(Path(on_path)):
             candidate = Path(on_path).resolve()
-            return DSSATConnection(candidate, candidate.parent, None, "default")
+            log.info("Found DSSAT via PATH: %s", candidate)
+            return candidate
         try:
             installs = [d for d in installer.cache_root().iterdir()
                         if d.is_dir()]
@@ -201,8 +210,9 @@ def _discover(os_name: str) -> DSSATConnection | None:
         for install_dir in installs:
             candidate = installer.find_cached_install(
                 install_dir.name, install_dir)
-            if candidate is not None and _validate_executable(candidate):
-                return DSSATConnection(candidate, install_dir, install_dir.name, "managed")
+            if candidate is not None and validate_dssat_path(candidate):
+                log.info("Found DSSAT via managed cache: %s", candidate)
+                return candidate
     return None
 
 
@@ -211,19 +221,14 @@ def _version_sort_key(version: str) -> tuple:
     return tuple((0, int(part)) if part.isdigit() else (1, part) for part in version.split("."))
 
 
-def _save_connection(connection: DSSATConnection) -> None:
-    config.save_config({
-        "executable": str(connection.executable),
-        "root": str(connection.root),
-        "version": connection.version,
-        "source": connection.source,
-    })
+def _save_path(dssat_path: Path) -> None:
+    config.save_config({"executable": str(dssat_path)})
 
 
 def _invalid_path(path: Path) -> DSSATNotFoundError:
     return DSSATNotFoundError(
         f"No valid DSSAT executable found at {str(path)!r}. "
         "Checked for a dscsm048 or DSCSM048.EXE file with execute permission on POSIX. "
-        "Pass connect(executable=...) with a valid executable or connect(path=...) "
-        "with its directory."
+        "Pass connect(path=...) with the executable file or the directory "
+        "that contains it."
     )
