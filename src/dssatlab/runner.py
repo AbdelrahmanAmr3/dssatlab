@@ -51,8 +51,26 @@ def run(
 ) -> RunResult:
     """Run all treatments or one treatment, collecting outputs even on failure.
 
-    An explicit DSSAT executable is validated without changing saved config.
-    Failed runs raise DSSATRunError; completed runs keep their run directory.
+    Executes the DSSAT executable on the specified FileX. Creates a dated run
+    directory beside the FileX (dssat_run_YYYY-MM-DD_HHMMSS) and moves all output
+    files generated or updated during the run into it.
+
+    Args:
+        filex: Path to the FileX experiment file (*.MZX, *.SBX, etc.). The filename
+            must be at most 12 characters.
+        treatment: Specific treatment number to run (DSSAT batch option C). If None,
+            runs all treatments in the FileX (DSSAT batch option A).
+        executable: Optional explicit path to the DSSAT executable or its directory.
+            Validated without modifying saved configuration. If None, uses
+            connect(interactive=False) to locate the executable.
+
+    Returns:
+        RunResult: Dataclass containing returncode, run_dir, outputs, and stdout_tail.
+
+    Raises:
+        DSSATRunError: If the FileX does not exist, its filename exceeds 12 characters,
+            the DSSAT executable cannot be executed, DSSAT exits with a non-zero code,
+            or ERROR.OUT is generated during the run.
     """
     filex = Path(filex).resolve()
     if not filex.is_file():

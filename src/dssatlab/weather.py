@@ -26,6 +26,12 @@ def write_weather_template(path: str | Path) -> None:
     rain in mm; latitude/longitude in degrees; elevation/refht/wndht in m.
     Optional station values default to -99 (not given). Nothing is converted.
     An existing path raises DSSATError, preserving the user's data.
+
+    Args:
+        path: File destination path where the CSV weather template will be created.
+
+    Raises:
+        DSSATError: If the destination path already exists.
     """
     path = Path(path)
     exists_message = f"Weather template path {path} already exists. Choose another path."
