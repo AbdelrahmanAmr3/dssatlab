@@ -1,6 +1,7 @@
 """Simulation runs through a fake DSSAT subprocess writing real output files."""
 
 import csv
+from copy import deepcopy
 from datetime import date, datetime
 from pathlib import Path
 import subprocess
@@ -11,6 +12,7 @@ import pytest
 
 from dssatlab import DSSATCheckError, DSSATRunError, Simulation, runner
 from dssatlab import simulation as simulation_module
+from dssatlab.soil import write_soil_file
 from dssatlab.weather import write_weather_file
 
 
@@ -35,7 +37,8 @@ def inputs(tmp_path):
     folder.mkdir()
     filex = folder / "UFGA8201.MZX"
     filex.write_text(SAMPLE, encoding="latin-1")
-    siblings = ["LOCAL.SOL", "other.sol", "MZCER048.cUl", "MZCER048.ECO", "MZCER048.spe"]
+    siblings = ["SOIL.SOL", "XX.SOL", "LOCAL.SOL", "other.sol",
+                "MZCER048.cUl", "MZCER048.ECO", "MZCER048.spe"]
     for name in siblings + ["UFGA8201.WTH", "notes.txt"]:
         (folder / name).write_text(f"original {name}")
     (folder / "nested.SOL").mkdir()
@@ -49,6 +52,13 @@ def inputs(tmp_path):
         writer.writeheader()
         writer.writerows(rows)
     return SimpleNamespace(filex=filex, weather=weather, rows=rows, siblings=siblings)
+
+
+@pytest.fixture
+def soil_rows():
+    return [dict(soil_id="IBMZ910014", salb=0.13, slro=60, sldr=0.5,
+                 slpf=1, slb=depth, slll=0.1, sdul=0.24, ssat=0.45,
+                 srgf=1, sbdm=1.3) for depth in (5, 15, 30)]
 
 
 @pytest.fixture
@@ -119,9 +129,22 @@ def test_constructor_stores_all_inputs_without_work(monkeypatch):
 @pytest.mark.parametrize("station,weather_name", [
     ("UFGA", "UFGA8201.WTH"), ("UFGA8307", "UFGA8307.WTH")])
 @pytest.mark.parametrize("explicit", [False, True])
+@pytest.mark.parametrize("soil_form", [None, "rows", "path", "str"])
 def test_run_command_inputs_weather_and_result(
-        inputs, fake_dssat, tmp_path, monkeypatch, station, weather_name, explicit):
+        inputs, fake_dssat, tmp_path, monkeypatch, soil_rows,
+        station, weather_name, explicit, soil_form):
     inputs.filex.write_text(SAMPLE.replace("UFGA       -99", f"{station:<8}   -99"))
+    soil = None
+    if soil_form is not None:
+        soil = [dict(row, slb=str(row["slb"])) for row in soil_rows]
+        if soil_form in ("path", "str"):
+            path = inputs.filex.parent / "soil.csv"
+            with path.open("w", encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=list(soil[0]))
+                writer.writeheader()
+                writer.writerows(soil)
+            soil = path if soil_form == "path" else str(path)
+    original_soil = deepcopy(soil)
     before = snapshot(inputs.filex.parent)
     listing = set(inputs.filex.parent.iterdir())
     monkeypatch.chdir(tmp_path)
@@ -137,7 +160,7 @@ def test_run_command_inputs_weather_and_result(
         return result
 
     monkeypatch.setattr(simulation_module, "run", record_run)
-    result = Simulation(filex, "02", inputs.weather, executable).run()
+    result = Simulation(filex, "02", inputs.weather, executable, soil=soil).run()
 
     sim_folder = inputs.filex.parent / f"dssat_sim_{STAMP}"
     assert result is returned[0]
@@ -153,9 +176,15 @@ def test_run_command_inputs_weather_and_result(
         fake_dssat.connect.assert_not_called()
     else:
         fake_dssat.connect.assert_called_once_with(interactive=False)
-    assert {p.name for p in sim_folder.iterdir()} == {
-        inputs.filex.name, *inputs.siblings, weather_name, result.run_dir.name}
-    for name in [inputs.filex.name, *inputs.siblings]:
+    siblings = inputs.siblings if soil is None else [
+        name for name in inputs.siblings if Path(name).suffix.upper() != ".SOL"]
+    expected_names = {inputs.filex.name, *siblings, weather_name, result.run_dir.name}
+    if soil is not None:
+        expected_names.add("SOIL.SOL")
+        expected_soil = write_soil_file(soil_rows, tmp_path / "expected.SOL")
+        assert (sim_folder / "SOIL.SOL").read_bytes() == expected_soil.read_bytes()
+    assert {p.name for p in sim_folder.iterdir()} == expected_names
+    for name in [inputs.filex.name, *siblings]:
         assert (sim_folder / name).read_bytes() == (inputs.filex.parent / name).read_bytes()
         assert (sim_folder / name).stat().st_mtime_ns == (inputs.filex.parent / name).stat().st_mtime_ns
     parsed = [dict(row, date=date.fromisoformat(row["date"]),
@@ -164,13 +193,19 @@ def test_run_command_inputs_weather_and_result(
     assert (sim_folder / weather_name).read_bytes() == expected.read_bytes()
     assert snapshot(inputs.filex.parent) == before
     assert set(inputs.filex.parent.iterdir()) == listing | {sim_folder}
+    assert soil == original_soil
 
 
-def test_all_problems_stop_before_writing_or_running(inputs, fake_dssat, monkeypatch):
+@pytest.mark.parametrize("with_soil", [False, True])
+def test_all_problems_stop_before_writing_or_running(
+        inputs, fake_dssat, monkeypatch, soil_rows, with_soil):
     rows = [dict(inputs.rows[0], rain=-1, tmax=0, station="ABCD")]
-    sim = Simulation(inputs.filex, 2, rows)
+    soil_rows[0]["sbdm"] = 10
+    sim = Simulation(inputs.filex, 2, rows, soil=soil_rows if with_soil else None)
     problems = sim.check()
-    assert len(problems) == 4  # Rain, temperature order, station and start coverage.
+    assert len(problems) == (5 if with_soil else 4)
+    for word in ("rain", "tmax", "WSTA", "start") + (("sbdm",) if with_soil else ()):
+        assert any(word in problem for problem in problems)
     before = snapshot(inputs.filex.parent)
     listing = set(inputs.filex.parent.iterdir())
     forbidden = Mock(side_effect=AssertionError("checks must finish before writing"))
@@ -189,12 +224,32 @@ def test_all_problems_stop_before_writing_or_running(inputs, fake_dssat, monkeyp
     assert set(inputs.filex.parent.iterdir()) == listing
 
 
-def test_same_second_simulations_never_reuse_folders(inputs, fake_dssat):
-    results = [Simulation(inputs.filex, 2, inputs.weather).run() for _ in range(3)]
+@pytest.mark.parametrize("with_soil", [False, True])
+def test_same_second_simulations_never_reuse_folders(inputs, fake_dssat, soil_rows, with_soil):
+    soil = soil_rows if with_soil else None
+    results = [Simulation(inputs.filex, 2, inputs.weather, soil=soil).run() for _ in range(3)]
     assert [result.run_dir.parent.name for result in results] == [
         f"dssat_sim_{STAMP}", f"dssat_sim_{STAMP}-2", f"dssat_sim_{STAMP}-3"]
     assert all((result.run_dir / "Summary.OUT").read_bytes() == b"summary"
                for result in results)
+    if with_soil:
+        assert all((result.run_dir.parent / "SOIL.SOL").read_bytes() ==
+                   (results[0].run_dir.parent / "SOIL.SOL").read_bytes() for result in results)
+
+
+def test_unusable_soil_raises_existing_run_error_and_keeps_run(inputs, fake_dssat, soil_rows):
+    fake_dssat.returncode = 99
+    fake_dssat.outputs["ERROR.OUT"] = b"End of soil file... soil profile not found"
+    before = snapshot(inputs.filex.parent)
+    with pytest.raises(DSSATRunError) as error:
+        Simulation(inputs.filex, 2, inputs.weather, soil=soil_rows).run()
+    run_dir = inputs.filex.parent / f"dssat_sim_{STAMP}" / f"dssat_run_{STAMP}"
+    for text in ("return code 99", "ERROR.OUT", "End of soil file...", str(run_dir)):
+        assert text in str(error.value)
+    assert (run_dir / "ERROR.OUT").read_bytes() == fake_dssat.outputs["ERROR.OUT"]
+    assert (run_dir / "Summary.OUT").read_bytes() == b"summary"
+    assert (run_dir.parent / "SOIL.SOL").is_file()
+    assert snapshot(inputs.filex.parent) == before
 
 
 @pytest.mark.parametrize("warning", [None, b"An unrelated warning\xff\n"])
