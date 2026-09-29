@@ -13,6 +13,32 @@ from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
 
+def _simulation_start_date(values, days):
+    """Convert FileX SDATE to a calendar date using years from weather data."""
+    if values.get("START", "S") != "S" or "SDATE" not in values or not days:
+        return None
+    sdate = values["SDATE"]
+    if not (isinstance(sdate, str) and re.fullmatch(r"[0-9]{5}", sdate)):
+        return None
+    yy = int(sdate[:2])
+    doy = int(sdate[2:])
+    if doy < 1:
+        return None
+    min_year = min(day.year for day in days)
+    max_year = max(day.year for day in days)
+    matching_years = [y for y in range(min_year, max_year + 1) if y % 100 == yy]
+    if len(matching_years) != 1:
+        return None
+    year = matching_years[0]
+    try:
+        candidate = date(year, 1, 1) + timedelta(days=doy - 1)
+        if candidate.year != year:
+            return None
+        return candidate
+    except (ValueError, OverflowError):
+        return None
+
+
 class Simulation:
     """One FileX treatment with weather data and optional soil data.
 
@@ -49,8 +75,9 @@ class Simulation:
 
         Print Checks in weather, soil (if given), FileX and management order
         when management is given or verbose=True. Management checks cover
-        every treatment's planting shape and values, including ISO date syntax;
-        they do not compare planting dates with weather or the FileX start.
+        every treatment's shape, value ranges, unique and ascending dates for
+        event lists, and compares the selected treatment's dates with the
+        weather range and FileX simulation start date.
         An empty returned list means all checks passed.
         """
         problems, report = self._check_inputs()
@@ -117,7 +144,10 @@ class Simulation:
             report.extend(_report_lines("Soil data", soil_problems))
         report.extend(_report_lines("FileX", filex_problems))
         if self.management is not None:
-            management_problems, management_report = _check_management(self.management, self.filex)
+            start_date = _simulation_start_date(values, days)
+            management_problems, management_report = _check_management(
+                self.management, self.filex, self.treatment, rows, start_date
+            )
             problems.extend(management_problems)
             report.extend(management_report)
         return problems, report
