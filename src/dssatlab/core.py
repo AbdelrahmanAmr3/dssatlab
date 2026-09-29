@@ -15,7 +15,6 @@ from pathlib import Path
 from . import config, installer
 from .errors import DSSATInstallError, DSSATNotFoundError
 
-
 _WINDOWS_DEFAULT = Path(r"C:\DSSAT48")
 
 
@@ -88,24 +87,29 @@ def connect(
         if not _validate_executable(candidate):
             raise _invalid_path(candidate)
         candidate = candidate.resolve()
-        connection = DSSATConnection(candidate, candidate.parent, None, "explicit")
+        connection = DSSATConnection(
+            candidate, candidate.parent, None, "explicit")
     elif path is not None:
         candidate = _find_executable(Path(path))
         if candidate is None:
             raise _invalid_path(Path(path))
-        connection = DSSATConnection(candidate, candidate.parent, None, "explicit")
+        connection = DSSATConnection(
+            candidate, candidate.parent, None, "explicit")
     else:
         os_name = _os_name()
         connection = _discover(os_name)
         if connection is None and interactive:
             if os_name == "windows":
-                answer = input("Enter the DSSAT directory or executable path: ").strip()
+                answer = input(
+                    "Enter the DSSAT directory or executable path: ").strip()
                 candidate = _find_executable(Path(answer)) if answer else None
                 if candidate is None:
                     raise _invalid_path(Path(answer))
-                connection = DSSATConnection(candidate, candidate.parent, None, "manual")
+                connection = DSSATConnection(
+                    candidate, candidate.parent, None, "manual")
             elif os_name == "linux":
-                answer = input("Install the latest stable DSSAT release? [y/N]: ").strip().lower()
+                answer = input(
+                    "Install the latest stable DSSAT release? [y/N]: ").strip().lower()
                 if answer in ("y", "yes"):
                     return install()
         if connection is None:
@@ -171,7 +175,8 @@ def _discover(os_name: str) -> DSSATConnection | None:
             ):
                 candidate = candidate.resolve()
                 return DSSATConnection(
-                    candidate, Path(root).expanduser().resolve() if root else candidate.parent,
+                    candidate, Path(root).expanduser(
+                    ).resolve() if root else candidate.parent,
                     version, "config",
                 )
     except (OSError, ValueError):
@@ -193,12 +198,14 @@ def _discover(os_name: str) -> DSSATConnection | None:
             candidate = Path(on_path).resolve()
             return DSSATConnection(candidate, candidate.parent, None, "default")
         try:
-            installs = [d for d in installer.cache_root().iterdir() if d.is_dir()]
+            installs = [d for d in installer.cache_root().iterdir()
+                        if d.is_dir()]
         except OSError:
             installs = []
         installs.sort(key=lambda d: _version_sort_key(d.name), reverse=True)
         for install_dir in installs:
-            candidate = installer.find_cached_install(install_dir.name, install_dir)
+            candidate = installer.find_cached_install(
+                install_dir.name, install_dir)
             if candidate is not None and _validate_executable(candidate):
                 return DSSATConnection(candidate, install_dir, install_dir.name, "managed")
     return None
