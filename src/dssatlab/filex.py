@@ -21,10 +21,16 @@ def _section_row(text, section, key, level, required):
         if line.startswith("@"):
             columns = []
             previous_end = 0
-            for token in re.finditer(r"\S+", line):
+            tokens = list(re.finditer(r"\S+", line))
+            for index, token in enumerate(tokens):
                 name = token.group().lstrip("@").rstrip(".")
-                # ID_SOIL's ten-character value extends past its short header.
-                end = token.start() + 10 if name == "ID_SOIL" else token.end()
+                end = token.end()
+                if name == "ID_SOIL":
+                    # Its ten-character value extends past the short header, but
+                    # never into the next column.
+                    end = token.start() + 10
+                    if index + 1 < len(tokens):
+                        end = min(end, tokens[index + 1].start())
                 columns.append((name, previous_end, end))
                 previous_end = end
             if set((key,) + required) <= {name for name, _, _ in columns}:

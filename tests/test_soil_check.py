@@ -286,3 +286,20 @@ def test_soil_is_keyword_only_so_v03_positional_calls_still_work(tmp_path):
     assert simulation.executable == "dscsm048" and simulation.soil is None
     with pytest.raises(TypeError):
         dssatlab.Simulation(tmp_path / "x.MZX", 1, [], None, [])
+
+
+def test_id_soil_read_with_tight_or_last_header_column(simulation, rows):
+    simulation.soil = rows
+    tight = SAMPLE.replace("ID_SOIL    FLNAME", "ID_SOIL FLNAME")
+    tight = tight.replace("IBMZ910214 Field section", "IBMZ910214 Field")
+    simulation.filex.write_text(tight, encoding="latin-1")
+    # The ID cannot fit before the next column, but nothing else may break.
+    assert not any("WSTA" in p or "SDATE" in p or "TREATMENTS" in p
+                   for p in simulation.check())
+    last = SAMPLE.replace("  ID_SOIL    FLNAME", "  ID_SOIL").replace(
+        " Field section", "").replace(" Other field", "")
+    simulation.filex.write_text(last, encoding="latin-1")
+    assert simulation.check() == []
+    simulation.treatment = 2
+    simulation.soil = [dict(row, soil_id="OTHER12345") for row in rows]
+    assert simulation.check() == []
