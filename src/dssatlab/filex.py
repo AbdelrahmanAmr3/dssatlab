@@ -1,4 +1,4 @@
-"""Read only a treatment's field, weather station and simulation start."""
+"""Read only a treatment's field, weather station, soil profile and start."""
 
 from pathlib import Path
 import re
@@ -21,10 +21,18 @@ def _section_row(text, section, key, level, required):
         if line.startswith("@"):
             columns = []
             previous_end = 0
-            for token in re.finditer(r"\S+", line):
+            tokens = list(re.finditer(r"\S+", line))
+            for index, token in enumerate(tokens):
                 name = token.group().lstrip("@").rstrip(".")
-                columns.append((name, previous_end, token.end()))
-                previous_end = token.end()
+                end = token.end()
+                if name == "ID_SOIL":
+                    # Its ten-character value extends past the short header, but
+                    # never into the next column.
+                    end = token.start() + 10
+                    if index + 1 < len(tokens):
+                        end = min(end, tokens[index + 1].start())
+                columns.append((name, previous_end, end))
+                previous_end = end
             if set((key,) + required) <= {name for name, _, _ in columns}:
                 matching_header = True
             else:
@@ -51,7 +59,7 @@ def _section_row(text, section, key, level, required):
 
 
 def _read_filex(source, treatment) -> tuple[dict[str, str], list[str]]:
-    """Return available WSTA/START/SDATE values and problems, without writing.
+    """Return available WSTA/ID_SOIL/START/SDATE values and problems, without writing.
 
     Partial results let check() compare a valid station even if the start is bad,
     or compare a valid start even if the field cannot be resolved.
@@ -93,6 +101,8 @@ def _read_filex(source, treatment) -> tuple[dict[str, str], list[str]]:
             problems.append(f"FileX {source}: {error}")
             continue
         values.update((name, selected[name]) for name in required)
+        if section == "FIELDS" and "ID_SOIL" in selected:
+            values["ID_SOIL"] = selected["ID_SOIL"]
 
     if "WSTA" in values and len(values["WSTA"]) not in (4, 8):
         problems.append(f"FileX {source}: WSTA {values['WSTA']!r} has an invalid length. "

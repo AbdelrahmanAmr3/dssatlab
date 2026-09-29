@@ -79,7 +79,7 @@ def write_weather_file(rows: list[dict], path: str | Path) -> Path:
     return path
 
 
-def _read_weather(source):
+def _read_table(source, label="Weather data"):
     """Read a CSV path, plain rows or DataFrame without importing pandas.
 
     Return (line-numbered raw rows, declared columns or None, problems).
@@ -93,10 +93,10 @@ def _read_weather(source):
                 rows = source.to_dict("records")
                 return list(enumerate(rows, 2)), columns, []
         except Exception as error:
-            return [], None, [("source", f"Cannot read weather data DataFrame: "
+            return [], None, [("source", f"Cannot read {label.lower()} DataFrame: "
                                f"{error}. Supply a DataFrame convertible to plain "
                                "rows with to_dict('records').")]
-        return [], None, [("source", "Cannot read weather data: expected a CSV "
+        return [], None, [("source", f"Cannot read {label.lower()}: expected a CSV "
                            "path, plain rows or a DataFrame. Pass a str/Path, "
                            "a list of dicts or a DataFrame with template columns.")]
     try:
@@ -110,13 +110,13 @@ def _read_weather(source):
                 if values is None:
                     break
                 if len(values) != len(columns):
-                    problems.append(("row shape", f"Weather data row {line} has "
+                    problems.append(("row shape", f"{label} row {line} has "
                                      f"{len(values)} values for {len(columns)} columns. "
                                      "Supply one value per column."))
                 rows.append((line, dict(zip(columns, values))))
             return rows, columns, problems
     except (OSError, UnicodeError, csv.Error, ValueError) as error:
-        return [], None, [("source", f"Cannot read weather data CSV {source!s}: "
+        return [], None, [("source", f"Cannot read {label.lower()} CSV {source!s}: "
                            f"{error}. Supply a readable comma-separated UTF-8 CSV.")]
 
 
@@ -176,7 +176,7 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
     Invalid fields are omitted; consumers must require no problems before using
     parsed rows. The source is never mutated, sorted, repaired or written.
     """
-    rows, columns, problems = _read_weather(source)
+    rows, columns, problems = _read_table(source)
     if problems and problems[0][0] == "source":
         return [], _all_messages(problems)
     if columns is not None:
