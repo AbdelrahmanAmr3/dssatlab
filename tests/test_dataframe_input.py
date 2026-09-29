@@ -28,7 +28,11 @@ def rows():
 
 
 def check(weather):
-    return dssatlab.Simulation("missing.MZX", 1, weather).check()
+    problems = dssatlab.Simulation("missing.MZX", 1, weather).check()
+    # These tests isolate weather checks; ticket #14 also reports the absent FileX.
+    filex_problems = [p for p in problems if p.startswith("Cannot read FileX ")]
+    assert len(filex_problems) == 1
+    return [p for p in problems if p not in filex_problems]
 
 
 def write_csv(path, rows, columns=None):
