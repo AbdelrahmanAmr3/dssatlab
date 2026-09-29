@@ -114,9 +114,26 @@ def _check_columns(columns, where, problems):
                             f"{', '.join(REQUIRED + OPTIONAL)}.")
 
 
+def _dataframe_cell(value):
+    """Match CSV cell text, including blanks for None and numeric NaN."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        try:
+            if math.isnan(value):
+                return ""
+        except (TypeError, ValueError, OverflowError):
+            pass
+    try:
+        return str(value)
+    except (ValueError, OverflowError):
+        return value  # Let the checks report even unrepresentable numbers.
+
+
 def _parse_soil(source) -> tuple[list[dict], list[str]]:
     """Read soil data and return parsed rows and all problems without writing.
 
+    DataFrame cells use CSV text and blank-cell semantics, keeping IDs as text.
     Numbers become floats; absent or empty optional values become -99.
     Invalid fields are omitted. Consumers must require no problems before
     using parsed rows. The source is never mutated, sorted or repaired.
@@ -125,6 +142,8 @@ def _parse_soil(source) -> tuple[list[dict], list[str]]:
     problems = [message for _, message in read_problems]
     if read_problems and read_problems[0][0] == "source":
         return [], problems
+    # The shared reader supplies columns only for CSV paths and DataFrames.
+    is_dataframe = columns is not None and not isinstance(source, (str, Path))
     if columns is not None:
         for column in dict.fromkeys(columns):
             if columns.count(column) > 1:
@@ -156,6 +175,8 @@ def _parse_soil(source) -> tuple[list[dict], list[str]]:
                                     f"{name!r}. Supply a value.")
                 continue
             value = row.get(name)
+            if is_dataframe:
+                value = _dataframe_cell(value)
             where = f"Soil data row {line}, column {name!r}"
             if name == "soil_id":
                 if not isinstance(value, str) or not re.fullmatch(
