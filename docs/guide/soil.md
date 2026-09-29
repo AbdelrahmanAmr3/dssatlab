@@ -1,0 +1,195 @@
+# Run a Simulation with your soil data
+
+A `Simulation` can combine one treatment of an existing FileX with your daily
+weather data and your own soil profile. Prepare the FileX and its supporting files,
+then [find or install a DSSAT executable](install.md). The examples use
+`UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
+
+By default, a `Simulation` copies sibling `.SOL` files sitting beside the FileX.
+When you pass `soil` to `Simulation`, dssatlab generates a single `SOIL.SOL` file
+from your soil data instead. A `.SOL` file in the FileX folder always beats
+DSSAT's own `Soil` directory (`C:\DSSAT48\Soil` on Windows or the managed install
+cache on Linux), so the soil profile you provide is the one DSSAT uses.
+
+## Prepare the soil template
+
+Create an example CSV in a notebook cell:
+
+```python
+import dssatlab as dl
+
+dl.write_soil_template("soil.csv")
+```
+
+This writes a UTF-8 soil template with one valid three-layer soil profile,
+`IBMZ910214`, with layer bottom depths of 5, 15, and 30 cm. Replace those example
+values with your soil data before running a Simulation. An existing path raises
+`DSSATError`, so rerunning this cell does not overwrite your soil data.
+
+The soil template is ONE flat CSV describing exactly one soil profile, with one
+row per soil layer. Use a comma-separated UTF-8 CSV with the exact lower-case
+column names below. Columns may appear in any order. Unknown or repeated columns
+fail the checks. Values use DSSAT's own units; nothing is converted.
+
+Profile-level values repeat on every row and must be identical across all rows.
+Layer bottom depths (`slb`) must be positive and strictly increasing from top to bottom.
+
+| Column | Level | Required | Units | Meaning and checks |
+| --- | --- | --- | --- | --- |
+| `soil_id` | Profile | Yes | ASCII | 1 to 10 ASCII letters or digits; must match the treatment's FileX `ID_SOIL` exactly (case-sensitive) |
+| `salb` | Profile | Yes | fraction | Soil albedo, from 0 to 1 |
+| `slro` | Profile | Yes | dimensionless | Runoff curve number, from 0 to 100 |
+| `sldr` | Profile | Yes | fraction/day | Drainage rate, from 0 to 1 |
+| `slpf` | Profile | Yes | factor | Soil fertility factor, from 0 to 1 |
+| `slnf` | Profile | No | factor | Mineralization factor, from 0 to 1; defaults to -99 |
+| `slu1` | Profile | No | mm | Stage 1 soil evaporation limit; defaults to -99 |
+| `smhb` | Profile | No | - | Profile-level property; defaults to -99 |
+| `smpx` | Profile | No | - | Profile-level property; defaults to -99 |
+| `smke` | Profile | No | - | Profile-level property; defaults to -99 |
+| `slb` | Layer | Yes | cm | Layer bottom depth, positive and strictly increasing without duplicates |
+| `slll` | Layer | Yes | cm³/cm³ | Lower limit / wilting point, strictly between 0 and 1; must satisfy `slll < sdul < ssat` |
+| `sdul` | Layer | Yes | cm³/cm³ | Drained upper limit / field capacity, strictly between 0 and 1; must satisfy `slll < sdul < ssat` |
+| `ssat` | Layer | Yes | cm³/cm³ | Saturated water content, strictly between 0 and 1; must satisfy `slll < sdul < ssat` |
+| `srgf` | Layer | Yes | fraction | Root growth factor, from 0 to 1 |
+| `ssks` | Layer | No | cm/h | Saturated hydraulic conductivity, from 0 to 500; defaults to -99 |
+| `sbdm` | Layer | No | g/cm³ | Bulk density, from 0.5 to 2.5; defaults to -99 |
+| `sloc` | Layer | No | % | Organic carbon, from 0 to 100; defaults to -99 |
+| `slmh` | Layer | No | - | Master horizon code or property; defaults to -99 |
+| `slcl` | Layer | No | % | Clay content; defaults to -99 |
+| `slsi` | Layer | No | % | Silt content; defaults to -99 |
+| `slcf` | Layer | No | % | Coarse fraction; defaults to -99 |
+| `slni` | Layer | No | % | Total nitrogen; defaults to -99 |
+| `slhw` | Layer | No | pH | pH in water; defaults to -99 |
+| `slhb` | Layer | No | pH | pH in buffer; defaults to -99 |
+| `scec` | Layer | No | cmol/kg | Cation exchange capacity; defaults to -99 |
+| `sadc` | Layer | No | - | Anion exchange capacity or property; defaults to -99 |
+
+Required columns (`soil_id`, `salb`, `slro`, `sldr`, `slpf`, `slb`, `slll`,
+`sdul`, `ssat`, `srgf`) must be supplied with non-empty, finite numbers. Real
+DSSAT stops with an error if any of these are missing or `-99`.
+
+Profile-level columns (`soil_id`, `salb`, `slro`, `sldr`, `slpf`, and optional
+`slnf`, `slu1`, `smhb`, `smpx`, `smke`) describe the overall profile and must have
+identical values on every row. `soil_id` must consist of 1 to 10 ASCII letters or
+digits; DSSAT silently truncates longer IDs.
+
+Layer bottom depths (`slb`) must be strictly positive and strictly increasing
+from the surface downwards, without duplicate depths.
+
+Water limits (`slll`, `sdul`, `ssat`) must each be fractions strictly between 0
+and 1, and must be in strict ascending order: `slll < sdul < ssat`. While DSSAT
+itself accepts equal values and only fails when `slll > sdul` or `sdul > ssat`,
+dssatlab enforces strict inequalities because equal values leave no plant-available
+water or no pore space.
+
+Optional columns default to `-99` (DSSAT's "not given" sentinel) when omitted or
+left blank. When supplied, they must be finite numbers and satisfy their valid
+ranges; range checks are skipped for `-99`.
+
+## Create a Simulation and inspect the checks
+
+Once you have edited `soil.csv` and your [weather data](simulation.md#prepare-the-weather-template),
+create the Simulation:
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation(
+    "UFGA8201.MZX",
+    treatment=1,
+    weather="weather.csv",
+    soil="soil.csv",
+)
+problems = sim.check()
+for problem in problems:
+    print(problem)
+```
+
+`soil` is an optional, keyword-only argument. Construction only stores the supplied
+inputs. `check()` reads the soil data, weather data, and FileX and returns a list
+of problem strings; `[]` means all checks passed. It writes nothing, does not
+repair data, and does not run DSSAT. It reports all problems together.
+
+The checks verify that:
+
+- All required columns are present and no unknown columns appear.
+- `soil_id` has 1 to 10 ASCII letters or digits (DSSAT truncates longer IDs).
+- Profile values are identical on every row.
+- Layer bottom depths (`slb`) are positive and strictly increasing.
+- Water limits satisfy `0 < slll < sdul < ssat < 1`.
+- Numeric values fall within valid physical bounds.
+- `soil_id` matches the field's `ID_SOIL` in the FileX for the chosen treatment
+  exactly, including case. DSSAT matches soil IDs case-sensitively on every system.
+
+## Run after the checks
+
+Continue with the `sim` created above:
+
+```python
+try:
+    result = sim.run()
+except dl.DSSATCheckError as error:
+    for problem in error.problems:
+        print(problem)
+except dl.DSSATRunError as error:
+    print(error)
+else:
+    print(result.run_dir)
+    for path in result.outputs:
+        print(path)
+```
+
+`sim.run()` repeats the checks. If any problems remain, it raises one
+`DSSATCheckError` containing the list in `error.problems`, before creating the
+simulation folder or writing DSSAT files.
+
+After the checks pass, it creates a new `dssat_sim_YYYY-MM-DD_HHMMSS` folder beside
+your FileX. That simulation folder contains:
+
+- A copy of the FileX.
+- Copies of every `.CUL`, `.ECO`, and `.SPE` file directly beside the original
+  FileX; suffix matching ignores case.
+- One generated `.WTH` weather file from your weather data.
+- One generated `SOIL.SOL` soil file from your soil data.
+- A `dssat_run_YYYY-MM-DD_HHMMSS` run directory containing the files collected
+  after DSSAT exits.
+
+When `soil` is provided, `Simulation.run()` writes `SOIL.SOL` directly into the
+simulation folder and copies no sibling `.SOL` files. Because a `.SOL` file in the
+FileX folder always beats DSSAT's own `Soil` directory, DSSAT uses your soil profile.
+When `soil` is not provided (`soil=None`), behavior is unchanged: sibling `.SOL`
+files are copied as before.
+
+If DSSAT cannot use the soil profile (for example, if the profile ID is missing
+or the soil file is corrupted), DSSAT exits with return code 99 and writes
+`ERROR.OUT`. In this case, `Simulation.run()` raises `DSSATRunError` containing the
+`ERROR.OUT` message and keeps the run directory for inspection.
+
+A successful call returns a [RunResult](run-filex.md#inspect-the-run-result).
+
+## Use a DataFrame or plain rows
+
+If pandas is already part of your environment, pass a DataFrame with the same
+soil template columns:
+
+```python
+import pandas as pd
+import dssatlab as dl
+
+soil = pd.read_csv("soil.csv")
+sim = dl.Simulation(
+    "UFGA8201.MZX",
+    treatment=1,
+    weather="weather.csv",
+    soil=soil,
+)
+print(sim.check())
+```
+
+A blank or `NaN` cell in an optional column counts as "not given" and is written
+as `-99`, exactly as in a CSV. In a required column it is reported by the checks.
+A numeric-looking `soil_id` is kept as text.
+
+pandas is optional; dssatlab does not import or require it. You can also pass a
+list of dictionaries with the soil template names as keys. The same checks apply
+to CSV, DataFrame, and list inputs. dssatlab does not modify the supplied soil data.

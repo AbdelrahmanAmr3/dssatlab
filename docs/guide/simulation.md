@@ -1,7 +1,8 @@
 # Run a Simulation from your weather data
 
 A `Simulation` combines one treatment of an existing FileX with your daily weather
-data. Prepare the FileX and its supporting files, then
+data. To supply your own soil data as well, see [Run with soil data](soil.md).
+Prepare the FileX and its supporting files, then
 [find or install a DSSAT executable](install.md). The examples use
 `UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
 
@@ -108,7 +109,9 @@ your FileX, adding a numeric suffix if needed. That simulation folder contains:
 
 - A copy of the FileX.
 - Copies of every `.SOL`, `.CUL`, `.ECO`, and `.SPE` file directly beside the
-  original FileX; suffix matching ignores case.
+  original FileX; suffix matching ignores case. (When you supply your own soil data
+  via `soil=...`, `Simulation.run()` writes `SOIL.SOL` and does not copy sibling
+  `.SOL` files; see [Run with soil data](soil.md).)
 - One generated `.WTH` weather file from your weather data.
 - A `dssat_run_YYYY-MM-DD_HHMMSS` run directory containing the files collected
   after DSSAT exits.

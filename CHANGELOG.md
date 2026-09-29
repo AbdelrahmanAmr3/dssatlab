@@ -2,6 +2,24 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.3.1] - unreleased
+
+### Added
+- `Simulation(filex, treatment, weather, executable=None, *, soil=None)`: `soil` is optional and keyword-only, accepting the user's own soil data for one soil profile.
+- A fixed soil template in DSSAT's own units (required profile columns `soil_id`, `salb`, `slro`, `sldr`, `slpf`, required layer columns `slb`, `slll`, `sdul`, `ssat`, `srgf`, and optional columns defaulting to -99), and `write_soil_template(path)` to write a valid three-layer example profile (`IBMZ910214`).
+- Soil data input as a CSV path, a list of dicts, or a pandas DataFrame. pandas is never required.
+- Soil checks in `check()`: reports every problem at once, with what is wrong, where and what to do: wrong or unknown columns, empty or non-numeric values, profile values that differ across layer rows, profile IDs longer than 10 ASCII characters (DSSAT truncates longer IDs), non-positive or non-increasing layer depths, water fractions not in strict order `slll < sdul < ssat`, out-of-range physical bounds, and a `soil_id` that does not match the FileX treatment's `ID_SOIL` (case-sensitive). Nothing is fixed or converted automatically.
+- When soil is given, `run()` writes a single `SOIL.SOL` into the simulation folder. Sibling `.SOL` files are not copied, ensuring the user's soil profile is the one DSSAT uses (a `.SOL` in the FileX folder always beats DSSAT's own Soil folder).
+
+### Changed
+- `Simulation` accepts `soil` as a keyword-only argument placed after `executable`. Positional calls from 0.3.0 keep their meaning.
+- When `soil` is provided, `run()` skips copying sibling `.SOL` files into the simulation folder, while `.CUL`, `.ECO`, and `.SPE` files are copied as before. Without soil, sibling `.SOL` files are copied as before.
+
+### Notes
+- Upgrading from 0.3.0 needs no changes.
+- If DSSAT cannot use the soil profile, it exits with return code 99 and writes `ERROR.OUT`, and `run()` raises `DSSATRunError` with the `ERROR.OUT` text.
+- Not included yet: management data, unit converters, output parsing, several treatments per `Simulation`, and choosing a soil profile from DSSAT's own soil files.
+
 ## [0.3.0] - 2026-09-29
 
 ### Added
@@ -55,6 +73,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Notes
 - Environment diagnostics only. DSSAT discovery, connecting, installation and simulation support were deferred.
 
+[0.3.1]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.1
 [0.3.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.0
 [0.2.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.2.0
 [0.1.1]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.1.1

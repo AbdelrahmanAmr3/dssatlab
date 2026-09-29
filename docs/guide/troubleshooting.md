@@ -111,16 +111,22 @@ The label identifies either the run directory or the simulation folder.
 Move or copy the FileX and its supporting files to a folder where your Python
 process can create files and directories, then use the new FileX path.
 
-## The weather template already exists
+## The weather or soil template already exists
 
-`DSSATError` from `write_weather_template()`:
+`DSSATError` from `write_weather_template()` or `write_soil_template()`:
 
 ```text
 Weather template path {path} already exists. Choose another path.
 ```
 
-The function preserves existing data. Edit that weather template, or call
-`write_weather_template()` with a new filename.
+or:
+
+```text
+Soil template path {path} already exists. Choose another path.
+```
+
+The function preserves existing data. Edit that template, or call
+`write_weather_template()` or `write_soil_template()` with a new filename.
 
 ## Simulation checks found problems
 
@@ -165,6 +171,30 @@ FileX start year {start[:2]} day {start[2:]} is not covered by weather data ({mi
 For `START S`, include the date identified by `SDATE`, as well as the days needed
 after it. Fill gaps with your weather data; dssatlab does not fill them for you.
 
+```text
+Soil data row {line}, column 'soil_id': found {value!r}. Use 1 to 10 ASCII letters or digits.
+```
+
+DSSAT silently truncates soil profile IDs longer than 10 characters. Shorten the
+`soil_id` in your soil data to at most 10 ASCII letters or digits.
+
+```text
+FileX ID_SOIL {soil_id!r} for treatment {treatment} differs from the soil template's soil_id {template_id!r}. Make the IDs exactly equal; filenames are case-sensitive on Linux.
+```
+
+The soil profile ID in your soil data must match the field's `ID_SOIL` in the
+FileX for the selected treatment exactly, including case.
+
+```text
+Soil data row {line}: slll {slll}, sdul {sdul}, ssat {ssat} are not in strict order. Correct the fractions so slll < sdul < ssat (equal values leave no plant-available water or no pore space).
+```
+
+Lower limit (`slll`), drained upper limit (`sdul`), and saturation (`ssat`) must
+be strictly increasing fractions. While DSSAT itself accepts equal values,
+dssatlab enforces strict inequalities because equal values leave no
+plant-available water or no pore space. Correct the fractions using the
+[soil template columns](soil.md#prepare-the-soil-template).
+
 ## DSSAT could not start or reported a failed run
 
 `DSSATRunError` may begin with this excerpt:
@@ -187,6 +217,12 @@ collected, even if the status was `0`. Read the command, console tail, and any
 `ERROR.OUT` excerpt in the exception. Open `ERROR.OUT` and `WARNING.OUT` in the
 reported run directory when present, correct the reported problem, and retry.
 The run directory is kept.
+
+For example, when DSSAT cannot locate or use the requested soil profile, it exits
+with return code 99 and writes `ERROR.OUT` (such as
+`End of soil file.  Please add missing information to input file.`). `Simulation.run()`
+raises `DSSATRunError` containing the `ERROR.OUT` diagnostic message and keeps
+the run directory.
 
 ## Weather ran out during a Simulation
 
