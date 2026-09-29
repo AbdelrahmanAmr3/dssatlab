@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dssatlab"
-version = "0.1.1"
-description = "A small Python connection and installer layer for DSSAT-CSM."
+version = "0.2.0"
+description = "A small Python interface to DSSAT-CSM: find or build DSSAT, then run a FileX."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"

@@ -12,11 +12,15 @@ import urllib.request
 from .errors import DSSATInstallError
 
 
+# DSSAT cannot read DSSATPRO.L48 with longer prefixes (measured on v4.8.6.0).
+MAX_PREFIX_LENGTH = 51
+
+
 def cache_root() -> Path:
     """Compute the managed-install cache path without creating directories."""
     location = os.environ.get("XDG_CACHE_HOME")
     base = Path(location) if location else Path.home() / ".cache"
-    return base / "dssatlab" / "installs"
+    return base / "dssatlab"
 
 
 def resolve_version(version: str) -> str:
@@ -52,11 +56,14 @@ def check_prerequisites() -> None:
 
 
 def find_cached_install(version: str, install_dir: Path) -> Path | None:
-    """Return a manifest's existing executable; unusable cache entries are misses."""
+    """Return an existing executable only when the manifest records an install prefix."""
     # The caller already selected this version's own directory.
     try:
         manifest = json.loads((install_dir / "manifest.json").read_text(encoding="utf-8"))
         if not isinstance(manifest, dict):
+            return None
+        prefix = manifest.get("prefix")
+        if not isinstance(prefix, str) or not prefix:
             return None
         executable = manifest.get("executable")
         if not isinstance(executable, str) or not executable:
@@ -68,16 +75,24 @@ def find_cached_install(version: str, install_dir: Path) -> Path | None:
 
 
 def build_dssat(version: str, install_dir: Path) -> Path:
-    """Clone a release, build it, and record the resulting executable in a manifest."""
-    install_dir = install_dir.resolve()
-    source = install_dir / "source"
-    build = install_dir / "build"
+    """Clone, build and install a release, recording its installed executable."""
+    prefix = install_dir.resolve()
+    if len(str(prefix)) > MAX_PREFIX_LENGTH:
+        raise DSSATInstallError(
+            f"Cannot install DSSAT: prefix {prefix} is {len(str(prefix))} characters long; "
+            f"the limit is {MAX_PREFIX_LENGTH}. "
+            "Set the XDG_CACHE_HOME environment variable to a shorter folder "
+            "(for example ~/dl) and try again."
+        )
+    work = prefix.parent / "work" / version
+    source = work / "source"
+    build = work / "build"
     tag = f"v{version}"
     try:
-        install_dir.mkdir(parents=True, exist_ok=True)
+        work.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise DSSATInstallError(
-            f"Could not create install directory {install_dir}: {exc}. "
+            f"Could not create work directory {work}: {exc}. "
             "Choose a writable installation directory and retry."
         ) from exc
 
@@ -85,10 +100,14 @@ def build_dssat(version: str, install_dir: Path) -> Path:
         ("Git clone", ["git", "clone", "--depth", "1", "--branch", tag,
                        "https://github.com/DSSAT/dssat-csm-os", str(source)]),
         ("CMake configure", ["cmake", "-S", str(source), "-B", str(build),
-                             "-DCMAKE_BUILD_TYPE=RELEASE"]),
+                             "-DCMAKE_BUILD_TYPE=RELEASE", f"-DCMAKE_INSTALL_PREFIX={prefix}"]),
         ("CMake build", ["cmake", "--build", str(build), "--parallel"]),
+        ("CMake install", ["cmake", "--install", str(build)]),
     ]
     for step, command in commands:
+        # Reuse source from a previous build; cloning into it would fail.
+        if step == "Git clone" and (source / "CMakeLists.txt").is_file():
+            continue
         try:
             result = subprocess.run(command, capture_output=True, text=True)
         except OSError as exc:
@@ -108,31 +127,23 @@ def build_dssat(version: str, install_dir: Path) -> Path:
                 "permissions. Retry with a fresh installation directory if needed."
             )
 
-    executable = None
+    executable = prefix / "dscsm048"
     try:
-        # Upstream CMake puts executables in build/bin; tolerate nested layouts.
-        for directory in (build / "bin", build):
-            for candidate in directory.rglob("*"):
-                if candidate.name.lower() in ("dscsm048", "dscsm048.exe") and candidate.is_file():
-                    executable = candidate
-                    break
-            if executable is not None:
-                break
+        installed = executable.is_file()
     except OSError as exc:
         raise DSSATInstallError(
-            f"Could not search {build / 'bin'} and {build} for the DSSAT executable: "
+            f"Could not check the installed DSSAT executable at {executable}: "
             f"{exc}. Check directory permissions and retry."
         ) from exc
-    if executable is None:
+    if not installed:
         raise DSSATInstallError(
-            "DSSAT build succeeded, but no dscsm048 or dscsm048.exe was located. "
-            f"Searched {build / 'bin'} and {build} recursively. "
-            "Inspect the build output and connect to the executable explicitly if "
-            "it was produced elsewhere."
+            "DSSAT build and install commands succeeded, but the installed DSSAT "
+            f"executable was not found. Checked {executable} for a file. "
+            "Inspect the CMake install output and directory permissions, then retry."
         )
 
     manifest = {"version": version, "tag": tag, "executable": str(executable),
-                "platform": "linux"}
+                "platform": "linux", "prefix": str(prefix)}
     try:
         commit = subprocess.run(
             ["git", "-C", str(source), "rev-parse", "--short", "HEAD"],
@@ -142,7 +153,7 @@ def build_dssat(version: str, install_dir: Path) -> Path:
             manifest["commit"] = commit.stdout.strip()
     except OSError:
         pass  # Optional provenance must not turn a successful build into a failure.
-    manifest_path = install_dir / "manifest.json"
+    manifest_path = prefix / "manifest.json"
     try:
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
