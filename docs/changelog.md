@@ -1,3 +1,1 @@
-# Changelog
-
-To be written (ticket #25).
+{% include "../CHANGELOG.md" %}
