@@ -1,10 +1,10 @@
 """Small installation/discovery layer for DSSAT-CSM."""
 
-from .core import DSSATConnection, EnvironmentInfo, connect, detect, install
+from .core import DSSATConnection, PlatformInfo, connect, detect, install
 from .errors import DSSATError, DSSATInstallError, DSSATNotFoundError
 
 __all__ = [
-    "DSSATConnection", "EnvironmentInfo", "DSSATError",
+    "DSSATConnection", "PlatformInfo", "DSSATError",
     "DSSATInstallError", "DSSATNotFoundError", "connect", "detect", "install",
 ]
 

@@ -23,12 +23,9 @@ Do not add additional public abstractions unless they are essential.
 It should determine:
 - OS (`windows`, `linux`, or other)
 - machine architecture
-- whether execution appears to be in Google Colab
 - whether a usable DSSAT executable can already be found
 
 It must not clone repositories, compile software, edit config, or prompt the user.
-
-Colab detection should be conservative and dependency-free. Do not import Colab packages on normal Python installations.
 
 ## 2. Executable validation
 

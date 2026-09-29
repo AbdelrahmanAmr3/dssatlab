@@ -1,5 +1,4 @@
 """Core behavior with isolated files and a mocked installer contract."""
-import importlib.util
 import json
 import os
 import platform
@@ -20,7 +19,6 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "environ", {"HOME": str(tmp_path), "USERPROFILE": str(tmp_path)})
     monkeypatch.setattr(platform, "system", lambda: "Linux")
     monkeypatch.setattr(platform, "machine", lambda: "test-arch")
-    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
     monkeypatch.setattr(shutil, "which", lambda name: None)
     monkeypatch.setattr(config, "config_dir", lambda: tmp_path / "config")
     monkeypatch.setattr(core, "_WINDOWS_DEFAULT", tmp_path / "DSSAT48", raising=False)
@@ -41,21 +39,11 @@ def executable_at(tmp_path, folder="existing", name="dscsm048"):
 
 
 @pytest.mark.parametrize("system, expected", [("Windows", "windows"), ("Linux", "linux"), ("Darwin", "other")])
-@pytest.mark.parametrize("colab", [False, True])
-def test_detect_environment_without_writes(tmp_path, monkeypatch, system, expected, colab):
+def test_detect_environment_without_writes(tmp_path, monkeypatch, system, expected):
     monkeypatch.setattr(platform, "system", lambda: system)
-    finder = Mock(return_value=object() if colab else None)
-    monkeypatch.setattr(importlib.util, "find_spec", finder)
-    assert core.detect() == core.EnvironmentInfo(expected, colab, "test-arch", None)
-    finder.assert_called_once_with("google.colab")
+    assert core.detect() == core.PlatformInfo(expected, "test-arch", None)
     assert not config.config_dir().exists()
     assert not (tmp_path / "cache").exists()
-
-
-@pytest.mark.parametrize("error", [ModuleNotFoundError, ValueError])
-def test_detect_handles_unavailable_colab_spec(monkeypatch, error):
-    monkeypatch.setattr(importlib.util, "find_spec", Mock(side_effect=error))
-    assert core.detect().is_colab is False
 
 
 @pytest.mark.parametrize("origin", ["config", "env", "default", "managed"])

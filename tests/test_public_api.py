@@ -1,4 +1,4 @@
-from dssatlab import DSSATConnection, EnvironmentInfo, connect, detect, install
+from dssatlab import DSSATConnection, PlatformInfo, connect, detect, install
 
 
 def test_public_api_is_importable():
@@ -6,4 +6,4 @@ def test_public_api_is_importable():
     assert callable(detect)
     assert callable(install)
     assert DSSATConnection is not None
-    assert EnvironmentInfo is not None
+    assert PlatformInfo is not None

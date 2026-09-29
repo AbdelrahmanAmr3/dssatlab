@@ -5,7 +5,6 @@ v0.1 is deliberately limited to detect(), install(), and connect().
 """
 from __future__ import annotations
 
-import importlib.util
 import os
 import platform
 import shutil
@@ -19,9 +18,8 @@ _WINDOWS_DEFAULT = Path(r"C:\DSSAT48")
 
 
 @dataclass(frozen=True)
-class EnvironmentInfo:
+class PlatformInfo:
     os_name: str
-    is_colab: bool
     architecture: str
     dssat_executable: Path | None = None
 
@@ -38,17 +36,14 @@ class DSSATConnection:
         return f"DSSATConnection(version={version!r}, executable={str(self.executable)!r})"
 
 
-def detect() -> EnvironmentInfo:
+def detect() -> PlatformInfo:
     """Inspect the current environment without changing anything."""
+    
     os_name = _os_name()
-    try:
-        is_colab = importlib.util.find_spec("google.colab") is not None
-    except (ImportError, ValueError):
-        is_colab = False
     connection = _discover(os_name)
-    return EnvironmentInfo(
+    
+    return PlatformInfo(
         os_name=os_name,
-        is_colab=is_colab,
         architecture=platform.machine(),
         dssat_executable=connection.executable if connection else None,
     )
