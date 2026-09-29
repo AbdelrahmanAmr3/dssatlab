@@ -73,11 +73,12 @@ def test_detect_and_connect_share_read_only_discovery(tmp_path, monkeypatch, cap
 
 def test_linux_managed_cache_prefers_highest_version(tmp_path, monkeypatch):
     monkeypatch.setattr(installer, "find_cached_install", _real_find_cached_install)
-    older = executable_at(tmp_path, "cache/4.8.6.0/build/bin")
-    newer = executable_at(tmp_path, "cache/4.8.10.0/build/bin")
+    older = executable_at(tmp_path, "cache/4.8.6.0/dssat")
+    newer = executable_at(tmp_path, "cache/4.8.10.0/dssat")
     for version, executable in (("4.8.6.0", older), ("4.8.10.0", newer)):
         manifest = tmp_path / "cache" / version / "manifest.json"
-        manifest.write_text(json.dumps({"executable": str(executable)}))
+        manifest.write_text(json.dumps({
+            "prefix": str(executable.parent), "executable": str(executable)}))
     connection = core.connect(interactive=False)
     assert connection == newer
 
@@ -217,7 +218,7 @@ def test_install_rejects_non_linux(monkeypatch, system):
 
 @pytest.mark.parametrize("cached", [False, True])
 def test_install_builds_once_and_reuses_cache(tmp_path, monkeypatch, cached):
-    executable = executable_at(tmp_path, "cache/4.8.6.0/build/bin")
+    executable = executable_at(tmp_path, "cache/4.8.6.0/dssat")
     install_dir = tmp_path / "cache" / "4.8.6.0"
     lookup = Mock(side_effect=[executable if cached else None, executable])
     resolve = Mock(return_value="4.8.6.0")

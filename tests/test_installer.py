@@ -7,7 +7,7 @@ import urllib.request
 
 import pytest
 
-from dssatlab import installer
+from dssatlab import config, core, installer
 from dssatlab.errors import DSSATInstallError
 
 
@@ -87,14 +87,36 @@ def test_check_prerequisites(missing, monkeypatch):
 
 
 def test_find_cached_install(tmp_path):
-    executable = tmp_path / "dscsm048"
+    prefix = tmp_path / "dssat"
+    prefix.mkdir()
+    executable = prefix / "dscsm048"
     executable.touch()
-    (tmp_path / "manifest.json").write_text(json.dumps({"executable": str(executable)}))
+    (tmp_path / "manifest.json").write_text(json.dumps({
+        "prefix": str(prefix), "executable": str(executable)}))
     assert installer.find_cached_install("4.8.6.0", tmp_path) == executable
 
 
+@pytest.mark.parametrize("prefix", [None, "", 1, [], {}])
+def test_find_cached_install_rejects_invalid_prefix(tmp_path, prefix):
+    executable = tmp_path / "dscsm048"
+    executable.touch()
+    (tmp_path / "manifest.json").write_text(json.dumps({
+        "prefix": prefix, "executable": str(executable)}))
+    assert installer.find_cached_install("4.8.6.0", tmp_path) is None
+
+
+def test_find_cached_install_rejects_v01_manifest(tmp_path):
+    executable = tmp_path / "dscsm048"
+    executable.touch()
+    (tmp_path / "manifest.json").write_text(json.dumps({"executable": str(executable)}))
+    assert installer.find_cached_install("4.8.6.0", tmp_path) is None
+
+
 @pytest.mark.parametrize("payload", [None, "not json", "[]", "{}",
-    '{"executable": null}', '{"executable": 1}', '{"executable": "missing"}'])
+    '{"prefix": "dssat", "executable": null}',
+    '{"prefix": "dssat", "executable": 1}',
+    '{"prefix": "dssat", "executable": ""}',
+    '{"prefix": "dssat", "executable": "missing"}'])
 def test_find_cached_install_miss(tmp_path, payload):
     if payload is not None:
         (tmp_path / "manifest.json").write_text(payload)
@@ -102,7 +124,8 @@ def test_find_cached_install_miss(tmp_path, payload):
 
 
 def test_find_cached_install_rejects_directory(tmp_path):
-    (tmp_path / "manifest.json").write_text(json.dumps({"executable": str(tmp_path)}))
+    (tmp_path / "manifest.json").write_text(json.dumps({
+        "prefix": str(tmp_path), "executable": str(tmp_path)}))
     assert installer.find_cached_install("4.8.6.0", tmp_path) is None
 
 
@@ -114,19 +137,66 @@ def test_find_cached_install_unreadable(tmp_path, monkeypatch):
     assert installer.find_cached_install("4.8.6.0", tmp_path) is None
 
 
-@pytest.mark.parametrize("relative", ["bin/dscsm048", "bin/DSCSM048.EXE", "nested/DsCsM048"])
+@pytest.mark.parametrize("legacy", [False, True])
+def test_install_rebuilds_legacy_and_reuses_installed_prefix(tmp_path, monkeypatch, legacy):
+    install_dir = tmp_path / "4.8.6.0"
+    source = install_dir / "source"
+    prefix = install_dir / "dssat"
+    executable = prefix / "dscsm048"
+    if legacy:
+        source.mkdir(parents=True)
+        (source / "CMakeLists.txt").touch()
+        old_executable = install_dir / "build" / "bin" / "dscsm048"
+        old_executable.parent.mkdir(parents=True)
+        old_executable.touch()
+        (install_dir / "manifest.json").write_text(json.dumps({
+            "version": "4.8.6.0", "tag": "v4.8.6.0", "platform": "linux",
+            "executable": str(old_executable)}))
+    calls = []
+
+    def run(command, *, capture_output, text):
+        calls.append(command)
+        if command[:2] == ["git", "clone"]:
+            if source.exists() and any(source.iterdir()):
+                return SimpleNamespace(returncode=128, stdout="", stderr="source is not empty")
+            source.mkdir(parents=True, exist_ok=True)
+        if command[:2] == ["cmake", "--install"]:
+            prefix.mkdir()
+            executable.touch()
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setattr("shutil.which", lambda tool: f"/bin/{tool}")
+    monkeypatch.setattr(installer, "cache_root", lambda: tmp_path)
+    monkeypatch.setattr(config, "config_file", lambda: tmp_path / "config.json")
+    monkeypatch.setattr("subprocess.run", run)
+    assert core.install("4.8.6.0") == executable
+    assert ["cmake", "--install", str(install_dir / "build")] in calls
+    manifest = json.loads((install_dir / "manifest.json").read_text())
+    assert manifest["prefix"] == str(prefix)
+    assert manifest["executable"] == str(executable)
+    assert config.load_config() == {"executable": str(executable)}
+    calls.clear()
+    assert core.install("4.8.6.0") == executable
+    assert calls == []
+
+
 @pytest.mark.parametrize("commit_status", ["success", "nonzero", "oserror"])
-def test_build_commands_and_manifest(tmp_path, monkeypatch, relative, commit_status):
+def test_build_commands_and_manifest(tmp_path, monkeypatch, commit_status):
     install_dir = tmp_path / "managed install" / "4.8.6.0"
     source = install_dir / "source"
     build = install_dir / "build"
-    executable = build / relative
+    prefix = install_dir / "dssat"
+    executable = prefix / "dscsm048"
     calls = []
 
     def run(command, *, capture_output, text):
         assert capture_output is True and text is True
         calls.append(command)
         if command[:2] == ["cmake", "--build"]:
+            (build / "bin").mkdir(parents=True)
+            (build / "bin" / "dscsm048").touch()
+        if command[:2] == ["cmake", "--install"]:
             executable.parent.mkdir(parents=True)
             executable.touch()
         if "rev-parse" in command:
@@ -138,22 +208,24 @@ def test_build_commands_and_manifest(tmp_path, monkeypatch, relative, commit_sta
 
     monkeypatch.setattr("subprocess.run", run)
     assert installer.build_dssat("4.8.6.0", install_dir) == executable
-    assert calls[:3] == [
+    assert calls[:4] == [
         ["git", "clone", "--depth", "1", "--branch", "v4.8.6.0",
          "https://github.com/DSSAT/dssat-csm-os", str(source)],
-        ["cmake", "-S", str(source), "-B", str(build), "-DCMAKE_BUILD_TYPE=RELEASE"],
+        ["cmake", "-S", str(source), "-B", str(build), "-DCMAKE_BUILD_TYPE=RELEASE",
+         f"-DCMAKE_INSTALL_PREFIX={prefix}"],
         ["cmake", "--build", str(build), "--parallel"],
+        ["cmake", "--install", str(build)],
     ]
-    assert calls[3:] == [["git", "-C", str(source), "rev-parse", "--short", "HEAD"]]
+    assert calls[4:] == [["git", "-C", str(source), "rev-parse", "--short", "HEAD"]]
     manifest = json.loads((install_dir / "manifest.json").read_text())
     expected = {"version": "4.8.6.0", "tag": "v4.8.6.0",
-                "executable": str(executable), "platform": "linux"}
+                "prefix": str(prefix), "executable": str(executable), "platform": "linux"}
     if commit_status == "success":
         expected["commit"] = "abc1234"
     assert manifest == expected
 
 
-@pytest.mark.parametrize("failed_step", [0, 1, 2])
+@pytest.mark.parametrize("failed_step", [0, 1, 2, 3])
 def test_build_failure_includes_command_and_output_tails(tmp_path, monkeypatch, failed_step):
     calls = []
 
@@ -184,16 +256,20 @@ def test_build_cannot_start_command(tmp_path, monkeypatch):
         installer.build_dssat("4.8.6.0", tmp_path)
 
 
-def test_build_missing_executable(tmp_path, monkeypatch):
+@pytest.mark.parametrize("installed_directory", [False, True])
+def test_build_missing_executable(tmp_path, monkeypatch, installed_directory):
     build = tmp_path / "build"
-    (build / "bin" / "dscsm048").mkdir(parents=True)
-    (build / "bin" / "unrelated").touch()
+    (build / "bin").mkdir(parents=True)
+    (build / "bin" / "dscsm048").touch()
+    executable = tmp_path / "dssat" / "dscsm048"
+    if installed_directory:
+        executable.mkdir(parents=True)
     monkeypatch.setattr("subprocess.run", lambda *a, **k:
                         SimpleNamespace(returncode=0, stdout="", stderr=""))
     with pytest.raises(DSSATInstallError) as caught:
         installer.build_dssat("4.8.6.0", tmp_path)
     message = str(caught.value)
     assert "succeeded" in message
-    assert str(build / "bin") in message and str(build) in message
-    assert "dscsm048" in message
+    assert str(executable) in message
+    assert "Inspect" in message
     assert not (tmp_path / "manifest.json").exists()
