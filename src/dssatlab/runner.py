@@ -12,6 +12,7 @@ import subprocess
 from . import core
 from .core import connect
 from .errors import DSSATRunError
+from .outputs import read_plant_growth, read_summary
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,19 @@ class RunResult:
     run_dir: Path
     outputs: list[Path]
     stdout_tail: str
+
+    def summary(self) -> list[dict]:
+        """Read the Summary from this run directory."""
+        return read_summary(self.run_dir)
+
+    def plant_growth(self) -> list[dict]:
+        """Read the Plant growth from this run directory."""
+        return read_plant_growth(self.run_dir)
+
+    def plot(self, variable: str):
+        """Plot a Plant growth variable from this run directory."""
+        from .plot import plot_plant_growth
+        return plot_plant_growth(self.run_dir, variable)
 
 
 def _create_dated_folder(parent: Path, prefix: str, label: str) -> Path:

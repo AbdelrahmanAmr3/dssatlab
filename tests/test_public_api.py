@@ -1,6 +1,7 @@
 import dssatlab
 from dssatlab import (DSSATError, DSSATOutputError, DSSATRunError, connect, detect,
-                     install, read_plant_growth, read_summary, run)
+                     install, plot_plant_growth, read_plant_growth, read_summary, run,
+                     to_dataframe)
 
 
 def test_public_api_is_importable():
@@ -23,6 +24,16 @@ def test_summary_public_api_is_exported():
 def test_plant_growth_public_api_is_exported():
     assert callable(read_plant_growth)
     assert "read_plant_growth" in dssatlab.__all__
+
+
+def test_dataframe_public_api_is_exported():
+    assert callable(to_dataframe)
+    assert "to_dataframe" in dssatlab.__all__
+
+
+def test_plot_public_api_is_exported():
+    assert callable(plot_plant_growth)
+    assert "plot_plant_growth" in dssatlab.__all__
 
 
 def test_weather_public_api_is_exported():

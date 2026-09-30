@@ -4,11 +4,27 @@ from datetime import date, timedelta
 from pathlib import Path
 import re
 
-from .errors import DSSATOutputError
+from .errors import DSSATError, DSSATOutputError
 
 
 _SUMMARY_DATES = {"SDAT", "PDAT", "EDAT", "ADAT", "MDAT", "HDAT"}
 _SUMMARY_TEXT = {"CR", "MODEL", "EXNAME", "TNAM", "FNAM", "WSTA", "SOIL_ID"}
+
+
+def to_dataframe(rows: list[dict]):
+    """Build a pandas DataFrame in row key order, retaining dates and missing values.
+
+    pandas is imported only when called. Install it with ``pip install pandas``
+    if unavailable. An empty list produces an empty DataFrame.
+    """
+    try:
+        import pandas as pd
+    except ImportError as exc:
+        raise DSSATError(
+            "Cannot create a DataFrame: could not import pandas. "
+            "Install it with pip install pandas, then call to_dataframe(rows) again."
+        ) from exc
+    return pd.DataFrame(rows)
 
 
 def _split_fixed_width(header: str, line: str) -> dict[str, str]:
