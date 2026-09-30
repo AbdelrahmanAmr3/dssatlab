@@ -75,5 +75,8 @@ def plot_plant_growth(run_dirs: str | Path | Sequence[str | Path], variable: str
                 values.append(val)
         ax.plot(dates, values, label=label)
 
+    ax.set_title(f"Plant growth: {variable}")
+    ax.set_xlabel("Date")
+    ax.set_ylabel(variable)
     ax.legend()
     return ax

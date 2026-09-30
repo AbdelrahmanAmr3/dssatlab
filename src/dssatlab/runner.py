@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import shlex
@@ -22,8 +22,12 @@ class RunResult:
 
     returncode: int
     run_dir: Path
-    outputs: list[Path]
-    stdout_tail: str
+    outputs: list[Path] = field(repr=False)
+    stdout_tail: str = field(repr=False)
+
+    def __repr__(self) -> str:
+        return (f"RunResult(returncode={self.returncode}, run_dir={str(self.run_dir)!r}, "
+                f"{len(self.outputs)} output files)")
 
     def summary(self) -> list[dict]:
         """Read the Summary from this run directory."""

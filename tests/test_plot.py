@@ -112,3 +112,11 @@ def test_plot_skips_none_values(tmp_path):
     assert len(ax.lines) == 1
     # 20th day has None for LAID in missing_value fixture, so only 19 points plotted
     assert len(ax.lines[0].get_xdata()) == 19
+
+
+def test_plot_has_title_and_axis_labels(tmp_path):
+    make_run_dir(tmp_path)
+    ax = plot_plant_growth(tmp_path / "maize", "LAID")
+    assert ax.get_title() == "Plant growth: LAID"
+    assert ax.get_xlabel() == "Date"
+    assert ax.get_ylabel() == "LAID"
