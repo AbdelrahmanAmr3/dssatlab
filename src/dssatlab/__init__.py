@@ -18,4 +18,4 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "read_summary", "read_plant_growth", "to_dataframe", "plot_plant_growth", "DSSATOutputError",
            ]
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
