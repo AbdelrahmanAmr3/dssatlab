@@ -166,9 +166,10 @@ def test_new_fields_use_strict_yaml_checks(tmp_path, sim_inputs, fragment, word)
     assert any(word in p for p in problems)
 
 
-def test_new_sections_are_not_applied_to_filex(inputs, fake_dssat):
+def test_remaining_shape_only_sections_are_not_applied_to_filex(inputs, fake_dssat):
     original = inputs.filex.read_bytes()
     entry = deepcopy(SECTIONS)
+    del entry["initial_conditions"]
     entry["controls"]["start_date"] = "2000-01-01"
     sim = Simulation(inputs.filex, 2, inputs.weather, management={"treatments": {2: entry}})
     assert sim.check() == []

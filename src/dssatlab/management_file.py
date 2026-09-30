@@ -55,21 +55,22 @@ treatments:
 
 
 _EXPERIMENT_SECTIONS_TEXT = """
-    # These three sections currently have shape checks only; they are not yet
-    # applied to the FileX. Omit a section to keep the FileX's own level.
+    # Omit a section to keep the FileX's own level.
+    # Cultivar currently has shape checks only; it is not applied to FileX yet.
     cultivar:
       code: "IB0035"             # Required existing DSSAT cultivar code from the .CUL file
 
-    initial_conditions:
+    initial_conditions:          # Checked and written as a new level in the FileX copy
       date: "1982-02-25"          # Required initial-conditions date (quoted "YYYY-MM-DD")
-      previous_crop: "MZ"         # Optional previous crop, DSSAT crop code
-      residue_mass: 0.0           # Optional surface residue mass, kg/ha
-      layers:                    # Required list of layers; all four fields required per layer
-        - depth: 15.0            # Bottom of layer, cm; list layers in ascending depth
-          water: 0.2             # Volumetric soil water, cm3/cm3
-          nh4: 0.5               # Soil ammonium, mg/kg
-          no3: 2.0               # Soil nitrate, mg/kg
+      previous_crop: "MZ"         # Optional two-letter DSSAT crop code; omitted writes -99
+      residue_mass: 0.0           # Optional surface residue mass, kg/ha (>= 0); omitted writes -99
+      layers:                    # Required non-empty list; all four fields required per layer
+        - depth: 15.0            # Bottom of layer, cm (> 0); strictly ascending; within soil= depth
+          water: 0.2             # Volumetric soil water, cm3/cm3 (0 to 1 inclusive)
+          nh4: 0.5               # Soil ammonium, mg/kg (>= 0, no upper limit)
+          no3: 2.0               # Soil nitrate, mg/kg (>= 0, no upper limit)
 
+    # Controls currently have shape checks only; they are not applied to FileX yet.
     controls:                    # All fields optional; supply only the fields to change
       start_date: "1982-02-25"    # Simulation start date (quoted "YYYY-MM-DD")
       water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)

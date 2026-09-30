@@ -43,29 +43,11 @@ def _check_fields(data, required, optional, where, template="Management"):
     return problems
 
 
-def _check_layers(layers, where):
-    if not isinstance(layers, list):
-        return [f"{where}: expected a list of layer dicts. Supply layers with "
-                "depth, water, nh4 and no3 following the Experiment template."]
-    problems = []
-    for number, layer in enumerate(layers, 1):
-        location = f"{where}, layer {number}"
-        if not isinstance(layer, dict):
-            problems.append(f"{location}: expected a dict. Supply depth, water, nh4 and no3.")
-            continue
-        fields = ("depth", "water", "nh4", "no3")
-        problems.extend(_check_fields(layer, fields, (), location, "Experiment"))
-        for field in fields:
-            if field in layer:
-                problems.extend(_check_number(layer[field], f"{location}, field {field!r}"))
-    return problems
-
-
 def _check_experiment_section(data, section, where):
     """Check keys, required fields and scalar/container types, without FileX edits.
 
-    Cultivar lookup, ranges, layer ordering and cross-input checks belong to
-    the later section tickets. Dates follow the existing strict ISO contract.
+    Cultivar lookup and control values belong to the later section tickets.
+    Dates follow the existing strict ISO contract.
     """
     where = f"{where}, {section}"
     if not isinstance(data, dict):
@@ -73,8 +55,6 @@ def _check_experiment_section(data, section, where):
                 "template or omit the section to keep the FileX level."]
     if section == "cultivar":
         required, optional = ("code",), ()
-    elif section == "initial_conditions":
-        required, optional = ("date", "layers"), ("previous_crop", "residue_mass")
     else:
         required, optional = (), ("start_date", "water", "nitrogen", "output_interval")
     problems = _check_fields(data, required, optional, where, "Experiment")
@@ -84,10 +64,6 @@ def _check_experiment_section(data, section, where):
         value, location = data[field], f"{where}, field {field!r}"
         if field in ("date", "start_date"):
             problems.extend(_check_date(value, location))
-        elif field == "layers":
-            problems.extend(_check_layers(value, location))
-        elif field == "residue_mass":
-            problems.extend(_check_number(value, location))
         elif field == "output_interval":
             if isinstance(value, bool) or not isinstance(value, int):
                 problems.append(f"{location}: found {_show_value(value)}. "

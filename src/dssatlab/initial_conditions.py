@@ -1,0 +1,110 @@
+"""Check initial conditions and render a new level in a copied FileX."""
+
+from datetime import date
+import re
+
+from .experiment import _check_date, _check_fields, _check_number
+from .filex import _section_row
+from .filex_write import (_append_rows, _event_blocks, _event_row,
+                          _insert_section, _repoint)
+from .weather import _show_value
+
+
+# DSSAT 4.8 Input Files help and UFGA8201.MZX: surface row then layer rows.
+_HEADERS = (
+    "@C   PCR ICDAT  ICRT  ICND  ICRN  ICRE  ICWD ICRES ICREN ICREP ICRIP ICRID ICNAME",
+    "@C  ICBL  SH2O  SNH4  SNO3",
+)
+
+
+def _check_layers(layers, where, soil_depth):
+    if not isinstance(layers, list) or not layers:
+        return [f"{where}: expected a non-empty list of layer dicts. Supply layers "
+                "with depth, water, nh4 and no3 following the Experiment template."]
+    problems, depths = [], []
+    for number, layer in enumerate(layers, 1):
+        location = f"{where}, layer {number}"
+        if not isinstance(layer, dict):
+            problems.append(f"{location}: expected a dict. Supply depth, water, nh4 and no3.")
+            continue
+        fields = ("depth", "water", "nh4", "no3")
+        problems.extend(_check_fields(layer, fields, (), location, "Experiment"))
+        for field in fields:
+            if field not in layer:
+                continue
+            value, field_location = layer[field], f"{location}, field {field!r}"
+            numeric_problems = _check_number(value, field_location)
+            problems.extend(numeric_problems)
+            if numeric_problems:
+                continue
+            if field == "depth":
+                if value <= 0:
+                    problems.append(f"{field_location}: found {_show_value(value)}. "
+                                    "Supply a positive bottom-of-layer depth in cm.")
+                if depths and value <= depths[-1]:
+                    problems.append(f"{field_location}: depth {value} cm follows {depths[-1]} cm. "
+                                    "Supply layer bottom depths in strictly ascending order.")
+                depths.append(value)
+            elif field == "water" and not 0 <= value <= 1:
+                problems.append(f"{field_location}: found {_show_value(value)}; allowed range "
+                                "is 0 to 1 cm3/cm3 inclusive. Supply volumetric soil water.")
+            elif field in ("nh4", "no3") and value < 0:
+                problems.append(f"{field_location}: found {_show_value(value)}; allowed range "
+                                "is 0 or greater mg/kg (no upper limit). Supply nonnegative "
+                                "soil nitrogen in DSSAT's units.")
+    if depths and soil_depth is not None and max(depths) > soil_depth:
+        problems.append(f"{where}: deepest initial-condition layer {max(depths)} cm exceeds "
+                        f"the soil profile depth {soil_depth} cm. Supply layer bottom depths "
+                        "within the supplied soil profile.")
+    return problems
+
+
+def _check_initial_conditions(data, where, soil_depth=None):
+    where = f"{where}, initial_conditions"
+    if not isinstance(data, dict):
+        return [f"{where}: expected a dict. Supply fields from the Experiment "
+                "template or omit the section to keep the FileX level."]
+    problems = _check_fields(data, ("date", "layers"), ("previous_crop", "residue_mass"),
+                             where, "Experiment")
+    if "date" in data:
+        problems.extend(_check_date(data["date"], f"{where}, field 'date'"))
+    if "previous_crop" in data:
+        value = data["previous_crop"]
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}", value):
+            problems.append(f"{where}, field 'previous_crop': found {_show_value(value)}. "
+                            "Supply a quoted two-ASCII-letter DSSAT crop code.")
+    if "residue_mass" in data:
+        location, value = f"{where}, field 'residue_mass'", data["residue_mass"]
+        numeric_problems = _check_number(value, location)
+        problems.extend(numeric_problems)
+        if not numeric_problems and value < 0:
+            problems.append(f"{location}: found {_show_value(value)}. "
+                            "Supply a nonnegative surface residue mass in kg/ha.")
+    if "layers" in data:
+        problems.extend(_check_layers(data["layers"], f"{where}, layers", soil_depth))
+    return problems
+
+
+def _initial_conditions_text(text, treatment, data):
+    """Dry-run during checks; apply only to the selected treatment's copy at run."""
+    name = "INITIAL CONDITIONS"
+    _section_row(text, "TREATMENTS", "N", treatment, ("IC",))
+    lines = text.splitlines(keepends=True)
+    blocks, highest = _event_blocks(lines, name, _HEADERS)
+    level = highest + 1
+    day = date.fromisoformat(data["date"])
+    values = {"C": level, "PCR": data.get("previous_crop", -99),
+              "ICDAT": f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}",
+              "ICRES": data.get("residue_mass", -99)}
+    body = [blocks[0][2], _event_row(blocks[0][0], values, name), blocks[1][2]]
+    for layer in data["layers"]:
+        values = {"C": level, "ICBL": layer["depth"], "SH2O": layer["water"],
+                  "SNH4": layer["nh4"], "SNO3": layer["no3"]}
+        body.append(_event_row(blocks[1][0], values, name))
+    _repoint(lines, treatment, "IC", level)
+    if blocks[0][1] is None:
+        lines = _insert_section(lines, name, body)
+    else:
+        # Keep each surface row and its layers together, including repeated headers.
+        _append_rows(lines, max(block[1] for block in blocks), body)
+    return "".join(lines)

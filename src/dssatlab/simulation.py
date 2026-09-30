@@ -125,9 +125,11 @@ class Simulation:
                 filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
-        soil_problems = []
+        soil_problems, soil_depth = [], None
         if self.soil is not None:
             soil_rows, soil_problems = _parse_soil(self.soil)
+            if not soil_problems:
+                soil_depth = max(row["slb"] for row in soil_rows)
             soil_ids = {row["soil_id"] for row in soil_rows if "soil_id" in row}
             soil_id = values.get("ID_SOIL")
             if not soil_id or soil_id == "-99":
@@ -154,7 +156,7 @@ class Simulation:
             else:
                 start_date = _simulation_start_date(values, days)
                 management_problems, management_report = _check_management(
-                    management_dict, self.filex, self.treatment, rows, start_date
+                    management_dict, self.filex, self.treatment, rows, start_date, soil_depth
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)

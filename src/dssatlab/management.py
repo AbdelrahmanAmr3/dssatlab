@@ -9,6 +9,7 @@ from .filex_write import _event_text, _planting_text
 from .experiment import (_check_date, _check_experiment_section, _check_fields,
                          _check_number, _unknown_keys)
 from .weather import _show_value
+from .initial_conditions import _check_initial_conditions, _initial_conditions_text
 
 
 _REQUIRED = ("date", "method", "distribution", "population", "row_spacing", "depth")
@@ -165,7 +166,7 @@ def _check_treatment_key(key, seen_numbers, text, filex):
     return number, where, problems
 
 
-def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range):
+def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range, soil_depth):
     sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
@@ -198,16 +199,27 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         report.extend(lines)
     for section in ("cultivar", "initial_conditions", "controls"):
         if section in entry:
-            section_problems = _check_experiment_section(entry[section], section, where)
+            if section == "initial_conditions":
+                section_problems = _check_initial_conditions(entry[section], where, soil_depth)
+                if not section_problems and not entry_problems and text is not None:
+                    try:
+                        _initial_conditions_text(text, number, entry[section])
+                    except ValueError as error:
+                        section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
+            else:
+                section_problems = _check_experiment_section(entry[section], section, where)
             problems.extend(section_problems)
             lines = _report_lines(f"    {section}", section_problems)
-            if not section_problems:
+            if not section_problems and section != "initial_conditions":
                 lines[0] += " (shape only; not applied to FileX yet)"
             report.extend(lines)
+        elif section == "initial_conditions":
+            report.append(f"    {section}: OK (omitted; keeps the FileX Level)")
     return problems, report
 
 
-def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None):
+def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
+                      soil_depth=None):
     """Check every treatment without mutation; compare selected dates with FileX and weather.
 
     If FileX is unreadable, Simulation reports that failure; shape checks still run.
@@ -248,7 +260,8 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         is_selected = number is not None and number == selected_number
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
-            start_date if is_selected else None, weather_range if is_selected else None)
+            start_date if is_selected else None, weather_range if is_selected else None,
+            soil_depth if is_selected else None)
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
         report.extend(lines)
