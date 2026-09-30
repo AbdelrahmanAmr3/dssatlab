@@ -40,47 +40,28 @@ def plot_plant_growth(run_dirs: str | Path | Sequence[str | Path], variable: str
 
     if not dirs:
         raise DSSATOutputError(
-            "No run directories provided. "
-            "Checked run_dirs argument; expected at least one run directory. "
-            "Pass one or more run directories to plot_plant_growth()."
+            "No run directories were given to plot_plant_growth(). "
+            "Pass one run directory, or a list of run directories to compare."
         )
 
     simulations = []
-    all_available_vars = set()
-
     for run_dir in dirs:
         growth_rows = read_plant_growth(run_dir)
-        summary_rows = read_summary(run_dir)
-        summary_map = {
-            (row["RUNNO"], row["TRNO"]): row.get("TNAM")
-            for row in summary_rows
-        }
-
-        sim_groups = {}
+        available = sorted({key for row in growth_rows for key in row
+                            if key not in _EXCLUDED_COLUMNS})
+        if variable not in available:
+            raise DSSATOutputError(
+                f"Unknown plant growth variable {variable!r} in {run_dir}. "
+                f"Checked the columns of PlantGro.OUT there. "
+                f"Available variables are: {', '.join(available)}. "
+                "Choose an available growth variable to plot."
+            )
+        names = {(row["RUNNO"], row["TRNO"]): row["TNAM"] for row in read_summary(run_dir)}
+        groups = {}
         for row in growth_rows:
-            sim_key = (row["RUNNO"], row["TRNO"])
-            if sim_key not in sim_groups:
-                sim_groups[sim_key] = []
-            sim_groups[sim_key].append(row)
-            for k in row:
-                if k not in _EXCLUDED_COLUMNS:
-                    all_available_vars.add(k)
-
-        for (runno, trno), rows in sim_groups.items():
-            tnam = summary_map.get((runno, trno))
-            label = tnam or f"Run {runno} Treatment {trno}"
-            simulations.append((label, rows))
-
-    if variable not in all_available_vars:
-        available_list = sorted(all_available_vars)
-        checked = "Checked PlantGro.OUT in the run directory for plant growth variables."
-        next_step = (
-            f"Available variables are: {', '.join(available_list)}. "
-            "Choose an available growth variable to plot."
-        )
-        raise DSSATOutputError(
-            f"Unknown plant growth variable {variable!r}. {checked} {next_step}"
-        )
+            groups.setdefault((row["RUNNO"], row["TRNO"]), []).append(row)
+        for key, rows in groups.items():
+            simulations.append((names.get(key) or f"Run {key[0]} Treatment {key[1]}", rows))
 
     fig, ax = plt.subplots()
     for label, rows in simulations:
