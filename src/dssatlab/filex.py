@@ -122,3 +122,34 @@ def _weather_filename(station: str, start_date: str) -> str:
     if len(station) == 4:
         return f"{station}{start_date[:2]}01.WTH"
     raise ValueError("WSTA must have four or eight characters.")
+
+
+def read_treatment_numbers(source) -> list[int]:
+    """Return the treatment numbers (column N) of the FileX TREATMENTS section, in file order."""
+    try:
+        text = Path(source).read_text(encoding="latin-1")
+    except (OSError, ValueError, TypeError) as error:
+        raise ValueError(f"Cannot read FileX {source}: {error}. Supply a readable FileX path.") from error
+    in_section = found_section = has_header = False
+    numbers = []
+    for line in text.splitlines():
+        if line.startswith("*"):
+            in_section = line[1:].strip().split(" ")[0] == "TREATMENTS"
+            found_section = found_section or in_section
+        elif in_section and line.startswith("@"):
+            has_header = line.split()[:1] == ["@N"]
+            if not has_header:
+                raise ValueError(f"FileX {source}: TREATMENTS header does not start with @N. "
+                                 "Correct the FileX header.")
+        elif in_section and has_header and line.strip():
+            try:
+                numbers.append(int(line.split()[0]))
+            except ValueError:
+                raise ValueError(f"FileX {source}: TREATMENTS row {line!r} does not start with a "
+                                 "treatment number. Correct the FileX row.") from None
+    if not found_section:
+        raise ValueError(f"FileX {source}: missing TREATMENTS section. Supply that section in the FileX.")
+    if not numbers:
+        raise ValueError(f"FileX {source}: TREATMENTS section has no treatment rows. "
+                         "Add at least one treatment row.")
+    return numbers
