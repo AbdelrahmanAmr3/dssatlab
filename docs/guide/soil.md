@@ -123,6 +123,11 @@ The checks verify that:
   `management`, the copied field's `ID_SOIL` is replaced by the supplied soil ID
   instead. DSSAT matches soil IDs case-sensitively on every system.
 
+A named soil-only scenario still writes its scenario name into the copied
+treatment's `TNAME`/`TNAM` column (`"base"` retains the source treatment name).
+This label change does not override the field's `ID_SOIL`; experiment overrides
+are still required for that change.
+
 ## Run after the checks
 
 Continue with the `sim` created above:

@@ -116,10 +116,14 @@ also fit the 12-character limit.
 When `management` supplies experiment overrides for the selected treatment,
 the copied FileX uses the weather data's station and, if supplied, the soil
 data's profile ID. These IDs need not match the source FileX. An omitted or empty
-treatment entry keeps the matching checks above. You can also pass `name="own site"`
-to write a name into the copied treatment's `TNAME` (or `TNAM`) column, reported
-as `TNAM` in Summary. Without `name`, the source treatment name is retained.
-Names that exceed the FileX column width are rejected during checks.
+treatment entry keeps the matching checks above.
+
+Independently of experiment overrides, pass `name="own site"` to write a name
+into the copied treatment's `TNAME` (or `TNAM`) column, reported as `TNAM` in
+Summary. Both `name=None` (the default) and `name="base"` retain the source
+treatment name. Names that exceed the FileX column width are rejected during
+checks, including when no experiment data is supplied. Giving a name alone
+leaves the copied field IDs unchanged.
 
 **Start-date coverage is checked only when `START` is `S`.** In that case, a
 weather date must match the two-digit year and day of year in `SDATE`. These

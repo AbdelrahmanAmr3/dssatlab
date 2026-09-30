@@ -60,9 +60,11 @@ def run_treatments(filex, weather, treatments=None, soil=None, management=None,
     accepted; base overrides are rejected. Base always runs first, followed by
     scenarios in mapping order, with treatments in the selected order.
 
-    Uses Simulation's input checks. With experiment overrides for a treatment,
-    its copy receives the scenario name, weather station and supplied soil ID.
-    Otherwise the FileX station and soil ID must match the supplied data.
+    Uses Simulation's input checks, including scenario name column fit. Each
+    copied treatment receives its scenario name, except "base", which keeps
+    the FileX treatment name. With experiment overrides, the field receives
+    the weather station and supplied soil ID. Otherwise the FileX station
+    and soil ID must match the supplied data.
     All problems are labelled by scenario and treatment
     in one DSSATCheckError, before any files are written or DSSAT is run.
     The first DSSATRunError stops the batch and names earlier kept run
