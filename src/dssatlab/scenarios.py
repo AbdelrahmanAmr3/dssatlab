@@ -60,8 +60,10 @@ def run_treatments(filex, weather, treatments=None, soil=None, management=None,
     accepted; base overrides are rejected. Base always runs first, followed by
     scenarios in mapping order, with treatments in the selected order.
 
-    Uses Simulation's input checks, including matching each treatment's WSTA
-    to the weather station. All problems are labelled by scenario and treatment
+    Uses Simulation's input checks. With experiment overrides for a treatment,
+    its copy receives the scenario name, weather station and supplied soil ID.
+    Otherwise the FileX station and soil ID must match the supplied data.
+    All problems are labelled by scenario and treatment
     in one DSSATCheckError, before any files are written or DSSAT is run.
     The first DSSATRunError stops the batch and names earlier kept run
     directories. ``executable`` selects the DSSAT executable as for Simulation.
@@ -83,7 +85,7 @@ def run_treatments(filex, weather, treatments=None, soil=None, management=None,
         inputs = {**base, **overrides}
         seen = set()
         for treatment in treatments:
-            sim = Simulation(filex, treatment, executable=executable, **inputs)
+            sim = Simulation(filex, treatment, executable=executable, name=name, **inputs)
             found, _ = sim._check_inputs()
             # Simulation reports invalid treatment types/values; only normalize
             # here to detect aliases such as 1 and "01" before results overwrite.

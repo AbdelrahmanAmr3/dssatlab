@@ -14,6 +14,14 @@ The un-overridden run is always included under the scenario name `"base"`. Resul
 are returned in a dictionary keyed by `(scenario, treatment)`, and
 `combine_summaries()` merges the summary tables into a single dataset.
 
+When a treatment has experiment overrides in `management`, its copied FileX also
+receives the scenario name (including `"base"`) in `TNAME`/`TNAM`, so Summary's
+`TNAM` identifies the scenario. The name must fit the FileX column; checks reject
+longer names before any simulation runs. The copied field uses the supplied weather
+station and soil profile ID, so they need not match the source FileX. Without soil
+data, the source soil ID is retained. Omitted or empty treatment entries keep the
+source identity and the existing station/soil matching checks.
+
 ## Run all treatments or a subset
 
 To run every treatment defined in a FileX using your weather data:
