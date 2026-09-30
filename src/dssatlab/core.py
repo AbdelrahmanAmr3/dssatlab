@@ -221,7 +221,7 @@ def _discover(os_name: str) -> Path | None:
             candidate = Path(saved["executable"]).expanduser()
             if validate_dssat_path(candidate):
                 candidate = candidate.resolve()
-                log.info("Found DSSAT via saved config: %s", candidate)
+                log.debug("Found DSSAT via saved config: %s", candidate)
                 return candidate
     except (OSError, ValueError):
         pass

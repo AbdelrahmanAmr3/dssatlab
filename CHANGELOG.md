@@ -2,6 +2,23 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.6.1] - UNDATED
+
+### Fixed
+- `run(filex)` now stops before starting when the FileX folder holds a `.csv` file DSSAT would delete (`weather.csv`, `summary.csv`, `plantgro.csv`, and the other Output file names). Checked on real DSSAT 4.8. `Simulation` was never affected because it runs in its own folder.
+- `check()` now reports a weather column missing from rows given as a list of dicts once, not once per row.
+- An unknown cultivar code is reported with the five closest codes and the `.CUL` file to open, not the whole list.
+- `check()` now catches a `controls` `start_date` after the FileX's first irrigation date. DSSAT stopped with error `IPIRR` after the check had passed.
+- `check(verbose=False)` prints nothing. Left unset, it still prints the report when management data is given.
+- "Found DSSAT via saved config" is now a debug message, so it no longer appears on every `Simulation`.
+- `RunResult` prints on one line instead of the whole console tail and file list.
+- `plot_plant_growth()` and `result.plot()` add a title and axis labels.
+- The walkthrough notebook now reads results with `result.summary()`.
+
+### Notes
+- Upgrading from 0.6.0 needs no changes.
+- Weather that ends before the crop matures is still caught by `run()`, not `check()`.
+
 ## [0.6.0] - UNDATED
 
 ### Added

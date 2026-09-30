@@ -120,6 +120,32 @@ def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], 
     return values, problems
 
 
+def _irrigation_dates(source, treatment):
+    """Return the IDATE values (five digits) of the treatment's irrigation level.
+
+    Best effort: any unreadable FileX or missing irrigation level gives [], because
+    the FileX problems are already reported by _read_filex.
+    """
+    try:
+        text = Path(source).read_text(encoding="latin-1")
+        level = int(_section_row(text, "TREATMENTS", "N", int(treatment), ("MI",))["MI"])
+    except (OSError, ValueError, TypeError, KeyError):
+        return []
+    if level == 0:
+        return []
+    dates, in_section, has_date = [], False, False
+    for line in text.splitlines():
+        if line.startswith("*"):
+            in_section = line[1:].strip().startswith("IRRIGATION")
+        elif in_section and line.startswith("@"):
+            has_date = "IDATE" in line.split()
+        elif in_section and has_date and line.strip():
+            parts = line.split()
+            if parts[0] == str(level) and len(parts) > 1 and re.fullmatch(r"[0-9]{5}", parts[1]):
+                dates.append(parts[1])
+    return dates
+
+
 def _weather_filename(station: str, start_date: str) -> str:
     """Name DSSAT's weather file from checked WSTA and SDATE, for any START option."""
     if len(station) == 8:

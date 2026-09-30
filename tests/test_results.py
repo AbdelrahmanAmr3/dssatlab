@@ -125,3 +125,11 @@ assert 'pandas' not in sys.modules
 """
     completed = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_repr_is_short_and_hides_console_tail(tmp_path):
+    run_dir = tmp_path / "dssat_run_1"
+    run_dir.mkdir()
+    (run_dir / "Summary.OUT").write_text("x")
+    text = repr(RunResult(0, run_dir, [run_dir / "Summary.OUT"], "DSSAT finished\n" * 50))
+    assert "1 output files" in text and "DSSAT finished" not in text and "\n" not in text

@@ -49,7 +49,7 @@ def test_detect_environment_without_writes(tmp_path, monkeypatch, system, expect
 
 @pytest.mark.parametrize("origin", ["config", "env", "default", "managed"])
 def test_detect_and_connect_share_read_only_discovery(tmp_path, monkeypatch, caplog, origin):
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.DEBUG)
     executable = executable_at(tmp_path)
     if origin == "config":
         config.save_config({"executable": str(executable)})
@@ -271,3 +271,10 @@ def test_install_propagates_errors_without_saving(monkeypatch, stage):
     with pytest.raises(DSSATInstallError, match=stage):
         core.install()
     assert not config.config_file().exists()
+
+
+def test_saved_config_is_not_logged_at_info(tmp_path, caplog):
+    caplog.set_level(logging.INFO)
+    config.save_config({"executable": str(executable_at(tmp_path))})
+    core.connect(interactive=False)
+    assert "Found DSSAT via saved config" not in caplog.text
