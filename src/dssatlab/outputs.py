@@ -182,7 +182,7 @@ def read_plant_growth(run_dir: str | Path) -> list[dict]:
                     or {"RUNNO", "TRNO", "DATE"}.intersection(names)):
                 raise ValueError("invalid @YEAR header: expected unique DSSAT columns including YEAR and DOY")
             for line_number, line in enumerate(lines[header_index + 1:end], header_index + 2):
-                if not line.strip() or line.lstrip().startswith("!"):
+                if not line.strip() or line.lstrip().startswith(("!", "*")):
                     continue
                 values = _split_fixed_width(header, line)
                 row = {name: _numeric_value(name, value) for name, value in values.items()}
