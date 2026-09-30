@@ -1,6 +1,6 @@
 # 0006: A FileX can be written from a fixed template, one field and one treatment
 
-Status: proposed (2026-09-30)
+Status: accepted (2026-09-30)
 
 ## Context
 
