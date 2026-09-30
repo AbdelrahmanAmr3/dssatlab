@@ -1,12 +1,13 @@
 """Checks and report lines for Management data supplied as a plain dict."""
 
 from datetime import date
-import math
 from pathlib import Path
 import re
 
 from .filex import _section_row
 from .filex_write import _event_text, _planting_text
+from .experiment import (_check_date, _check_experiment_section, _check_fields,
+                         _check_number, _unknown_keys)
 from .weather import _show_value
 
 
@@ -21,34 +22,6 @@ def _report_lines(label, problems, *, details=None):
     indent = " " * (len(label) - len(label.lstrip()) + 2)
     details = problems if details is None else details
     return [f"{label}: {status}"] + [f"{indent}{problem}" for problem in details]
-
-
-def _unknown_keys(data, allowed, where):
-    return [f"{where}: unknown key {_show_value(key)}. Use only "
-            f"{', '.join(allowed)} from the Management template."
-            for key in data if key not in allowed]
-
-
-def _check_date(value, location):
-    try:
-        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
-            raise ValueError
-        date.fromisoformat(value)
-    except ValueError:
-        return [f"{location}: found {_show_value(value)}. Supply a "
-                'valid ISO calendar date as a quoted YYYY-MM-DD string '
-                '(for example "2024-05-10"); quote the date, even in a dict.']
-    return []
-
-
-def _check_number(value, location):
-    try:
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise ValueError
-    except (ValueError, OverflowError):
-        return [f"{location}: found {_show_value(value)}. Supply a "
-                "finite number in DSSAT's units, not a string or boolean."]
-    return []
 
 
 def _check_planting(planting, where, start_date=None, weather_range=None):
@@ -98,14 +71,6 @@ def _check_weather_date(value, location, weather_range):
     return [f"{location}: date {_show_value(value)} is outside weather range "
             f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
             "the date or choose a date within the weather range."]
-
-
-def _check_fields(data, required, optional, where):
-    problems = _unknown_keys(data, required + optional, where)
-    problems.extend(f"{where}: missing required field {field!r}. "
-                    f"Add {field!r} following the Management template."
-                    for field in required if field not in data)
-    return problems
 
 
 def _check_event_field(value, field, location):
@@ -201,12 +166,13 @@ def _check_treatment_key(key, seen_numbers, text, filex):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range):
+    sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
-                              "with optional planting, irrigation and fertilizer, "
+                              f"with optional {', '.join(sections)}, "
                               "or an empty dict to keep the FileX Levels.")
         return entry_problems, []
-    entry_problems.extend(_unknown_keys(entry, ("planting", "irrigation", "fertilizer"), where))
+    entry_problems.extend(_unknown_keys(entry, sections, where, "Experiment"))
     problems, report = list(entry_problems), []
     for section in ("planting", "irrigation", "fertilizer"):
         label = f"    {section}"
@@ -230,6 +196,14 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                 lines = _report_lines(label, section_problems)
         problems.extend(section_problems)
         report.extend(lines)
+    for section in ("cultivar", "initial_conditions", "controls"):
+        if section in entry:
+            section_problems = _check_experiment_section(entry[section], section, where)
+            problems.extend(section_problems)
+            lines = _report_lines(f"    {section}", section_problems)
+            if not section_problems:
+                lines[0] += " (shape only; not applied to FileX yet)"
+            report.extend(lines)
     return problems, report
 
 

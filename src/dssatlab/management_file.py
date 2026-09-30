@@ -1,8 +1,9 @@
-"""YAML management template writer and strict YAML loader."""
+"""Management and experiment YAML templates and the strict optional YAML loader."""
 
 from pathlib import Path
 
 from .errors import DSSATError
+from .filex import read_treatment_numbers
 
 
 _MANAGEMENT_TEMPLATE_TEXT = """# DSSATLab Management Template
@@ -53,7 +54,31 @@ treatments:
 """
 
 
-def write_management_template(path: str | Path) -> None:
+_EXPERIMENT_SECTIONS_TEXT = """
+    # These three sections currently have shape checks only; they are not yet
+    # applied to the FileX. Omit a section to keep the FileX's own level.
+    cultivar:
+      code: "IB0035"             # Required existing DSSAT cultivar code from the .CUL file
+
+    initial_conditions:
+      date: "1982-02-25"          # Required initial-conditions date (quoted "YYYY-MM-DD")
+      previous_crop: "MZ"         # Optional previous crop, DSSAT crop code
+      residue_mass: 0.0           # Optional surface residue mass, kg/ha
+      layers:                    # Required list of layers; all four fields required per layer
+        - depth: 15.0            # Bottom of layer, cm; list layers in ascending depth
+          water: 0.2             # Volumetric soil water, cm3/cm3
+          nh4: 0.5               # Soil ammonium, mg/kg
+          no3: 2.0               # Soil nitrate, mg/kg
+
+    controls:                    # All fields optional; supply only the fields to change
+      start_date: "1982-02-25"    # Simulation start date (quoted "YYYY-MM-DD")
+      water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)
+      nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
+      output_interval: 1          # Output interval, integer days
+"""
+
+
+def write_management_template(path: str | Path, filex: str | Path | None = None) -> None:
     """Write a UTF-8 YAML management template with commented examples.
 
     Documents every planting, irrigation, and fertilizer field and its unit.
@@ -62,17 +87,49 @@ def write_management_template(path: str | Path) -> None:
 
     Args:
         path: File destination path where the YAML management template will be created.
+        filex: Optional FileX whose treatment numbers replace the example number.
+            Only numbers are read; all example values stay unchanged.
 
     Raises:
-        DSSATError: If the destination path already exists.
+        DSSATError: If the destination exists or FileX treatments cannot be read.
     """
+    _write_template(path, _MANAGEMENT_TEMPLATE_TEXT, "Management", filex)
+
+
+def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
+    """Write commented YAML for management, cultivar, initial conditions and controls.
+
+    The new sections are accepted and checked for shape only, not applied to
+    FileX yet. Dates are quoted ISO calendar strings; units and codes are DSSAT's.
+    With filex, use its treatment numbers in file order, keeping example values.
+    Without filex, write one example treatment numbered 1. No PyYAML is needed.
+    Raise DSSATError if the destination exists or FileX treatments cannot be read.
+    """
+    text = _MANAGEMENT_TEMPLATE_TEXT.replace(
+        "# DSSATLab Management Template", "# DSSATLab Experiment Template", 1)
+    text = text.replace(
+        "# Management operations (planting, irrigation, fertilizer) by treatment number.",
+        "# Experiment data by treatment number: planting, irrigation, fertilizer,\n"
+        "# cultivar, initial_conditions and controls.", 1)
+    _write_template(path, text + _EXPERIMENT_SECTIONS_TEXT, "Experiment", filex)
+
+
+def _write_template(path, text, label, filex):
+    """Share exclusive creation and treatment-number pre-fill for both templates."""
     path = Path(path)
-    message = f"Management template path {path} already exists. Choose another path."
+    message = f"{label} template path {path} already exists. Choose another path."
     if path.exists():
         raise DSSATError(message)
+    if filex is not None:
+        try:
+            numbers = read_treatment_numbers(filex)
+        except ValueError as error:
+            raise DSSATError(str(error)) from error
+        header, example = text.split("  1:\n", 1)
+        text = header + "\n".join(f"  {number}:\n{example}" for number in numbers)
     try:
         with path.open("x", encoding="utf-8", newline="\n") as stream:
-            stream.write(_MANAGEMENT_TEMPLATE_TEXT)
+            stream.write(text)
     except FileExistsError as error:
         raise DSSATError(message) from error
 
