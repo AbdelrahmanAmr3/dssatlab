@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 
 from .filex import _section_row
+from .cultivar import _check_cultivar
 from .filex_write import _event_text, _planting_text
 from .experiment import (_check_date, _check_experiment_section, _check_fields,
                          _check_number, _unknown_keys)
@@ -196,7 +197,13 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                 lines = _report_lines(label, section_problems)
         problems.extend(section_problems)
         report.extend(lines)
-    for section in ("cultivar", "initial_conditions", "controls"):
+    if "cultivar" in entry:
+        section_problems = _check_cultivar(entry["cultivar"], where, filex, text, number)
+        problems.extend(section_problems)
+        report.extend(_report_lines("    cultivar", section_problems))
+    else:
+        report.append("    cultivar: OK (omitted; keeps the FileX Level)")
+    for section in ("initial_conditions", "controls"):
         if section in entry:
             section_problems = _check_experiment_section(entry[section], section, where)
             problems.extend(section_problems)

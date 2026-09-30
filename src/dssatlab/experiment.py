@@ -64,16 +64,14 @@ def _check_layers(layers, where):
 def _check_experiment_section(data, section, where):
     """Check keys, required fields and scalar/container types, without FileX edits.
 
-    Cultivar lookup, ranges, layer ordering and cross-input checks belong to
+    Ranges, layer ordering and cross-input checks belong to
     the later section tickets. Dates follow the existing strict ISO contract.
     """
     where = f"{where}, {section}"
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply fields from the Experiment "
                 "template or omit the section to keep the FileX level."]
-    if section == "cultivar":
-        required, optional = ("code",), ()
-    elif section == "initial_conditions":
+    if section == "initial_conditions":
         required, optional = ("date", "layers"), ("previous_crop", "residue_mass")
     else:
         required, optional = (), ("start_date", "water", "nitrogen", "output_interval")
