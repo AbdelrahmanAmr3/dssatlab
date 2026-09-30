@@ -71,7 +71,7 @@ def write_weather_file(rows: list[dict], path: str | Path) -> Path:
         stream.write("\n@DATE  SRAD  TMAX  TMIN  RAIN\n")
         for row in rows:
             day = row["date"]
-            stream.write(f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}")
+            stream.write(_dssat_date(day))
             for name in ("srad", "tmax", "tmin", "rain"):
                 value = round(row[name], 1) + 0.0
                 stream.write(f"{value:6.1f}")
@@ -118,6 +118,11 @@ def _read_table(source, label="Weather data"):
     except (OSError, UnicodeError, csv.Error, ValueError) as error:
         return [], None, [("source", f"Cannot read {label.lower()} CSV {source!s}: "
                            f"{error}. Supply a readable comma-separated UTF-8 CSV.")]
+
+
+def _dssat_date(day):
+    """DSSAT's YYDDD date code: two-digit year and day of year."""
+    return f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
 
 
 def _show_value(value):

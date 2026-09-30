@@ -30,6 +30,7 @@ nav:
       - Run a Simulation: guide/simulation.md
       - Run with soil data: guide/soil.md
       - Run with management data: guide/management.md
+      - Run with experiment data: guide/experiment.md
       - Run treatments and scenarios: guide/scenarios.md
       - Reading results: guide/reading-results.md
       - Troubleshooting: guide/troubleshooting.md
@@ -44,6 +45,7 @@ nav:
           - adr/0002-optional-pandas.md
           - adr/0003-optional-pyyaml-for-management.md
           - adr/0004-optional-matplotlib-for-plots.md
+          - adr/0005-experiment-data-edits-an-existing-filex.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md

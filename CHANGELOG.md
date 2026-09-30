@@ -2,6 +2,25 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.6.0] - UNDATED
+
+### Added
+- Experiment data: the per-treatment management YAML (or dict) gains three sections, `cultivar`, `initial_conditions` and `controls`, applied to a copy of your FileX. The original is never changed, and an omitted section keeps the FileX's own level.
+- `cultivar` (`crop` and `code`) is checked against the one crop-matching `.CUL` file beside the FileX; an unknown code is reported with the codes that do exist. A new `CULTIVARS` level is written and only the selected treatment is repointed.
+- `initial_conditions` (`date`, optional `previous_crop` and `residue_mass`, and `layers` of `depth`, `water`, `nh4`, `no3`) rejects non-ascending depths and out-of-range values with the allowed range, and, when `soil=` is given, layers deeper than the soil profile. A new `INITIAL CONDITIONS` level is written.
+- `controls` (`start_date`, `water` and `nitrogen` as `"Y"`/`"N"`, `output_interval` in days) writes a new `SIMULATION CONTROLS` level. A changed `start_date` replaces `SDATE` in the weather-coverage and planting-date checks.
+- `write_experiment_template(path, filex=None)` writes one commented YAML covering every section. `filex=` pre-fills treatment numbers only, here and in `write_management_template`.
+- The new sections work in scenario `management` overrides.
+- Guide page "Run with experiment data" and ADR 0005.
+- Proven on real DSSAT (4.8.5) with maize `UFGA8201` and wheat `KSAS8101`: each section moved the summary as expected (for example a different cultivar changed `HWAM` from 2293 to 658 on maize).
+
+### Changed
+- `check()` now lists `cultivar`, `initial_conditions` and `controls` as "omitted" in its Management report when they are not given. A management-only YAML is still valid.
+
+### Notes
+- Upgrading from 0.5.0 needs no changes.
+- Not included yet: building a FileX from scratch, writing `.CUL`, `.ECO` or `.SPE` parameters, simulation controls beyond the four named, per-crop parameter checks.
+
 ## [0.5.0] - UNDATED
 
 ### Added
@@ -137,6 +156,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Notes
 - Environment diagnostics only. DSSAT discovery, connecting, installation and simulation support were deferred.
 
+[0.6.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.6.0
 [0.5.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.5.0
 [0.4.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.4.0
 [0.3.2]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.2

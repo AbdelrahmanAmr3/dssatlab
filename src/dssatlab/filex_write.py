@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 
 from .filex import _section_row
+from .weather import _dssat_date
 
 
 _PLANTING_HEADER = (
@@ -89,7 +90,7 @@ def _planting_row(columns, level, planting):
     for column in ("PDATE", "EDATE"):
         if values[column] != -99:
             day = date.fromisoformat(values[column])
-            values[column] = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
+            values[column] = _dssat_date(day)
     return "".join(_cell(values.get(column, -99), end - start,
                          "PLANTING DETAILS", column)
                    for column, (start, end) in columns.items())
@@ -222,7 +223,7 @@ def _event_text(text, treatment, events, section="irrigation"):
         rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": 1}, name)])
     for event in events:
         day = date.fromisoformat(event["date"])
-        day_code = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
+        day_code = _dssat_date(day)
         if section == "irrigation":
             values = {"I": level, "IDATE": day_code, "IROP": event["method"], "IRVAL": event["amount"]}
         else:
@@ -242,6 +243,25 @@ def _event_text(text, treatment, events, section="irrigation"):
     return "".join(lines)
 
 
+def _cultivar_text(text, treatment, cultivar):
+    """Add a CULTIVARS level and repoint CU, using the management edit helpers."""
+    _section_row(text, "TREATMENTS", "N", treatment, ("CU",))
+    lines = text.splitlines(keepends=True)
+    header = "@C CR INGENO CNAME"
+    blocks, highest = _event_blocks(lines, "CULTIVARS", (header,))
+    columns, index, _ = blocks[0]
+    level = highest + 1
+    # CNAME is descriptive; -99 avoids retaining the previous cultivar's name.
+    row = _event_row(columns, {"C": level, "CR": cultivar["crop"],
+                               "INGENO": cultivar["code"], "CNAME": -99}, "CULTIVARS")
+    _repoint(lines, treatment, "CU", level)
+    if index is None:
+        lines = _insert_section(lines, "CULTIVARS", [header, row])
+    else:
+        _append_rows(lines, index, [row])
+    return "".join(lines)
+
+
 def _write_management(filex, treatment, management):
     """Apply only the selected, checked entry to the already-copied FileX."""
     if management is None:
@@ -250,10 +270,18 @@ def _write_management(filex, treatment, management):
         if int(key) == int(treatment):
             path = Path(filex)
             text = path.read_bytes().decode("latin-1")
+            if "cultivar" in entry:
+                text = _cultivar_text(text, int(treatment), entry["cultivar"])
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])
             for section in ("irrigation", "fertilizer"):
                 if section in entry:
                     text = _event_text(text, int(treatment), entry[section], section)
+            if "initial_conditions" in entry:
+                from .initial_conditions import _initial_conditions_text
+                text = _initial_conditions_text(text, int(treatment), entry["initial_conditions"])
+            if "controls" in entry:
+                from .controls import _controls_text
+                text = _controls_text(text, int(treatment), entry["controls"])
             path.write_bytes(text.encode("latin-1"))
             return

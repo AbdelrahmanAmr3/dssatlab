@@ -1,13 +1,17 @@
 """Checks and report lines for Management data supplied as a plain dict."""
 
 from datetime import date
-import math
 from pathlib import Path
 import re
 
 from .filex import _section_row
+from .cultivar import _check_cultivar
 from .filex_write import _event_text, _planting_text
+from .experiment import (_check_controls, _check_date, _check_fields,
+                         _check_number, _unknown_keys)
 from .weather import _show_value
+from .initial_conditions import _check_initial_conditions, _initial_conditions_text
+from .controls import _controls_text
 
 
 _REQUIRED = ("date", "method", "distribution", "population", "row_spacing", "depth")
@@ -21,34 +25,6 @@ def _report_lines(label, problems, *, details=None):
     indent = " " * (len(label) - len(label.lstrip()) + 2)
     details = problems if details is None else details
     return [f"{label}: {status}"] + [f"{indent}{problem}" for problem in details]
-
-
-def _unknown_keys(data, allowed, where):
-    return [f"{where}: unknown key {_show_value(key)}. Use only "
-            f"{', '.join(allowed)} from the Management template."
-            for key in data if key not in allowed]
-
-
-def _check_date(value, location):
-    try:
-        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
-            raise ValueError
-        date.fromisoformat(value)
-    except ValueError:
-        return [f"{location}: found {_show_value(value)}. Supply a "
-                'valid ISO calendar date as a quoted YYYY-MM-DD string '
-                '(for example "2024-05-10"); quote the date, even in a dict.']
-    return []
-
-
-def _check_number(value, location):
-    try:
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise ValueError
-    except (ValueError, OverflowError):
-        return [f"{location}: found {_show_value(value)}. Supply a "
-                "finite number in DSSAT's units, not a string or boolean."]
-    return []
 
 
 def _check_planting(planting, where, start_date=None, weather_range=None):
@@ -98,14 +74,6 @@ def _check_weather_date(value, location, weather_range):
     return [f"{location}: date {_show_value(value)} is outside weather range "
             f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
             "the date or choose a date within the weather range."]
-
-
-def _check_fields(data, required, optional, where):
-    problems = _unknown_keys(data, required + optional, where)
-    problems.extend(f"{where}: missing required field {field!r}. "
-                    f"Add {field!r} following the Management template."
-                    for field in required if field not in data)
-    return problems
 
 
 def _check_event_field(value, field, location):
@@ -200,13 +168,14 @@ def _check_treatment_key(key, seen_numbers, text, filex):
     return number, where, problems
 
 
-def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range):
+def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range, soil_depth):
+    sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
-                              "with optional planting, irrigation and fertilizer, "
+                              f"with optional {', '.join(sections)}, "
                               "or an empty dict to keep the FileX Levels.")
         return entry_problems, []
-    entry_problems.extend(_unknown_keys(entry, ("planting", "irrigation", "fertilizer"), where))
+    entry_problems.extend(_unknown_keys(entry, sections, where, "Experiment"))
     problems, report = list(entry_problems), []
     for section in ("planting", "irrigation", "fertilizer"):
         label = f"    {section}"
@@ -230,10 +199,38 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                 lines = _report_lines(label, section_problems)
         problems.extend(section_problems)
         report.extend(lines)
+    if "cultivar" in entry:
+        section_problems = _check_cultivar(entry["cultivar"], where, filex, text, number)
+        problems.extend(section_problems)
+        report.extend(_report_lines("    cultivar", section_problems))
+    else:
+        report.append("    cultivar: OK (omitted; keeps the FileX Level)")
+    for section in ("initial_conditions", "controls"):
+        if section in entry:
+            if section == "initial_conditions":
+                section_problems = _check_initial_conditions(entry[section], where, soil_depth)
+                if not section_problems and not entry_problems and text is not None:
+                    try:
+                        _initial_conditions_text(text, number, entry[section])
+                    except ValueError as error:
+                        section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
+            else:
+                section_problems = _check_controls(entry[section], where)
+                if not section_problems and not entry_problems and text is not None:
+                    try:
+                        _controls_text(text, number, entry[section])
+                    except ValueError as error:
+                        section_problems.append(f"{where}, controls: FileX {filex}: {error}")
+            problems.extend(section_problems)
+            lines = _report_lines(f"    {section}", section_problems)
+            report.extend(lines)
+        else:
+            report.append(f"    {section}: OK (omitted; keeps the FileX Level)")
     return problems, report
 
 
-def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None):
+def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
+                      soil_depth=None):
     """Check every treatment without mutation; compare selected dates with FileX and weather.
 
     If FileX is unreadable, Simulation reports that failure; shape checks still run.
@@ -274,7 +271,8 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         is_selected = number is not None and number == selected_number
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
-            start_date if is_selected else None, weather_range if is_selected else None)
+            start_date if is_selected else None, weather_range if is_selected else None,
+            soil_depth if is_selected else None)
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
         report.extend(lines)

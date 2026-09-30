@@ -1,0 +1,75 @@
+"""Check cultivar identifiers against the sibling .CUL copied into a simulation."""
+
+from pathlib import Path
+import re
+
+from .experiment import _check_fields
+from .filex_write import _cultivar_text
+from .weather import _show_value
+
+
+def _cultivar_codes(filex, crop):
+    """Read only VAR# from one crop's .CUL; never inspect model coefficients."""
+    folder = Path(filex).parent
+    paths = sorted(path for path in folder.iterdir()
+                   if path.is_file() and path.suffix.upper() == ".CUL"
+                   and path.name[:2].upper() == crop)
+    if not paths:
+        raise ValueError(f"no .CUL file for crop {crop!r} beside FileX {filex}. "
+                         f"Supply the {crop}*.CUL file to copy into the simulation folder.")
+    if len(paths) != 1:
+        raise ValueError(f"multiple .CUL files for crop {crop!r}: "
+                         f"{', '.join(path.name for path in paths)}. Keep one matching "
+                         ".CUL file beside the FileX; model selection is not supported.")
+    path = paths[0]
+    codes, in_table, has_header = [], False, False
+    for line in path.read_text(encoding="latin-1").splitlines():
+        if line.startswith("@"):
+            in_table = line.split()[0] == "@VAR#"
+            has_header = has_header or in_table
+        elif line.startswith("*"):
+            in_table = False
+        elif in_table and line.strip() and not line.lstrip().startswith("!"):
+            code = line[:6]
+            if re.fullmatch(r"[!-~]{6}", code) and code not in codes:
+                codes.append(code)
+    if not has_header:
+        raise ValueError(f".CUL file {path} has no @VAR# header. Supply a cultivar table.")
+    if not codes:
+        raise ValueError(f".CUL file {path} has no cultivar codes under @VAR#. "
+                         "Supply a table containing six-character cultivar codes.")
+    return path, codes
+
+
+def _check_cultivar(data, where, filex, text, treatment):
+    """Check fields, local cultivar availability and the edit before any write."""
+    where = f"{where}, cultivar"
+    if not isinstance(data, dict):
+        return [f"{where}: expected a dict. Supply crop and code from the "
+                "Experiment template or omit cultivar to keep the FileX level."]
+    problems = _check_fields(data, ("crop", "code"), (), where, "Experiment")
+    for field, pattern, hint in (
+        ("crop", r"[A-Z]{2}", "two uppercase ASCII letters for CR"),
+        ("code", r"[!-~]{6}", "six printable ASCII characters without spaces for INGENO"),
+    ):
+        if field in data and (not isinstance(data[field], str) or
+                              not re.fullmatch(pattern, data[field])):
+            problems.append(f"{where}, field {field!r}: found {_show_value(data[field])}. "
+                            f"Supply a quoted string with {hint}.")
+    if problems:
+        return problems
+    if isinstance(filex, (str, Path)):
+        try:
+            path, codes = _cultivar_codes(filex, data["crop"])
+            if data["code"] not in codes:
+                problems.append(f"{where}: code {data['code']!r} is missing from .CUL "
+                                f"file {path} for crop {data['crop']!r}. "
+                                f"Choose an existing code: {', '.join(codes)}.")
+        except (OSError, ValueError) as error:
+            problems.append(f"{where}: cannot check .CUL: {error}")
+    if text is not None and treatment is not None:
+        try:
+            _cultivar_text(text, treatment, data)
+        except ValueError as error:
+            problems.append(f"{where}: FileX {filex}: {error}")
+    return problems

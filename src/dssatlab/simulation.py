@@ -6,6 +6,7 @@ import re
 import shutil
 
 from .errors import DSSATCheckError, DSSATRunError
+from .controls import _controls_start_date
 from .filex import _read_filex, _weather_filename
 from .filex_write import _write_management
 from .management import _check_management, _report_lines
@@ -61,8 +62,9 @@ class Simulation:
             and keeps copying sibling soil files.
         management (str | Path | dict | None): Keyword-only. Management data as a
             path to a YAML file or a plain dict keyed by 'treatments', with optional
-            planting, irrigation and fertilizer per treatment. Construction only stores
-            it; check() checks every entry and prints a report.
+            planting, irrigation, fertilizer, cultivar, initial_conditions and controls
+            per treatment. Construction only stores it; check() checks every entry
+            and prints a report.
     """
 
     def __init__(self, filex, treatment, weather, executable=None, *, soil=None, management=None):
@@ -102,7 +104,9 @@ class Simulation:
         layers, and requires its soil_id to equal the selected field's ID_SOIL.
         """
         rows, weather_problems = _parse_weather(self.weather)
-        values, filex_problems = _read_filex(self.filex, self.treatment)
+        management_dict, load_problems = _load_management(self.management)
+        override_start = _controls_start_date(management_dict, self.treatment)
+        values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
         if len(name) > 12:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
@@ -118,16 +122,23 @@ class Simulation:
                                      f"{station!r}. Make the station codes exactly equal; "
                                      "filenames are case-sensitive on Linux.")
         days = [row["date"] for row in rows if "date" in row]
-        if values.get("START") == "S" and "SDATE" in values and days:
+        if override_start is not None and days:
+            if override_start not in days:
+                filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "
+                                     f"covered by weather data ({min(days)} to {max(days)}). "
+                                     "Supply weather for the simulation's start date.")
+        elif values.get("START") == "S" and "SDATE" in values and days:
             start = values["SDATE"]
             wanted = (int(start[:2]), int(start[2:]))
             if not any((day.year % 100, day.timetuple().tm_yday) == wanted for day in days):
                 filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
-        soil_problems = []
+        soil_problems, soil_depth = [], None
         if self.soil is not None:
             soil_rows, soil_problems = _parse_soil(self.soil)
+            if not soil_problems:
+                soil_depth = max(row["slb"] for row in soil_rows)
             soil_ids = {row["soil_id"] for row in soil_rows if "soil_id" in row}
             soil_id = values.get("ID_SOIL")
             if not soil_id or soil_id == "-99":
@@ -147,14 +158,13 @@ class Simulation:
             report.extend(_report_lines("Soil data", soil_problems))
         report.extend(_report_lines("FileX", filex_problems))
         if self.management is not None:
-            management_dict, load_problems = _load_management(self.management)
             if load_problems:
                 problems.extend(load_problems)
                 report.extend(_report_lines("Management data", load_problems))
             else:
-                start_date = _simulation_start_date(values, days)
+                start_date = override_start or _simulation_start_date(values, days)
                 management_problems, management_report = _check_management(
-                    management_dict, self.filex, self.treatment, rows, start_date
+                    management_dict, self.filex, self.treatment, rows, start_date, soil_depth
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)
@@ -168,8 +178,9 @@ class Simulation:
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
         FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
         and generates the weather file (*.WTH).
-        With management planting, adds a new level in the copy and repoints only
-        the selected treatment; the original FileX is never changed.
+        With management data, adds a new level for each section given (planting,
+        irrigation, fertilizer, cultivar, initial conditions, controls) in the copy
+        and repoints only the selected treatment; the original FileX is never changed.
         When soil data is given, writes its soil profile to SOIL.SOL and copies
         no sibling .SOL files; otherwise
         copies all sibling .SOL files. Invokes the DSSAT executable for the
@@ -190,14 +201,13 @@ class Simulation:
             raise DSSATCheckError(problems)
 
         rows, _ = _parse_weather(self.weather)
-        values, _ = _read_filex(self.filex, self.treatment)
+        management_dict, _ = _load_management(self.management)
+        override_start = _controls_start_date(management_dict, self.treatment)
+        values, _ = _read_filex(self.filex, self.treatment, start_date=override_start)
         weather_name = _weather_filename(values["WSTA"], values["SDATE"])
         filex = Path(self.filex).resolve()
         sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
         shutil.copy2(filex, sim_folder / filex.name)
-        management_dict = None
-        if self.management is not None:
-            management_dict, _ = _load_management(self.management)
         _write_management(sim_folder / filex.name, self.treatment, management_dict)
         for sibling in filex.parent.iterdir():
             if self.soil is not None and sibling.suffix.upper() == ".SOL":

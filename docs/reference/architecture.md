@@ -9,9 +9,13 @@ The codebase under `src/dssatlab/` consists of fifteen modules:
 - `__init__.py`: Defines `__version__` and exports the public API via `__all__`.
 - `config.py`: Reads and writes persistent JSON configuration storing the remembered DSSAT executable path.
 - `core.py`: Discovers, validates, and installs the DSSAT executable (`connect`, `detect`, `install`).
+- `controls.py`: Checks the experiment `controls` section (start date, water and nitrogen switches, output interval) and writes a new `SIMULATION CONTROLS` level in the copied FileX.
+- `cultivar.py`: Checks an experiment `cultivar` code against the `.CUL` file beside the FileX and writes a new `CULTIVARS` level in the copied FileX.
 - `errors.py`: Defines the exception hierarchy for discovery, installation, input checks, and run failures.
+- `experiment.py`: Shared field, date and number checks for the experiment sections, and the `controls` shape check.
 - `filex.py`: Reads a FileX to extract field station codes (`WSTA`), field soil profile IDs (`ID_SOIL`), and simulation controls (`START`, `SDATE`) for a treatment.
 - `filex_write.py`: Modifies FileX text to append new management levels (planting details, irrigation schedules, fertilizer applications) and repoints treatment entries without altering other sections.
+- `initial_conditions.py`: Checks the experiment `initial_conditions` section (depths, ranges, soil depth) and writes a new `INITIAL CONDITIONS` level in the copied FileX.
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
 - `management.py`: Validates management dictionary shape, field keys, numeric bounds, date order, and start date / weather bounds; formats structured check report lines.
 - `management_file.py`: Writes the YAML management template (`write_management_template`) and provides strict YAML loading (`_load_management`) using PyYAML SafeLoader with duplicate key rejection.

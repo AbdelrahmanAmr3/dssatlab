@@ -1,6 +1,6 @@
 # 0005: Experiment data is one YAML that edits a copy of an existing FileX
 
-Status: proposed (2026-09-30)
+Status: accepted (2026-09-30)
 
 ## Context
 

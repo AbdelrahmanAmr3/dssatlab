@@ -1,8 +1,9 @@
-"""YAML management template writer and strict YAML loader."""
+"""Management and experiment YAML templates and the strict optional YAML loader."""
 
 from pathlib import Path
 
 from .errors import DSSATError
+from .filex import read_treatment_numbers
 
 
 _MANAGEMENT_TEMPLATE_TEXT = """# DSSATLab Management Template
@@ -53,7 +54,37 @@ treatments:
 """
 
 
-def write_management_template(path: str | Path) -> None:
+_EXPERIMENT_SECTIONS_TEXT = """
+    # Omit a section to keep the FileX's own level.
+    # Cultivar adds a new CULTIVARS level in the copy and repoints this treatment.
+    cultivar:
+      crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
+      code: "IB0035"             # Required INGENO: six printable ASCII characters, no spaces; case-sensitive
+      # Code must exist in the one crop-matching .CUL beside the FileX (e.g., MZCER048.CUL).
+      # That .CUL is copied into the simulation folder; no coefficients are edited.
+
+    initial_conditions:          # Checked and written as a new level in the FileX copy
+      date: "1982-02-25"          # Required initial-conditions date (quoted "YYYY-MM-DD")
+      previous_crop: "MZ"         # Optional two-letter DSSAT crop code; omitted writes -99
+      residue_mass: 0.0           # Optional surface residue mass, kg/ha (>= 0); omitted writes -99
+      layers:                    # Required non-empty list; all four fields required per layer
+        - depth: 15.0            # Bottom of layer, cm (> 0); strictly ascending; within soil= depth
+          water: 0.2             # Volumetric soil water, cm3/cm3 (0 to 1 inclusive)
+          nh4: 0.5               # Soil ammonium, mg/kg (>= 0, no upper limit)
+          no3: 2.0               # Soil nitrate, mg/kg (>= 0, no upper limit)
+
+    # Controls are checked and applied to a new level in a copy of the FileX.
+    # Omitted fields keep their base values; omit controls to keep the FileX level.
+    # start_date replaces SDATE in weather and management date checks; START stays unchanged.
+    controls:                    # All fields optional; an empty dict keeps the FileX level
+      start_date: "1982-02-25"    # Simulation start date (quoted "YYYY-MM-DD")
+      water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)
+      nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
+      output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column
+"""
+
+
+def write_management_template(path: str | Path, filex: str | Path | None = None) -> None:
     """Write a UTF-8 YAML management template with commented examples.
 
     Documents every planting, irrigation, and fertilizer field and its unit.
@@ -62,17 +93,52 @@ def write_management_template(path: str | Path) -> None:
 
     Args:
         path: File destination path where the YAML management template will be created.
+        filex: Optional FileX whose treatment numbers replace the example number.
+            Only numbers are read; all example values stay unchanged.
 
     Raises:
-        DSSATError: If the destination path already exists.
+        DSSATError: If the destination exists or FileX treatments cannot be read.
     """
+    _write_template(path, _MANAGEMENT_TEMPLATE_TEXT, "Management", filex)
+
+
+def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
+    """Write commented YAML for management, cultivar, initial conditions and controls.
+
+    Cultivar, initial conditions and controls are checked and applied to the FileX copy.
+    Dates are quoted ISO calendar strings; units and codes are DSSAT's.
+    With filex, use its treatment numbers in file order, keeping example values.
+    Without filex, write one example treatment numbered 1. No PyYAML is needed.
+    Raise DSSATError if the destination exists or FileX treatments cannot be read.
+    """
+    title = "# DSSATLab Management Template"
+    intro = "# Management operations (planting, irrigation, fertilizer) by treatment number."
+    assert title in _MANAGEMENT_TEMPLATE_TEXT and intro in _MANAGEMENT_TEMPLATE_TEXT, (
+        "management template wording changed; update write_experiment_template")
+    text = _MANAGEMENT_TEMPLATE_TEXT.replace(title, "# DSSATLab Experiment Template", 1)
+    text = text.replace(
+        intro,
+        "# Experiment data by treatment number: planting, irrigation, fertilizer,\n"
+        "# cultivar, initial_conditions and controls.", 1)
+    _write_template(path, text + _EXPERIMENT_SECTIONS_TEXT, "Experiment", filex)
+
+
+def _write_template(path, text, label, filex):
+    """Share exclusive creation and treatment-number pre-fill for both templates."""
     path = Path(path)
-    message = f"Management template path {path} already exists. Choose another path."
+    message = f"{label} template path {path} already exists. Choose another path."
     if path.exists():
         raise DSSATError(message)
+    if filex is not None:
+        try:
+            numbers = read_treatment_numbers(filex)
+        except ValueError as error:
+            raise DSSATError(str(error)) from error
+        header, example = text.split("  1:\n", 1)
+        text = header + "\n".join(f"  {number}:\n{example}" for number in numbers)
     try:
         with path.open("x", encoding="utf-8", newline="\n") as stream:
-            stream.write(_MANAGEMENT_TEMPLATE_TEXT)
+            stream.write(text)
     except FileExistsError as error:
         raise DSSATError(message) from error
 
