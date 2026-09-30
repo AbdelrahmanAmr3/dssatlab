@@ -275,7 +275,7 @@ def _identity_text(text, treatment, name, station, soil_id):
     """Render the selected treatment's label and field IDs, also for checks."""
     row = _section_row(text, "TREATMENTS", "N", treatment, ("FL",))
     lines = text.splitlines(keepends=True)
-    if name is not None:
+    if name not in (None, "base"):
         if not isinstance(name, str) or not name.strip() or not name.isprintable():
             raise ValueError("Scenario name must be a non-empty printable string.")
         name.encode("latin-1")
@@ -289,14 +289,17 @@ def _identity_text(text, treatment, name, station, soil_id):
 
 
 def _write_management(filex, treatment, management, *, name=None, station=None, soil_id=None):
-    """Apply only the selected, checked entry to the already-copied FileX."""
+    """Apply a checked label, optional site IDs and experiment edits to the copy."""
+    path = Path(filex)
+    if name not in (None, "base") or station is not None or soil_id is not None:
+        text = path.read_bytes().decode("latin-1")
+        text = _identity_text(text, int(treatment), name, station, soil_id)
+        path.write_bytes(text.encode("latin-1"))
     if management is None:
         return
     for key, entry in management["treatments"].items():
         if int(key) == int(treatment) and entry:
-            path = Path(filex)
             text = path.read_bytes().decode("latin-1")
-            text = _identity_text(text, int(treatment), name, station, soil_id)
             if "cultivar" in entry:
                 text = _cultivar_text(text, int(treatment), entry["cultivar"])
             if "planting" in entry:

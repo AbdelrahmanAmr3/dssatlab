@@ -80,8 +80,8 @@ class Simulation:
             planting, irrigation, fertilizer, cultivar, initial_conditions and controls
             per treatment. Construction only stores it; check() checks every entry
             and prints a report.
-        name (str | None): Scenario name written to the copied treatment when
-            experiment overrides are given. None keeps the FileX treatment name.
+        name (str | None): Scenario name written to the copied treatment, even
+            without experiment overrides. None and "base" keep the FileX name.
             Names must fit its column; run_treatments supplies each scenario name.
     """
 
@@ -120,9 +120,9 @@ class Simulation:
         ranges, date order, duplicates, and gaps; reads the FileX for treatment
         validity, field station code (WSTA), and start controls (START, SDATE);
         ensures FileX filename is at most 12 characters and weather data covers
-        SDATE when START is 'S'. Checks soil data when given. With experiment
-        overrides, checks the copied treatment name and field edits in memory;
-        otherwise requires matching weather station and soil profile IDs.
+        SDATE when START is 'S'. Checks soil data and scenario name column fit.
+        With experiment overrides, checks field edits in memory; otherwise
+        requires matching weather station and soil profile IDs.
         """
         rows, weather_problems = _parse_weather(self.weather)
         management_dict, load_problems = _load_management(self.management)
@@ -201,10 +201,12 @@ class Simulation:
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)
-        if edit_identity and not problems:
+        if (edit_identity or self.name not in (None, "base")) and not problems:
             try:
                 _identity_text(Path(self.filex).read_bytes().decode("latin-1"),
-                               int(self.treatment), self.name, rows[0]["station"], template_id)
+                               int(self.treatment), self.name,
+                               rows[0]["station"] if edit_identity else None,
+                               template_id if edit_identity else None)
             except ValueError as error:
                 problems.append(f"FileX: {error}")
                 report.extend(_report_lines("FileX identity", [str(error)]))
@@ -221,8 +223,9 @@ class Simulation:
         With management data, adds a new level for each section given (planting,
         irrigation, fertilizer, cultivar, initial conditions, controls) in the copy
         and repoints only the selected treatment; the original FileX is never changed.
-        Also writes name (when given), the weather station and supplied soil ID
-        into the selected treatment and its field in that copy.
+        With experiment overrides, writes the weather station and supplied soil
+        ID into that field. Independently writes name into the copied treatment,
+        except for None and "base", which retain the FileX treatment name.
         When soil data is given, writes its soil profile to SOIL.SOL and copies
         no sibling .SOL files; otherwise
         copies all sibling .SOL files. Invokes the DSSAT executable for the
@@ -256,7 +259,7 @@ class Simulation:
         shutil.copy2(filex, sim_folder / filex.name)
         _write_management(sim_folder / filex.name, self.treatment, management_dict,
                           name=self.name, station=station,
-                          soil_id=soil_rows[0]["soil_id"] if soil_rows else None)
+                          soil_id=soil_rows[0]["soil_id"] if soil_rows and station is not None else None)
         for sibling in filex.parent.iterdir():
             if self.soil is not None and sibling.suffix.upper() == ".SOL":
                 continue
