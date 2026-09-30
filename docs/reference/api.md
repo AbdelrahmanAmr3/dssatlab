@@ -12,13 +12,15 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.run
 
-## Simulation, weather, and soil
+## Simulation, weather, soil, and management
 
 ::: dssatlab.Simulation
 
 ::: dssatlab.write_weather_template
 
 ::: dssatlab.write_soil_template
+
+::: dssatlab.write_management_template
 
 ## Exceptions
 

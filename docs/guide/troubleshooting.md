@@ -111,9 +111,9 @@ The label identifies either the run directory or the simulation folder.
 Move or copy the FileX and its supporting files to a folder where your Python
 process can create files and directories, then use the new FileX path.
 
-## The weather or soil template already exists
+## The weather, soil, or management template already exists
 
-`DSSATError` from `write_weather_template()` or `write_soil_template()`:
+`DSSATError` from `write_weather_template()`, `write_soil_template()`, or `write_management_template()`:
 
 ```text
 Weather template path {path} already exists. Choose another path.
@@ -125,8 +125,14 @@ or:
 Soil template path {path} already exists. Choose another path.
 ```
 
+or:
+
+```text
+Management template path {path} already exists. Choose another path.
+```
+
 The function preserves existing data. Edit that template, or call
-`write_weather_template()` or `write_soil_template()` with a new filename.
+the template function with a new filename.
 
 ## Simulation checks found problems
 
@@ -194,6 +200,39 @@ be strictly increasing fractions. While DSSAT itself accepts equal values,
 dssatlab enforces strict inequalities because equal values leave no
 plant-available water or no pore space. Correct the fractions using the
 [soil template columns](soil.md#prepare-the-soil-template).
+
+```text
+Management file {path}: PyYAML is not installed. Install PyYAML with 'pip install pyyaml' to load management YAML files.
+```
+
+Reading a management YAML file requires PyYAML. Install it via `pip install pyyaml`
+or `pip install dssatlab[yaml]`, or pass management data as a plain Python dictionary.
+
+```text
+Management data treatment 1, planting, field 'date': found 1982-02-26. Supply a valid ISO calendar date as a quoted YYYY-MM-DD string (for example "2024-05-10"); quote the date, even in a dict.
+```
+
+Dates in YAML and dictionary inputs must be quoted strings in `"YYYY-MM-DD"` format.
+Bare dates in YAML parse into Python `date` objects, which are rejected.
+
+```text
+Management data treatment 1, planting, field 'date': planting date '1982-02-20' is before simulation start date '1982-02-26'. Planting must be on or after the simulation start date.
+```
+
+The crop cannot be planted before the simulation begins. Adjust the planting date
+or the simulation start date in the FileX.
+
+```text
+Management data treatment 1, irrigation, event 1, field 'date': date '1982-08-15' is outside weather range (1982-01-01 to 1982-07-31). Supply weather covering the date or choose a date within the weather range.
+```
+
+All management operations must occur on dates covered by your daily weather data.
+
+```text
+Management data treatment 1, irrigation, event 2, field 'date': duplicate date '1982-03-15' in events 1 and 2. Keep one event per date.
+```
+
+Event lists for irrigation and fertilizer must have unique and strictly ascending dates.
 
 ## DSSAT could not start or reported a failed run
 
