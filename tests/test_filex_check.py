@@ -285,7 +285,7 @@ def test_filex_problems_without_usable_weather(filex, data):
 def test_unreadable_filex_is_a_problem(tmp_path, weather, monkeypatch, kind):
     weather_path = weather(rain=-1)
     source = {"missing": tmp_path / "absent.MZX", "directory": tmp_path,
-              "denied": tmp_path / "denied.MZX", "invalid": None}[kind]
+              "denied": tmp_path / "denied.MZX", "invalid": object()}[kind]
     if kind == "denied":
         def denied(*args, **kwargs):
             raise PermissionError("read denied")

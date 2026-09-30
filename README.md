@@ -71,6 +71,13 @@ problems = sim.check()   # every problem at once, nothing is written; [] means f
 result = sim.run()       # checks first, then writes files and runs DSSAT
 ```
 
+No FileX yet? For maize or wheat, write one from a **FileX template** instead. Station, coordinates and elevation come from your weather data, and the soil ID from your soil data:
+
+```python
+dl.write_filex_template("filex.yaml")   # crop, treatment name, cultivar, planting
+sim = dl.Simulation(filex_template="filex.yaml", weather="weather.csv", soil="soil.csv")
+```
+
 Values are in DSSAT's own units and nothing is converted:
 
 - **Weather template**: comma-separated UTF-8 CSV with `station`, `latitude`, `longitude`, `elevation`, `date` (`YYYY-MM-DD`), `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`, `wndht` (default -99). Station and coordinates repeat on every row; one row per calendar day without gaps or duplicates.
@@ -87,7 +94,7 @@ What happens:
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, building a FileX from scratch, and parallel or resumed runs.
+Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a FileX with more than one field, treatment or crop (maize and wheat are supported), and parallel or resumed runs.
 
 ## Multi-treatment and scenario runs
 

@@ -1,10 +1,47 @@
 # Run a Simulation from your weather data
 
 A `Simulation` combines one treatment of an existing FileX with your daily weather
-data. To supply your own soil data as well, see [Run with soil data](soil.md).
+data, or creates a FileX from a template and your weather and soil data.
+To supply your own soil data, see [Run with soil data](soil.md).
 Prepare the FileX and its supporting files, then
 [find or install a DSSAT executable](install.md). The examples use
 `UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
+
+## Start from a FileX template
+
+For maize or wheat, supply a FileX template instead of an existing FileX:
+
+```python
+import dssatlab as dl
+
+dl.write_filex_template("filex.yaml")  # Edit the crop, cultivar and planting values.
+sim = dl.Simulation(
+    filex_template="filex.yaml", weather="weather.csv", soil="soil.csv",
+    executable=r"C:\DSSAT48\DSCSM048.EXE",
+)
+problems = sim.check()
+```
+
+`filex_template` accepts a YAML path (optional PyYAML required) or a dict with the
+same fields (no extra dependency). Supply exactly one of `filex` and
+`filex_template`; both or neither raise `DSSATCheckError` from `check()` and
+`run()`. The existing positional order remains `filex, treatment, weather,
+executable`, with defaults `None, 1, None, None`. Templates require `soil` and
+use treatment 1. Station and soil IDs come from your data. The simulation starts
+on the template's planting date, which must be covered by weather, unless
+experiment controls override the start date.
+
+Template checks find the data directory beside the explicit or discovered DSSAT
+executable and read its `Genotype` folder without saving configuration or writing
+files. `management` and `name` work as with an existing FileX: checks inspect the
+skeleton in memory, then experiment overrides apply to the generated FileX.
+Cultivar overrides must keep the template's crop and use its fixed model's table.
+
+`sim.run()` creates a fresh simulation folder beside the YAML file, or in the
+current directory for a dict. It writes the FileX, weather and `SOIL.SOL`, and
+copies the crop's `.CUL`, `.ECO` and `.SPE` files from `Genotype` (`MZCER048` for
+maize, `WHCER048` for wheat). Your original files are unchanged.
+`run_treatments()` continues to accept an existing FileX path only.
 
 ## Prepare the weather template
 
@@ -27,7 +64,7 @@ Values use DSSAT's own units; nothing is converted.
 
 | Column | Required | Meaning and checks |
 | --- | --- | --- |
-| `station` | Yes | Exactly four ASCII letters or digits; match the first four characters of the treatment's FileX `WSTA` exactly |
+| `station` | Yes | Exactly four ASCII letters or digits; match the first four characters of the treatment's FileX `WSTA` unless experiment overrides are supplied |
 | `latitude` | Yes | Degrees north, from -90 to 90 |
 | `longitude` | Yes | Degrees east, from -180 to 180 |
 | `elevation` | Yes | Station elevation in m, from -500 to 9000 |
@@ -76,6 +113,18 @@ case. `WSTA` must have four or eight characters, and `SDATE` must contain five
 digits: two for the year and three for the day of year. The FileX filename must
 also fit the 12-character limit.
 
+When `management` supplies experiment overrides for the selected treatment,
+the copied FileX uses the weather data's station and, if supplied, the soil
+data's profile ID. These IDs need not match the source FileX. An omitted or empty
+treatment entry keeps the matching checks above.
+
+Independently of experiment overrides, pass `name="own site"` to write a name
+into the copied treatment's `TNAME` (or `TNAM`) column, reported as `TNAM` in
+Summary. Both `name=None` (the default) and `name="base"` retain the source
+treatment name. Names that exceed the FileX column width are rejected during
+checks, including when no experiment data is supplied. Giving a name alone
+leaves the copied field IDs unchanged.
+
 **Start-date coverage is checked only when `START` is `S`.** In that case, a
 weather date must match the two-digit year and day of year in `SDATE`. These
 checks do not establish how long the crop will need weather. Supply weather for
@@ -121,6 +170,9 @@ eight characters, the generated weather file is named `<WSTA>.WTH`. If it has
 four, the name is `<WSTA><two-digit year from SDATE>01.WTH`. This naming uses
 `SDATE` for every `START` option. Your original FileX and supporting files are
 left unchanged; DSSAT runs against the copies.
+
+With experiment overrides, `WSTA` is the weather data's four-character station,
+so the weather filename uses that station and the year from `SDATE`.
 
 A successful call returns the same [RunResult fields](run-filex.md#inspect-the-run-result)
 as `dl.run()`. The simulation folder is kept on failure. For failures after DSSAT

@@ -36,7 +36,7 @@ Layer bottom depths (`slb`) must be positive and strictly increasing from top to
 
 | Column | Level | Required | Units | Meaning and checks |
 | --- | --- | --- | --- | --- |
-| `soil_id` | Profile | Yes | ASCII | 1 to 10 ASCII letters or digits; must match the treatment's FileX `ID_SOIL` exactly (case-sensitive) |
+| `soil_id` | Profile | Yes | ASCII | 1 to 10 ASCII letters or digits; must match the treatment's FileX `ID_SOIL` unless experiment overrides are supplied |
 | `salb` | Profile | Yes | fraction | Soil albedo, from 0 to 1 |
 | `slro` | Profile | Yes | dimensionless | Runoff curve number, from 0 to 100 |
 | `sldr` | Profile | Yes | fraction/day | Drainage rate, from 0 to 1 |
@@ -119,7 +119,14 @@ The checks verify that:
 - Water limits satisfy `0 < slll < sdul < ssat < 1`.
 - Numeric values fall within valid physical bounds.
 - `soil_id` matches the field's `ID_SOIL` in the FileX for the chosen treatment
-  exactly, including case. DSSAT matches soil IDs case-sensitively on every system.
+  exactly, including case. With experiment overrides for that treatment in
+  `management`, the copied field's `ID_SOIL` is replaced by the supplied soil ID
+  instead. DSSAT matches soil IDs case-sensitively on every system.
+
+A named soil-only scenario still writes its scenario name into the copied
+treatment's `TNAME`/`TNAM` column (`"base"` retains the source treatment name).
+This label change does not override the field's `ID_SOIL`; experiment overrides
+are still required for that change.
 
 ## Run after the checks
 

@@ -114,6 +114,12 @@ management data, and later cultivar, initial conditions and simulation controls.
 data is one part of it, not a synonym.
 _Avoid_: management (for the whole dict), FileX input
 
+**FileX template**:
+The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one field, one
+treatment, one crop. Built from the experiment data plus the crop, station and soil profile.
+Not the same as the experiment template, which only edits a copy of an existing FileX.
+_Avoid_: FileX generator
+
 **Example**:
 A complete, ready-to-run folder of filled-in files (a FileX with its genotype files,
 plus weather data, soil data and experiment data) that runs with no edits. Shows what a
