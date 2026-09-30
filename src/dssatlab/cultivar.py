@@ -23,6 +23,11 @@ def _cultivar_codes(filex, crop):
                          f"{', '.join(path.name for path in paths)}. Keep one matching "
                          ".CUL file beside the FileX; model selection is not supported.")
     path = paths[0]
+    return path, _read_cultivar_codes(path)
+
+
+def _read_cultivar_codes(path):
+    """Read VAR# from a selected .CUL, shared with the fixed FileX crop models."""
     codes, in_table, has_header = [], False, False
     for line in path.read_text(encoding="latin-1").splitlines():
         if line.startswith("@"):
@@ -39,7 +44,14 @@ def _cultivar_codes(filex, crop):
     if not codes:
         raise ValueError(f".CUL file {path} has no cultivar codes under @VAR#. "
                          "Supply a table containing six-character cultivar codes.")
-    return path, codes
+    return codes
+
+
+def _unknown_cultivar(code, codes, path, crop, where):
+    return (f"{where}: code {code!r} is missing from .CUL "
+            f"file {path} for crop {crop!r}. Closest codes: "
+            f"{', '.join(get_close_matches(code, codes, 5, 0) or codes[:5])}"
+            f" ({len(codes)} codes in the file; open it to see all).")
 
 
 def _check_cultivar(data, where, filex, text, treatment):
@@ -63,11 +75,7 @@ def _check_cultivar(data, where, filex, text, treatment):
         try:
             path, codes = _cultivar_codes(filex, data["crop"])
             if data["code"] not in codes:
-                problems.append(f"{where}: code {data['code']!r} is missing from .CUL "
-                                f"file {path} for crop {data['crop']!r}. "
-                                f"Closest codes: "
-                                f"{', '.join(get_close_matches(data['code'], codes, 5, 0) or codes[:5])}"
-                                f" ({len(codes)} codes in the file; open it to see all).")
+                problems.append(_unknown_cultivar(data["code"], codes, path, data["crop"], where))
         except (OSError, ValueError) as error:
             problems.append(f"{where}: cannot check .CUL: {error}")
     if text is not None and treatment is not None:
