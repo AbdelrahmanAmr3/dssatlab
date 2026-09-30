@@ -50,7 +50,7 @@ def _check_number(value, location):
     return []
 
 
-def _check_planting(planting, where):
+def _check_planting(planting, where, start_date=None, weather_range=None):
     if not isinstance(planting, dict) or not planting:
         return [f"{where}: planting must be a non-empty dict. Supply the required "
                 f"fields: {', '.join(_REQUIRED)}; omit planting to keep the FileX Level."]
@@ -65,7 +65,22 @@ def _check_planting(planting, where):
         value = planting[field]
         location = f"{where}, field {field!r}"
         if field in ("date", "emergence_date"):
-            problems.extend(_check_date(value, location))
+            date_problems = _check_date(value, location)
+            problems.extend(date_problems)
+            if not date_problems and field == "date":
+                d = date.fromisoformat(value)
+                if start_date is not None and d < start_date:
+                    problems.append(
+                        f"{location}: planting date {_show_value(value)} is before simulation "
+                        f"start date {_show_value(start_date.isoformat())}. Planting must be "
+                        "on or after the simulation start date."
+                    )
+                if weather_range is not None and not (weather_range[0] <= d <= weather_range[1]):
+                    problems.append(
+                        f"{location}: date {_show_value(value)} is outside weather range "
+                        f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
+                        "the date or choose a date within the weather range."
+                    )
         elif field in ("method", "distribution"):
             if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]", value):
                 problems.append(f"{location}: found {_show_value(value)}. Supply a "
@@ -85,7 +100,7 @@ def _check_planting(planting, where):
     return problems
 
 
-def _check_events(events, section, where):
+def _check_events(events, section, where, weather_range=None):
     label = f"    {section}"
     where = f"{where}, {section}"
     if not isinstance(events, list):
@@ -99,6 +114,8 @@ def _check_events(events, section, where):
                 ("date", "material", "application", "depth", "n"))
     optional = () if section == "irrigation" else ("p", "k")
     problems, report = [], []
+    seen_dates = {}
+    previous_date = None
     for number, event in enumerate(events, 1):
         location = f"{where}, event {number}"
         if not isinstance(event, dict):
@@ -116,7 +133,29 @@ def _check_events(events, section, where):
                 value = event[field]
                 field_location = f"{location}, field {field!r}"
                 if field == "date":
-                    event_problems.extend(_check_date(value, field_location))
+                    date_problems = _check_date(value, field_location)
+                    event_problems.extend(date_problems)
+                    if not date_problems:
+                        d = date.fromisoformat(value)
+                        if previous_date is not None and d < previous_date:
+                            event_problems.append(
+                                f"{field_location}: date {_show_value(value)} is not in ascending order. "
+                                "Order events by date ascending."
+                            )
+                        if value in seen_dates:
+                            event_problems.append(
+                                f"{field_location}: duplicate date {_show_value(value)} in "
+                                f"events {seen_dates[value]} and {number}. Keep one event per date."
+                            )
+                        else:
+                            seen_dates[value] = number
+                        previous_date = d
+                        if weather_range is not None and not (weather_range[0] <= d <= weather_range[1]):
+                            event_problems.append(
+                                f"{field_location}: date {_show_value(value)} is outside weather range "
+                                f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
+                                "the date or choose a date within the weather range."
+                            )
                 elif field in ("method", "material", "application"):
                     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}[0-9]{3}", value):
                         event_problems.append(f"{field_location}: found {_show_value(value)}. "
@@ -135,13 +174,16 @@ def _check_events(events, section, where):
     return problems, [f"{label}: {status}"] + report
 
 
-def _check_management(source, filex):
+def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None):
     """Check every treatment, returning problems and report lines without mutation.
 
     Treatment membership and planting writer columns are read from the FileX.
     When it is unreadable, Simulation's FileX checks report that failure and
     shape checks still run.
     Optional planting numbers pass through without crop-specific range checks.
+    Date order and uniqueness are checked within event lists. The selected
+    treatment's planting date is checked against the FileX simulation start date,
+    and its planting, irrigation and fertilizer dates against the weather range.
     """
     label = "Management data"
     if not isinstance(source, dict):
@@ -164,6 +206,15 @@ def _check_management(source, filex):
             text = Path(filex).read_text(encoding="latin-1")
         except (OSError, ValueError):
             pass
+    selected_number = None
+    try:
+        if not isinstance(selected_treatment, bool):
+            selected_number = int(selected_treatment)
+    except (TypeError, ValueError):
+        selected_number = None
+    weather_dates = [r["date"] for r in weather_rows if isinstance(r, dict) and isinstance(r.get("date"), date)] if weather_rows else []
+    weather_range = (min(weather_dates), max(weather_dates)) if weather_dates else None
+
     report = []
     for key, entry in source["treatments"].items():
         where = f"Management data treatment {_show_value(key)}"
@@ -189,10 +240,15 @@ def _check_management(source, filex):
                                   "or an empty dict to keep the FileX Levels.")
         else:
             entry_problems.extend(_unknown_keys(entry, ("planting", "irrigation", "fertilizer"), where))
+        is_selected = (number is not None and number == selected_number)
+        treat_start = start_date if is_selected else None
+        treat_weather = weather_range if is_selected else None
+
         planting_problems = []
         has_planting = isinstance(entry, dict) and "planting" in entry
         if has_planting:
-            planting_problems = _check_planting(entry["planting"], f"{where}, planting")
+            planting_problems = _check_planting(entry["planting"], f"{where}, planting",
+                                                start_date=treat_start, weather_range=treat_weather)
             if not planting_problems and not entry_problems and text is not None:
                 try:
                     _planting_text(text, number, entry["planting"])
@@ -203,7 +259,8 @@ def _check_management(source, filex):
         if isinstance(entry, dict):
             for section in ("irrigation", "fertilizer"):
                 if section in entry:
-                    event_problems, lines = _check_events(entry[section], section, where)
+                    event_problems, lines = _check_events(entry[section], section, where,
+                                                          weather_range=treat_weather)
                     treatment_problems.extend(event_problems)
                     event_report.extend(lines)
                 else:

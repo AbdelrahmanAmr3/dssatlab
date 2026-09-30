@@ -140,10 +140,10 @@ def test_codes_require_one_ascii_letter(simulation, planting, field, value):
     assert any(field in p and "single ASCII letter" in p for p in simulation.check())
 
 
-def test_optional_fields_and_dates_outside_weather_pass_without_repair(simulation, planting):
+def test_optional_fields_pass_without_repair(simulation, planting):
     planting.update(emergence_date="2024-02-29", emergence_population=7, row_direction=90,
                     planting_material_weight=10, transplant_age=20, transplant_environment=25,
-                    plants_per_hill=2, sprout_length=0, date="1980-01-01", method="x")
+                    plants_per_hill=2, sprout_length=0, date="1982-02-25", method="x")
     before = deepcopy(simulation.management)
     assert simulation.check() == []
     assert simulation.management == before
@@ -230,9 +230,13 @@ def events(request, simulation):
 
 def test_events_report_every_event_without_mutation(simulation, events, capsys, tmp_path, monkeypatch):
     section, event = events
-    # Dates deliberately run backwards, repeat, and fall outside weather coverage.
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in (25, 26, 27)
+    ]
     simulation.management["treatments"][1][section] += [
-        dict(event, date="1980-01-01"), dict(event, date="1980-01-01")]
+        dict(event, date="1982-02-26"), dict(event, date="1982-02-27")]
     before = deepcopy(simulation.management)
     files = {p: p.read_bytes() for p in tmp_path.rglob("*")}
 
@@ -366,3 +370,208 @@ def test_event_and_planting_problems_reported_across_treatments(simulation, plan
         assert f"{label}: REJECTED" in report
     assert "event 2: OK" in report
     assert all(p in report for p in problems)
+
+
+def test_planting_before_simulation_start_date_rejected(simulation, planting, capsys):
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in range(20, 29)
+    ]
+    planting["date"] = "1982-02-24"
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "1982-02-24" in problems[0] and "1982-02-25" in problems[0]
+    assert all(word in problems[0].lower() for word in ("planting date", "before", "simulation start date"))
+    report = capsys.readouterr().out
+    assert "planting: REJECTED" in report
+    assert problems[0] in report
+
+    planting["date"] = "1982-02-25"
+    assert simulation.check() == []
+    planting["date"] = "1982-02-26"
+    assert simulation.check() == []
+
+    simulation.management["treatments"][2] = {"planting": dict(planting, date="1982-02-20")}
+    assert simulation.check() == []
+
+
+@pytest.mark.parametrize("section", ["planting", "irrigation", "fertilizer"])
+@pytest.mark.parametrize("target_date", ["1982-02-19", "1982-03-01"])
+def test_date_outside_weather_range_rejected(simulation, planting, section, target_date, capsys):
+    simulation.filex.write_text(SAMPLE.replace("82056", "82051"), encoding="latin-1")
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in range(20, 29)
+    ]
+    if section == "planting":
+        planting["date"] = target_date
+    elif section == "irrigation":
+        simulation.management["treatments"][1]["irrigation"] = [
+            dict(date=target_date, amount=10, method="IR001")
+        ]
+    else:
+        simulation.management["treatments"][1]["fertilizer"] = [
+            dict(date=target_date, material="FE001", application="AP001", depth=0, n=20)
+        ]
+    problems = simulation.check()
+    assert any(target_date in p and "outside weather range" in p and "1982-02-20 to 1982-02-28" in p
+               for p in problems)
+    report = capsys.readouterr().out
+    assert f"{section}: REJECTED" in report
+
+
+def test_dates_on_weather_boundaries_pass(simulation, planting):
+    simulation.filex.write_text(SAMPLE.replace("82056", "82051"), encoding="latin-1")
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in range(20, 29)
+    ]
+    planting["date"] = "1982-02-20"
+    simulation.management["treatments"][1]["irrigation"] = [
+        dict(date="1982-02-20", amount=10, method="IR001"),
+        dict(date="1982-02-28", amount=15, method="IR001"),
+    ]
+    assert simulation.check() == []
+
+
+def test_non_selected_treatment_dates_outside_weather_pass(simulation, planting):
+    simulation.management["treatments"][2] = {
+        "planting": dict(planting, date="1999-01-01"),
+        "irrigation": [dict(date="1999-01-02", amount=10, method="IR001")],
+        "fertilizer": [dict(date="1999-01-03", material="FE001", application="AP001", depth=0, n=20)],
+    }
+    assert simulation.check() == []
+
+
+@pytest.mark.parametrize("section", ["irrigation", "fertilizer"])
+def test_duplicate_dates_in_one_list_rejected(simulation, section, capsys):
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in (25, 26)
+    ]
+    event = (dict(date="1982-02-25", amount=10, method="IR001") if section == "irrigation" else
+             dict(date="1982-02-25", material="FE001", application="AP001", depth=0, n=20))
+    simulation.management["treatments"][1][section] = [dict(event), dict(event)]
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert all(word in problems[0] for word in ("duplicate date", "1982-02-25", "events 1 and 2"))
+    report = capsys.readouterr().out
+    assert "event 1: OK" in report
+    assert "event 2: REJECTED" in report
+    assert problems[0] in report
+
+
+@pytest.mark.parametrize("section", ["irrigation", "fertilizer"])
+def test_out_of_order_events_rejected(simulation, section, capsys):
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in (25, 26)
+    ]
+    event = (dict(amount=10, method="IR001") if section == "irrigation" else
+             dict(material="FE001", application="AP001", depth=0, n=20))
+    simulation.management["treatments"][1][section] = [
+        dict(event, date="1982-02-26"),
+        dict(event, date="1982-02-25"),
+    ]
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert all(word in problems[0] for word in ("1982-02-25", "not in ascending order"))
+    report = capsys.readouterr().out
+    assert "event 1: OK" in report
+    assert "event 2: REJECTED" in report
+
+
+def test_duplicate_dates_and_order_checked_across_all_treatments(simulation):
+    simulation.management["treatments"][2] = {
+        "irrigation": [
+            dict(date="1982-02-26", amount=10, method="IR001"),
+            dict(date="1982-02-25", amount=10, method="IR001"),
+        ]
+    }
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "treatment 2" in problems[0].lower() and "not in ascending order" in problems[0]
+
+
+def test_unparsed_event_dates_skipped_for_order_and_duplicates(simulation):
+    simulation.management["treatments"][1]["irrigation"] = [
+        dict(date="1982-02-25", amount=10, method="IR001"),
+        dict(date="not-a-date", amount=10, method="IR001"),
+        dict(date="1982-02-25", amount=10, method="IR001"),
+    ]
+    problems = simulation.check()
+    assert len(problems) == 2
+    assert any("YYYY-MM-DD" in p and "event 2" in p for p in problems)
+    assert any("duplicate date" in p and "event 3" in p and "events 1 and 3" in p for p in problems)
+    assert not any("not in ascending order" in p for p in problems)
+
+
+def test_fertilizer_and_irrigation_before_planting_allowed(simulation, planting):
+    simulation.filex.write_text(SAMPLE.replace("82056", "82032"), encoding="latin-1")
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1982-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in range(1, 29)
+    ]
+    planting["date"] = "1982-02-20"
+    simulation.management["treatments"][1]["fertilizer"] = [
+        dict(date="1982-02-05", material="FE001", application="AP001", depth=0, n=30)
+    ]
+    simulation.management["treatments"][1]["irrigation"] = [
+        dict(date="1982-02-10", amount=25.0, method="IR001")
+    ]
+    assert simulation.check() == []
+
+
+def test_unreadable_weather_skips_dependent_checks(simulation, tmp_path, planting):
+    planting["date"] = "1980-01-01"
+    simulation.weather = tmp_path / "missing_weather.csv"
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "Cannot read weather data" in problems[0]
+    assert not any("before simulation start date" in p for p in problems)
+    assert not any("outside weather range" in p for p in problems)
+
+
+def test_empty_weather_skips_dependent_checks(simulation, planting):
+    planting["date"] = "1980-01-01"
+    simulation.weather = []
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "no daily rows" in problems[0]
+    assert not any("before simulation start date" in p for p in problems)
+    assert not any("outside weather range" in p for p in problems)
+
+
+def test_unreadable_filex_or_start_skips_dependent_checks(simulation, tmp_path, planting):
+    planting["date"] = "1982-02-25"
+    # Missing FileX: start date cannot be read
+    simulation.filex = tmp_path / "missing.MZX"
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "Cannot read FileX" in problems[0]
+    assert not any("before simulation start date" in p for p in problems)
+
+    # Invalid SDATE in FileX: start date cannot be read
+    path = tmp_path / "UFGA8201.MZX"
+    path.write_text(SAMPLE.replace("82056", "bad!!"), encoding="latin-1")
+    simulation.filex = path
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "SDATE 'bad!!' is invalid" in problems[0]
+    assert not any("before simulation start date" in p for p in problems)
+
+
+def test_ambiguous_weather_year_skips_start_date_check(simulation, planting):
+    simulation.weather = [dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+                               date="2024-05-10", srad=20, tmax=25, tmin=10, rain=0)]
+    planting["date"] = "2024-05-10"
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "FileX start year 82 day 056 is not covered by weather data" in problems[0]
+    assert not any("before simulation start date" in p for p in problems)
