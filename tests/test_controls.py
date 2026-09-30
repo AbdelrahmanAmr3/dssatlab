@@ -229,3 +229,20 @@ def test_omitted_controls_with_planting_keeps_controls_bytes(sim, fake_dssat):
     }}
     original = sim.filex.read_bytes().split(b"*SIMULATION CONTROLS")[1]
     assert copied(sim, fake_dssat).split(b"*SIMULATION CONTROLS")[1] == original
+
+
+IRRIGATION = ("\n*IRRIGATION AND WATER MANAGEMENT\n"
+              "@I  EFIR  IDEP  ITHR  IEPT  IOFF  IAME  IAMT IRNAME\n"
+              " 1     1   -99   -99   -99   -99   -99   -99 -99\n"
+              "@I IDATE  IROP IRVAL\n"
+              " 1 82063 IR001    13\n")
+
+
+@pytest.mark.parametrize("start, valid", [("1982-03-04", True), ("1982-03-05", False)])
+def test_start_after_the_filex_first_irrigation_is_a_check_problem(sim, start, valid):
+    sim.filex.write_bytes(sim.filex.read_bytes() + IRRIGATION.encode("latin-1"))
+    sim.management = {"treatments": {3: {"controls": {"start_date": start}}}}
+    problems = sim.check(verbose=False)
+    assert (problems == []) is valid
+    if not valid:
+        assert any("first irrigation date 1982-03-04" in p and "IPIRR" in p for p in problems)

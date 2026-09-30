@@ -7,7 +7,7 @@ import shutil
 
 from .errors import DSSATCheckError, DSSATRunError
 from .controls import _controls_start_date
-from .filex import _read_filex, _weather_filename
+from .filex import _irrigation_dates, _read_filex, _weather_filename
 from .filex_write import _write_management
 from .management import _check_management, _report_lines
 from .management_file import _load_management
@@ -40,6 +40,17 @@ def _simulation_start_date(values, days):
         return candidate
     except (ValueError, OverflowError):
         return None
+
+
+def _overrides_section(management, treatment, section):
+    """True when the management data gives the selected treatment this section."""
+    treatments = management.get("treatments") if isinstance(management, dict) else None
+    if not isinstance(treatments, dict):
+        return False
+    for key, entry in treatments.items():
+        if str(key) == str(treatment) and isinstance(entry, dict):
+            return section in entry
+    return False
 
 
 class Simulation:
@@ -75,18 +86,19 @@ class Simulation:
         self.management = management
         self.executable = executable
 
-    def check(self, verbose: bool = False) -> list[str]:
+    def check(self, verbose: bool | None = None) -> list[str]:
         """Return all input problems without writing files or running DSSAT.
 
         Print Checks in weather, soil (if given), FileX and management order
-        when management is given or verbose=True. Management checks cover
+        when verbose=True, or when verbose is left unset and management is given;
+        verbose=False prints nothing. Management checks cover
         every treatment's shape, value ranges, unique and ascending dates for
         event lists, and compares the selected treatment's dates with the
         weather range and FileX simulation start date.
         An empty returned list means all checks passed.
         """
         problems, report = self._check_inputs()
-        if self.management is not None or verbose:
+        if verbose or (verbose is None and self.management is not None):
             print("Checks")
             print("\n".join(report))
             print("Crop-specific fields are checked by DSSAT at run time.")
@@ -134,6 +146,16 @@ class Simulation:
                 filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
+        if override_start is not None and days and not _overrides_section(
+                management_dict, self.treatment, "irrigation"):
+            irrigation = [_simulation_start_date({"SDATE": text}, days)
+                          for text in _irrigation_dates(self.filex, self.treatment)]
+            irrigation = [day for day in irrigation if day is not None]
+            if irrigation and min(irrigation) < override_start:
+                filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is "
+                                     f"after the FileX's first irrigation date {min(irrigation)}; "
+                                     "DSSAT stops with error IPIRR. Start on or before that date, "
+                                     "or give irrigation in the management data.")
         soil_problems, soil_depth = [], None
         if self.soil is not None:
             soil_rows, soil_problems = _parse_soil(self.soil)

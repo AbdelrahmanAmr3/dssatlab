@@ -1,5 +1,6 @@
 """Check cultivar identifiers against the sibling .CUL copied into a simulation."""
 
+from difflib import get_close_matches
 from pathlib import Path
 import re
 
@@ -64,7 +65,9 @@ def _check_cultivar(data, where, filex, text, treatment):
             if data["code"] not in codes:
                 problems.append(f"{where}: code {data['code']!r} is missing from .CUL "
                                 f"file {path} for crop {data['crop']!r}. "
-                                f"Choose an existing code: {', '.join(codes)}.")
+                                f"Closest codes: "
+                                f"{', '.join(get_close_matches(data['code'], codes, 5, 0) or codes[:5])}"
+                                f" ({len(codes)} codes in the file; open it to see all).")
         except (OSError, ValueError) as error:
             problems.append(f"{where}: cannot check .CUL: {error}")
     if text is not None and treatment is not None:

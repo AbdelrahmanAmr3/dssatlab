@@ -191,3 +191,22 @@ def test_experiment_template_cultivar_loads_checks_and_runs(cultivar_inputs, fak
     assert "cultivar: OK\n" in capsys.readouterr().out
     result = sim.run()
     assert b" 8 MZ IB0035" in (result.run_dir.parent / filex.name).read_bytes()
+
+
+def test_missing_code_lists_only_the_closest_five(cultivar_inputs):
+    filex, _ = cultivar_inputs
+    (filex.parent / "MZCER048.CUL").write_text(
+        "*MAIZE CULTIVAR COEFFICIENTS\n@VAR#  VAR-NAME........ EXPNO   ECO#\n"
+        + "".join(f"IB{n:04d} CULTIVAR {n}          . IB0001\n" for n in range(40)))
+    problems = simulation(cultivar_inputs, {"crop": "MZ", "code": "IB0099"}).check()
+    message = next(p for p in problems if "missing from .CUL" in p)
+    assert "IB0099" in message and "40 codes" in message
+    assert message.count("IB00") <= 7  # the code asked for, five close ones, the path
+
+
+def test_check_verbose_false_prints_nothing_but_default_reports(cultivar_inputs, capsys):
+    sim = simulation(cultivar_inputs, {"crop": "MZ", "code": "IB0035"})
+    sim.check()
+    assert "Checks" in capsys.readouterr().out
+    sim.check(verbose=False)
+    assert capsys.readouterr().out == ""

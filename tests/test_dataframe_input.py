@@ -150,3 +150,10 @@ def test_real_dataframe_rejects_submicrosecond_time_part(rows):
     frame.loc[1, "date"] += pd.Timedelta(nanoseconds=1)
     assert any("row 3" in p and "date has a time part; use a whole date" in p
                for p in check(frame))
+
+
+def test_plain_rows_missing_column_is_reported_once(rows):
+    for row in rows:
+        del row["srad"]
+    problems = [p for p in check(rows) if "'srad'" in p]
+    assert len(problems) == 1

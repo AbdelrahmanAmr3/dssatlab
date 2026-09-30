@@ -207,8 +207,11 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
             problems.append(("row shape", f"Weather data row {line} is not a dict. "
                              "Supply a dict of weather template column values."))
             continue
-        if columns is None:
-            _check_columns(row, f"row {line}", problems)
+        if columns is None:  # rows without a header: report each column problem once
+            found = []
+            _check_columns(row, f"row {line}", found)
+            problems.extend(item for item in found if item[0] not in
+                            {kind for kind, _ in problems})
         result = {}
         for name in REQUIRED + OPTIONAL:
             if name not in row and name not in OPTIONAL:
