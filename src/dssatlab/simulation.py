@@ -7,7 +7,7 @@ import shutil
 
 from .errors import DSSATCheckError, DSSATRunError
 from .filex import _read_filex, _weather_filename
-from .filex_write import _write_planting
+from .filex_write import _write_management
 from .management import _check_management, _report_lines
 from .runner import RunResult, _create_dated_folder, run
 from .soil import _parse_soil, write_soil_file
@@ -188,7 +188,7 @@ class Simulation:
         filex = Path(self.filex).resolve()
         sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
         shutil.copy2(filex, sim_folder / filex.name)
-        _write_planting(sim_folder / filex.name, self.treatment, self.management)
+        _write_management(sim_folder / filex.name, self.treatment, self.management)
         for sibling in filex.parent.iterdir():
             if self.soil is not None and sibling.suffix.upper() == ".SOL":
                 continue

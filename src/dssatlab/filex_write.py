@@ -1,4 +1,4 @@
-"""Edit planting in FileX text; never build a model or rewrite existing sections."""
+"""Edit management in FileX text without rewriting existing sections."""
 
 from datetime import date
 from pathlib import Path
@@ -18,6 +18,11 @@ _PLANTING_FIELDS = {
     "PLWT": "planting_material_weight", "PAGE": "transplant_age",
     "PENV": "transplant_environment", "PLPH": "plants_per_hill", "SPRL": "sprout_length",
 }
+_IRRIGATION_HEADERS = (
+    "@I  EFIR  IDEP  ITHR  IEPT  IOFF  IAME  IAMT IRNAME",
+    "@I IDATE  IROP IRVAL",
+)
+_FERTILIZER_HEADER = "@F FDATE  FMCD  FACD  FDEP  FAMN  FAMP  FAMK  FAMC  FAMO  FOCD FERNAME"
 
 
 def _section_bounds(lines, section):
@@ -127,41 +132,128 @@ def _planting_text(text, treatment, planting):
     level = highest + 1
     row = _planting_row(columns, level, planting)
 
+    _repoint(lines, treatment, "MP", level)
+    if bounds is None:
+        lines = _insert_section(lines, "PLANTING DETAILS", [_PLANTING_HEADER, row])
+    else:
+        _append_rows(lines, insert_at, [row])
+    return "".join(lines)
+
+
+def _repoint(lines, treatment, column, level):
     start, end = _section_bounds(lines, "TREATMENTS")
     columns = {}
     for index in range(start + 1, end):
         line = lines[index]
         if line.startswith("@"):
             columns = _columns(line)
-        elif "N" in columns and "MP" in columns:
+        elif "N" in columns and column in columns:
             left, right = columns["N"]
             try:
                 number = int(line[left:right])
             except ValueError:
                 continue
             if number == treatment:
-                left, right = columns["MP"]
-                lines[index] = (line[:left] + _cell(level, right - left, "TREATMENTS", "MP")
+                left, right = columns[column]
+                lines[index] = (line[:left] + _cell(level, right - left, "TREATMENTS", column)
                                 + line[right:])
                 break
+
+
+def _append_rows(lines, index, rows):
+    newline = _newline(lines)
+    prefix = "" if lines[index - 1].endswith(("\r", "\n")) else newline
+    lines[index:index] = [prefix + newline.join(rows) + newline]
+
+
+def _event_blocks(lines, section, headers):
+    """Check every header and find the last insertion point for each block."""
+    expected = [_columns(header) for header in headers]
+    blocks, highest = {}, 0
+    bounds = _section_bounds(lines, section.split()[0])
     if bounds is None:
-        lines = _insert_section(lines, "PLANTING DETAILS", [_PLANTING_HEADER, row])
+        return [(columns, None, header) for columns, header in zip(expected, headers)], highest
+    active = None
+    for index in range(bounds[0] + 1, bounds[1]):
+        line = lines[index]
+        if line.startswith("@"):
+            columns = _columns(line)
+            active = max(range(len(expected)), key=lambda n: len(expected[n].keys() & columns.keys()))
+            missing = expected[active].keys() - columns.keys()
+            if missing:
+                raise ValueError(f"{section} header is missing columns {', '.join(sorted(missing))}. "
+                                 "Supply the needed columns.")
+            blocks[active] = (columns, index + 1, line.rstrip("\r\n"))
+        elif active is not None:
+            columns, _, header = blocks[active]
+            left, right = next(iter(columns.values()))
+            try:
+                level = int(line[left:right])
+            except ValueError:
+                continue
+            highest = max(highest, level)
+            blocks[active] = (columns, index + 1, header)
+    for number, columns in enumerate(expected):
+        if number not in blocks:
+            raise ValueError(f"{section} has no header containing columns {', '.join(columns)}. "
+                             "Supply the needed columns.")
+    return [blocks[number] for number in range(len(expected))], highest
+
+
+def _event_row(columns, values, section):
+    return "".join(_cell(values.get(column, -99), end - start, section, column)
+                   for column, (start, end) in columns.items())
+
+
+def _event_text(text, treatment, events, section="irrigation"):
+    """Render checked events in memory, also used by pre-write checks."""
+    name, column, headers = "IRRIGATION AND WATER MANAGEMENT", "MI", _IRRIGATION_HEADERS
+    if section == "fertilizer":
+        name, column, headers = "FERTILIZERS (INORGANIC)", "MF", (_FERTILIZER_HEADER,)
+    _section_row(text, "TREATMENTS", "N", treatment, (column,))
+    lines = text.splitlines(keepends=True)
+    blocks, highest = _event_blocks(lines, name, headers)
+    level = highest + 1 if events else 0
+    _repoint(lines, treatment, column, level)
+    if not events:
+        return "".join(lines)
+    rows = [[]]
+    if section == "irrigation":
+        rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": 1}, name)])
+    for event in events:
+        day = date.fromisoformat(event["date"])
+        day_code = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
+        if section == "irrigation":
+            values = {"I": level, "IDATE": day_code, "IROP": event["method"], "IRVAL": event["amount"]}
+        else:
+            values = {"F": level, "FDATE": day_code, "FMCD": event["material"],
+                      "FACD": event["application"], "FDEP": event["depth"], "FAMN": event["n"],
+                      "FAMP": event.get("p", 0), "FAMK": event.get("k", 0), "FAMC": 0, "FAMO": 0}
+        rows[-1].append(_event_row(blocks[-1][0], values, name))
+    body = [line for (_, _, header), added in zip(blocks, rows) for line in [header, *added]]
+    if blocks[0][1] is None:
+        lines = _insert_section(lines, name, body)
+    elif section == "irrigation":
+        # DSSAT reads all events after the selected control block. A new header
+        # pair isolates this schedule from the preceding level's events.
+        _append_rows(lines, max(block[1] for block in blocks), body)
     else:
-        newline = _newline(lines)
-        # An unterminated final row needs a separator before the appended row.
-        prefix = "" if lines[insert_at - 1].endswith(("\r", "\n")) else newline
-        lines.insert(insert_at, prefix + row + newline)
+        _append_rows(lines, blocks[0][1], rows[0])
     return "".join(lines)
 
 
-def _write_planting(filex, treatment, management):
+def _write_management(filex, treatment, management):
     """Apply only the selected, checked entry to the already-copied FileX."""
     if management is None:
         return
     for key, entry in management["treatments"].items():
-        if int(key) == int(treatment) and "planting" in entry:
+        if int(key) == int(treatment):
             path = Path(filex)
             text = path.read_bytes().decode("latin-1")
-            edited = _planting_text(text, int(treatment), entry["planting"])
-            path.write_bytes(edited.encode("latin-1"))
+            if "planting" in entry:
+                text = _planting_text(text, int(treatment), entry["planting"])
+            for section in ("irrigation", "fertilizer"):
+                if section in entry:
+                    text = _event_text(text, int(treatment), entry[section], section)
+            path.write_bytes(text.encode("latin-1"))
             return

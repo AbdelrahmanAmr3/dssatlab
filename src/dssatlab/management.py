@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 
 from .filex import _section_row
-from .filex_write import _planting_text
+from .filex_write import _event_text, _planting_text
 from .weather import _show_value
 
 
@@ -261,6 +261,12 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
                 if section in entry:
                     event_problems, lines = _check_events(entry[section], section, where,
                                                           weather_range=treat_weather)
+                    if not event_problems and not entry_problems and text is not None:
+                        try:
+                            _event_text(text, number, entry[section], section)
+                        except ValueError as exc:
+                            event_problems.append(f"{where}, {section}: {exc}")
+                            lines = _report_lines(f"    {section}", event_problems)
                     treatment_problems.extend(event_problems)
                     event_report.extend(lines)
                 else:

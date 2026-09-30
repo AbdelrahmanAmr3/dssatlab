@@ -101,7 +101,7 @@ def test_repeated_header_uses_highest_level_and_preserves_mixed_endings(planting
 
 
 @pytest.mark.parametrize("management", [None, {"treatments": {}},
-    {"treatments": {2: {}}}, {"treatments": {2: {"irrigation": [], "fertilizer": []}}}])
+    {"treatments": {2: {}}}])
 def test_no_planting_keeps_exact_copy(planting_sim, seen, management):
     sim = planting_sim
     sim.management = management
