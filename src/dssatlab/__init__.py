@@ -8,6 +8,7 @@ from .outputs import (read_plant_growth, read_plant_nitrogen, read_soil_water,
                       read_summary, read_weather, to_dataframe)
 from .plot import plot_plant_growth
 from .runner import run
+from .scenarios import combine_summaries, run_treatments, write_scenario_template
 from .simulation import Simulation
 from .soil import write_soil_template
 from .weather import write_weather_template
@@ -18,6 +19,7 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "write_management_template", "DSSATCheckError",
            "read_summary", "read_plant_growth", "to_dataframe", "plot_plant_growth", "DSSATOutputError",
            "read_soil_water", "read_plant_nitrogen", "read_weather",
+           "run_treatments", "combine_summaries", "write_scenario_template",
            ]
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

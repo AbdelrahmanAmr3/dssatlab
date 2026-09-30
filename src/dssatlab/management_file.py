@@ -83,6 +83,11 @@ def _load_management(source):
     Returns:
         tuple[Any, list[str]]: (loaded_dict_or_source, list_of_problems).
     """
+    return _load_yaml(source, "Management", "a 'treatments' key")
+
+
+def _load_yaml(source, label, mapping_hint):
+    """Shared optional, strict YAML loading; dict inputs pass through unchanged."""
     if source is None:
         return None, []
     if isinstance(source, (str, Path)):
@@ -91,19 +96,19 @@ def _load_management(source):
             import yaml
         except ImportError:
             return None, [
-                f"Management file {path}: PyYAML is not installed. "
-                "Install PyYAML with 'pip install pyyaml' to load management YAML files."
+                f"{label} file {path}: PyYAML is not installed. "
+                f"Install PyYAML with 'pip install pyyaml' to load {label.lower()} YAML files."
             ]
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as error:
             return None, [
-                f"Management file {path}: cannot read file: {error}. "
+                f"{label} file {path}: cannot read file: {error}. "
                 "Check that the path exists and is readable."
             ]
         except UnicodeDecodeError as error:
             return None, [
-                f"Management file {path}: cannot read file: {error}. "
+                f"{label} file {path}: cannot read file: {error}. "
                 "Supply a UTF-8 encoded YAML file."
             ]
 
@@ -134,15 +139,15 @@ def _load_management(source):
             data = yaml.load(text, Loader=_StrictSafeLoader)
         except yaml.constructor.ConstructorError as error:
             if "found duplicate key" in str(error):
-                return None, [f"Management file {path}: duplicate key: {error}"]
-            return None, [f"Management file {path}: invalid YAML: {error}"]
+                return None, [f"{label} file {path}: duplicate key: {error}"]
+            return None, [f"{label} file {path}: invalid YAML: {error}"]
         except yaml.YAMLError as error:
-            return None, [f"Management file {path}: invalid YAML: {error}"]
+            return None, [f"{label} file {path}: invalid YAML: {error}"]
 
         if not isinstance(data, dict):
             return None, [
-                f"Management file {path}: expected a YAML mapping document. "
-                "Supply a YAML mapping with a 'treatments' key."
+                f"{label} file {path}: expected a YAML mapping document. "
+                f"Supply a YAML mapping with {mapping_hint}."
             ]
         return data, []
 
