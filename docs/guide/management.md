@@ -53,7 +53,7 @@ treatments:
     # Irrigation schedule (optional section; omit to keep the FileX level, or [] for none)
     irrigation:
       - date: "1982-03-15"        # Event date (quoted "YYYY-MM-DD"); must be ascending and unique
-        amount: 30.0              # Water applied, mm (must be >= 0)
+        amount: 30.0              # Water applied, mm (must be > 0)
         method: "IR001"           # Irrigation method: 2 ASCII letters + 3 digits (e.g., IR001)
 
     # Fertilizer schedule (optional section; omit to keep the FileX level, or [] for none)
@@ -98,7 +98,7 @@ Values use DSSAT's native units without automatic conversion:
 | `planting` | `plants_per_hill` | No | count | Number of plants per hill |
 | `planting` | `sprout_length` | No | cm | Sprout length |
 | `irrigation` | `date` | Yes | `"YYYY-MM-DD"` | Event date; must be ascending, unique, and within weather range |
-| `irrigation` | `amount` | Yes | mm | Water applied; must be nonnegative (`>= 0`) |
+| `irrigation` | `amount` | Yes | mm | Water applied; must be strictly positive (`> 0`) |
 | `irrigation` | `method` | Yes | `[A-Za-z]{2}[0-9]{3}` | DSSAT irrigation code: 2 ASCII letters + 3 digits (e.g., `IR001`) |
 | `fertilizer` | `date` | Yes | `"YYYY-MM-DD"` | Event date; must be ascending, unique, and within weather range |
 | `fertilizer` | `material` | Yes | `[A-Za-z]{2}[0-9]{3}` | DSSAT fertilizer material code (e.g., `FE001`) |

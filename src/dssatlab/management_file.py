@@ -37,7 +37,7 @@ treatments:
     # Irrigation schedule (optional section; omit to keep the FileX level, or [] for none)
     irrigation:
       - date: "1982-03-15"        # Event date (quoted "YYYY-MM-DD"); must be ascending and unique
-        amount: 30.0              # Water applied, mm (must be >= 0)
+        amount: 30.0              # Water applied, mm (must be > 0)
         method: "IR001"           # Irrigation method: 2 ASCII letters + 3 digits (e.g., IR001)
 
     # Fertilizer schedule (optional section; omit to keep the FileX level, or [] for none)

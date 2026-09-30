@@ -16,10 +16,11 @@ _OPTIONAL = ("emergence_date", "emergence_population", "row_direction",
              "plants_per_hill", "sprout_length")
 
 
-def _report_lines(label, problems):
+def _report_lines(label, problems, *, details=None):
     status = "REJECTED" if problems else "OK"
     indent = " " * (len(label) - len(label.lstrip()) + 2)
-    return [f"{label}: {status}"] + [f"{indent}{problem}" for problem in problems]
+    details = problems if details is None else details
+    return [f"{label}: {status}"] + [f"{indent}{problem}" for problem in details]
 
 
 def _unknown_keys(data, allowed, where):
@@ -54,11 +55,7 @@ def _check_planting(planting, where, start_date=None, weather_range=None):
     if not isinstance(planting, dict) or not planting:
         return [f"{where}: planting must be a non-empty dict. Supply the required "
                 f"fields: {', '.join(_REQUIRED)}; omit planting to keep the FileX Level."]
-    problems = _unknown_keys(planting, _REQUIRED + _OPTIONAL, where)
-    for field in _REQUIRED:
-        if field not in planting:
-            problems.append(f"{where}: missing required field {field!r}. "
-                            f"Add {field!r} following the Management template.")
+    problems = _check_fields(planting, _REQUIRED, _OPTIONAL, where)
     for field in _REQUIRED + _OPTIONAL:
         if field not in planting:
             continue
@@ -75,12 +72,7 @@ def _check_planting(planting, where, start_date=None, weather_range=None):
                         f"start date {_show_value(start_date.isoformat())}. Planting must be "
                         "on or after the simulation start date."
                     )
-                if weather_range is not None and not (weather_range[0] <= d <= weather_range[1]):
-                    problems.append(
-                        f"{location}: date {_show_value(value)} is outside weather range "
-                        f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
-                        "the date or choose a date within the weather range."
-                    )
+                problems.extend(_check_weather_date(value, location, weather_range))
         elif field in ("method", "distribution"):
             if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]", value):
                 problems.append(f"{location}: found {_show_value(value)}. Supply a "
@@ -100,9 +92,72 @@ def _check_planting(planting, where, start_date=None, weather_range=None):
     return problems
 
 
+def _check_weather_date(value, location, weather_range):
+    if weather_range is None or weather_range[0] <= date.fromisoformat(value) <= weather_range[1]:
+        return []
+    return [f"{location}: date {_show_value(value)} is outside weather range "
+            f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
+            "the date or choose a date within the weather range."]
+
+
+def _check_fields(data, required, optional, where):
+    problems = _unknown_keys(data, required + optional, where)
+    problems.extend(f"{where}: missing required field {field!r}. "
+                    f"Add {field!r} following the Management template."
+                    for field in required if field not in data)
+    return problems
+
+
+def _check_event_field(value, field, location):
+    if field in ("method", "material", "application"):
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}[0-9]{3}", value):
+            return [f"{location}: found {_show_value(value)}. "
+                    "Supply two ASCII letters followed by three digits for the DSSAT code."]
+        return []
+    problems = _check_number(value, location)
+    if not problems and field == "amount" and value <= 0:
+        problems.append(f"{location}: found {_show_value(value)}. Supply a number above zero, in mm.")
+    elif not problems and value < 0:
+        unit = "cm" if field == "depth" else "kg per ha"
+        problems.append(f"{location}: found {_show_value(value)}. Supply a nonnegative number in {unit}.")
+    return problems
+
+
+def _check_event(event, section, where, number, seen_dates, previous_date, weather_range):
+    required = (("date", "amount", "method") if section == "irrigation" else
+                ("date", "material", "application", "depth", "n"))
+    optional = () if section == "irrigation" else ("p", "k")
+    if not isinstance(event, dict):
+        return [f"{where}: expected a dict of event fields. "
+                f"Supply the required fields: {', '.join(required)}."], previous_date
+    problems = _check_fields(event, required, optional, where)
+    for field in required + optional:
+        if field not in event:
+            continue
+        value, location = event[field], f"{where}, field {field!r}"
+        if field != "date":
+            problems.extend(_check_event_field(value, field, location))
+            continue
+        date_problems = _check_date(value, location)
+        problems.extend(date_problems)
+        if date_problems:
+            continue
+        d = date.fromisoformat(value)
+        if previous_date is not None and d < previous_date:
+            problems.append(f"{location}: date {_show_value(value)} is not in ascending order. "
+                            "Order events by date ascending.")
+        if value in seen_dates:
+            problems.append(f"{location}: duplicate date {_show_value(value)} in "
+                            f"events {seen_dates[value]} and {number}. Keep one event per date.")
+        else:
+            seen_dates[value] = number
+        previous_date = d
+        problems.extend(_check_weather_date(value, location, weather_range))
+    return problems, previous_date
+
+
 def _check_events(events, section, where, weather_range=None):
-    label = f"    {section}"
-    where = f"{where}, {section}"
+    label, where = f"    {section}", f"{where}, {section}"
     if not isinstance(events, list):
         problems = [f"{where}, field {section!r}: expected a list of event dicts. "
                     "Supply a list, an empty list for none, or omit the section "
@@ -110,80 +165,78 @@ def _check_events(events, section, where, weather_range=None):
         return problems, _report_lines(label, problems)
     if not events:
         return [], [f"{label}: OK (empty list; none for this treatment)"]
-    required = (("date", "amount", "method") if section == "irrigation" else
-                ("date", "material", "application", "depth", "n"))
-    optional = () if section == "irrigation" else ("p", "k")
-    problems, report = [], []
-    seen_dates = {}
+    problems, report, seen_dates = [], [], {}
     previous_date = None
     for number, event in enumerate(events, 1):
-        location = f"{where}, event {number}"
-        if not isinstance(event, dict):
-            event_problems = [f"{location}: expected a dict of event fields. "
-                              f"Supply the required fields: {', '.join(required)}."]
-        else:
-            event_problems = _unknown_keys(event, required + optional, location)
-            for field in required:
-                if field not in event:
-                    event_problems.append(f"{location}: missing required field {field!r}. "
-                                          f"Add {field!r} following the Management template.")
-            for field in required + optional:
-                if field not in event:
-                    continue
-                value = event[field]
-                field_location = f"{location}, field {field!r}"
-                if field == "date":
-                    date_problems = _check_date(value, field_location)
-                    event_problems.extend(date_problems)
-                    if not date_problems:
-                        d = date.fromisoformat(value)
-                        if previous_date is not None and d < previous_date:
-                            event_problems.append(
-                                f"{field_location}: date {_show_value(value)} is not in ascending order. "
-                                "Order events by date ascending."
-                            )
-                        if value in seen_dates:
-                            event_problems.append(
-                                f"{field_location}: duplicate date {_show_value(value)} in "
-                                f"events {seen_dates[value]} and {number}. Keep one event per date."
-                            )
-                        else:
-                            seen_dates[value] = number
-                        previous_date = d
-                        if weather_range is not None and not (weather_range[0] <= d <= weather_range[1]):
-                            event_problems.append(
-                                f"{field_location}: date {_show_value(value)} is outside weather range "
-                                f"({weather_range[0]} to {weather_range[1]}). Supply weather covering "
-                                "the date or choose a date within the weather range."
-                            )
-                elif field in ("method", "material", "application"):
-                    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}[0-9]{3}", value):
-                        event_problems.append(f"{field_location}: found {_show_value(value)}. "
-                                              "Supply two ASCII letters followed by three digits "
-                                              "for the DSSAT code.")
-                else:
-                    number_problems = _check_number(value, field_location)
-                    event_problems.extend(number_problems)
-                    if not number_problems and value < 0:
-                        unit = "mm" if field == "amount" else "cm" if field == "depth" else "kg per ha"
-                        event_problems.append(f"{field_location}: found {_show_value(value)}. "
-                                              f"Supply a nonnegative number in {unit}.")
+        event_problems, previous_date = _check_event(
+            event, section, f"{where}, event {number}", number, seen_dates, previous_date, weather_range)
         problems.extend(event_problems)
         report.extend(_report_lines(f"      event {number}", event_problems))
-    status = "REJECTED" if problems else "OK"
-    return problems, [f"{label}: {status}"] + report
+    return problems, _report_lines(label, problems, details=[]) + report
+
+
+def _check_treatment_key(key, seen_numbers, text, filex):
+    where = f"Management data treatment {_show_value(key)}"
+    try:
+        if (isinstance(key, bool) or not isinstance(key, (int, str)) or
+                isinstance(key, str) and not re.fullmatch(r"[0-9]+", key)):
+            raise ValueError
+        number = int(key)
+        where = f"Management data treatment {number}"
+    except ValueError:
+        return None, where, [f"{where}: invalid treatment key. Supply an int or digit string."]
+    problems = []
+    if number in seen_numbers:
+        problems.append(f"{where}: duplicate treatment number for keys "
+                        f"{_show_value(seen_numbers[number])} and {_show_value(key)}. "
+                        "Keep one entry per treatment number.")
+    else:
+        seen_numbers[number] = key
+    if text is not None:
+        try:
+            _section_row(text, "TREATMENTS", "N", number, ())
+        except ValueError as error:
+            problems.append(f"{where}: FileX {filex}: {error}")
+    return number, where, problems
+
+
+def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range):
+    if not isinstance(entry, dict):
+        entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
+                              "with optional planting, irrigation and fertilizer, "
+                              "or an empty dict to keep the FileX Levels.")
+        return entry_problems, []
+    entry_problems.extend(_unknown_keys(entry, ("planting", "irrigation", "fertilizer"), where))
+    problems, report = list(entry_problems), []
+    for section in ("planting", "irrigation", "fertilizer"):
+        label = f"    {section}"
+        if section not in entry:
+            report.append(f"{label}: OK (omitted; keeps the FileX Level)")
+            continue
+        if section == "planting":
+            section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
+            lines = _report_lines(label, section_problems)
+        else:
+            section_problems, lines = _check_events(entry[section], section, where, weather_range)
+        if not section_problems and not entry_problems and text is not None:
+            try:
+                if section == "planting":
+                    _planting_text(text, number, entry[section])
+                else:
+                    _event_text(text, number, entry[section], section)
+            except ValueError as error:
+                detail = f"FileX {filex}: {error}" if section == "planting" else str(error)
+                section_problems.append(f"{where}, {section}: {detail}")
+                lines = _report_lines(label, section_problems)
+        problems.extend(section_problems)
+        report.extend(lines)
+    return problems, report
 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None):
-    """Check every treatment, returning problems and report lines without mutation.
+    """Check every treatment without mutation; compare selected dates with FileX and weather.
 
-    Treatment membership and planting writer columns are read from the FileX.
-    When it is unreadable, Simulation's FileX checks report that failure and
-    shape checks still run.
-    Optional planting numbers pass through without crop-specific range checks.
-    Date order and uniqueness are checked within event lists. The selected
-    treatment's planting date is checked against the FileX simulation start date,
-    and its planting, irrigation and fertilizer dates against the weather range.
+    If FileX is unreadable, Simulation reports that failure; shape checks still run.
     """
     label = "Management data"
     if not isinstance(source, dict):
@@ -211,75 +264,19 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         if not isinstance(selected_treatment, bool):
             selected_number = int(selected_treatment)
     except (TypeError, ValueError):
-        selected_number = None
-    weather_dates = [r["date"] for r in weather_rows if isinstance(r, dict) and isinstance(r.get("date"), date)] if weather_rows else []
+        pass
+    weather_dates = [r["date"] for r in weather_rows
+                     if isinstance(r, dict) and isinstance(r.get("date"), date)] if weather_rows else []
     weather_range = (min(weather_dates), max(weather_dates)) if weather_dates else None
-
-    report = []
+    report, seen_numbers = [], {}
     for key, entry in source["treatments"].items():
-        where = f"Management data treatment {_show_value(key)}"
-        number = None
-        entry_problems = []
-        try:
-            if (isinstance(key, bool) or not isinstance(key, (int, str)) or
-                    isinstance(key, str) and not re.fullmatch(r"[0-9]+", key)):
-                raise ValueError
-            number = int(key)
-            where = f"Management data treatment {number}"
-        except ValueError:
-            number = None
-            entry_problems.append(f"{where}: invalid treatment key. Supply an int or digit string.")
-        if number is not None and text is not None:
-            try:
-                _section_row(text, "TREATMENTS", "N", number, ())
-            except ValueError as error:
-                entry_problems.append(f"{where}: FileX {filex}: {error}")
-        if not isinstance(entry, dict):
-            entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
-                                  "with optional planting, irrigation and fertilizer, "
-                                  "or an empty dict to keep the FileX Levels.")
-        else:
-            entry_problems.extend(_unknown_keys(entry, ("planting", "irrigation", "fertilizer"), where))
-        is_selected = (number is not None and number == selected_number)
-        treat_start = start_date if is_selected else None
-        treat_weather = weather_range if is_selected else None
-
-        planting_problems = []
-        has_planting = isinstance(entry, dict) and "planting" in entry
-        if has_planting:
-            planting_problems = _check_planting(entry["planting"], f"{where}, planting",
-                                                start_date=treat_start, weather_range=treat_weather)
-            if not planting_problems and not entry_problems and text is not None:
-                try:
-                    _planting_text(text, number, entry["planting"])
-                except ValueError as error:
-                    planting_problems.append(f"{where}, planting: FileX {filex}: {error}")
-        treatment_problems = entry_problems + planting_problems
-        event_report = []
-        if isinstance(entry, dict):
-            for section in ("irrigation", "fertilizer"):
-                if section in entry:
-                    event_problems, lines = _check_events(entry[section], section, where,
-                                                          weather_range=treat_weather)
-                    if not event_problems and not entry_problems and text is not None:
-                        try:
-                            _event_text(text, number, entry[section], section)
-                        except ValueError as exc:
-                            event_problems.append(f"{where}, {section}: {exc}")
-                            lines = _report_lines(f"    {section}", event_problems)
-                    treatment_problems.extend(event_problems)
-                    event_report.extend(lines)
-                else:
-                    event_report.append(f"    {section}: OK (omitted; keeps the FileX Level)")
+        number, where, entry_problems = _check_treatment_key(key, seen_numbers, text, filex)
+        is_selected = number is not None and number == selected_number
+        treatment_problems, lines = _check_entry(
+            entry, number, where, entry_problems, text, filex,
+            start_date if is_selected else None, weather_range if is_selected else None)
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
-        status = "REJECTED" if treatment_problems else "OK"
-        report.append(f"{treatment_label}: {status}")
-        report.extend(f"    {problem}" for problem in entry_problems)
-        if has_planting:
-            report.extend(_report_lines("    planting", planting_problems))
-        elif isinstance(entry, dict):
-            report.append("    planting: OK (omitted; keeps the FileX Level)")
-        report.extend(event_report)
+        report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
+        report.extend(lines)
         problems.extend(treatment_problems)
-    status = "REJECTED" if problems else "OK"
-    return problems, [f"{label}: {status}"] + [f"  {p}" for p in root_problems] + report
+    return problems, _report_lines(label, problems, details=root_problems) + report

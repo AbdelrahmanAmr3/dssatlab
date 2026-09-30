@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from dssatlab import Simulation
+from dssatlab import DSSATCheckError, Simulation
 
 
 SAMPLE = """*TREATMENTS                        -------------FACTOR LEVELS------------
@@ -63,6 +63,26 @@ def test_missing_required_field_names_location_and_action(simulation, planting, 
     assert all(word in problems[0].lower() for word in ("treatment 1", "planting", field, "missing", "add"))
     report = capsys.readouterr().out
     assert "planting: REJECTED" in report and problems[0] in report
+
+
+@pytest.mark.parametrize("first,second", [(1, "1"), (1, "01"), ("1", "01"), ("01", 1),
+                                         (2, "02")])
+def test_duplicate_treatment_numbers_reject_second_entry(simulation, capsys, first, second):
+    simulation.management = {"treatments": {first: {}, second: {}}}
+    before = deepcopy(simulation.management)
+    problems = simulation.check()
+    assert problems == [
+        f"Management data treatment {int(first)}: duplicate treatment number for keys "
+        f"{first!r} and {second!r}. Keep one entry per treatment number."
+    ]
+    report = capsys.readouterr().out
+    assert report.index(f"Treatment {int(first)}: OK") < report.index(
+        f"Treatment {int(first)}: REJECTED")
+    assert problems[0] in report
+    assert simulation.management == before
+    with pytest.raises(DSSATCheckError) as error:
+        simulation.run()
+    assert error.value.problems == problems
 
 
 @pytest.mark.parametrize("data,word", [
@@ -343,7 +363,34 @@ def test_event_numeric_boundaries_and_optional_nutrients(simulation, events, val
     section, event = events
     fields = ("amount",) if section == "irrigation" else ("depth", "n", "p", "k")
     event.update(dict.fromkeys(fields, value))
-    assert simulation.check() == []
+    if section == "irrigation" and value == 0:
+        problems = simulation.check()
+        assert len(problems) == 1
+        assert "above zero, in mm" in problems[0]
+    else:
+        assert simulation.check() == []
+
+
+@pytest.mark.parametrize("amount", [0, 0.0, -0.0, -1])
+def test_irrigation_amount_must_be_above_zero(simulation, amount, capsys, tmp_path, monkeypatch):
+    simulation.management["treatments"][1]["irrigation"] = [
+        dict(date="1982-02-25", amount=amount, method="IR001")]
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*")}
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Rejected management must not run DSSAT")
+
+    monkeypatch.setattr(subprocess, "run", forbidden)
+    problems = simulation.check()
+    assert problems == [
+        f"Management data treatment 1, irrigation, event 1, field 'amount': found {amount!r}. "
+        "Supply a number above zero, in mm."
+    ]
+    assert problems[0] in capsys.readouterr().out
+    with pytest.raises(DSSATCheckError) as error:
+        simulation.run()
+    assert error.value.problems == problems
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*")} == before
 
 
 def test_event_empty_and_omitted_sections_have_distinct_meanings(simulation, events, capsys):
