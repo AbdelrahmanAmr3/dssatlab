@@ -37,3 +37,8 @@ def test_section_without_rows_is_reported(tmp_path):
 def test_unreadable_path_is_reported(tmp_path):
     with pytest.raises(ValueError, match="Cannot read FileX"):
         read_treatment_numbers(tmp_path / "missing.MZX")
+
+
+def test_comment_lines_are_skipped(tmp_path):
+    text = "*TREATMENTS\n" + HEADER + "! a comment\n" + ROW.format(n=1)
+    assert read_treatment_numbers(write(tmp_path, text)) == [1]

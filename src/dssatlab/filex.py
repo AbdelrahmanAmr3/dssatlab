@@ -141,7 +141,7 @@ def read_treatment_numbers(source) -> list[int]:
             if not has_header:
                 raise ValueError(f"FileX {source}: TREATMENTS header does not start with @N. "
                                  "Correct the FileX header.")
-        elif in_section and has_header and line.strip():
+        elif in_section and has_header and line.strip() and not line.startswith("!"):
             try:
                 numbers.append(int(line.split()[0]))
             except ValueError:
