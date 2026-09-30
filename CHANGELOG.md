@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-09-30
 
 ### Added
 - `read_summary(run_dir)` reads `Summary.OUT` from any run directory into a list of dicts (one row per simulation) with DSSAT column names, summary dates (`SDAT`, `PDAT`, `EDAT`, `ADAT`, `MDAT`, `HDAT`) as `datetime.date` objects, `-99` missing values as `None`, and `RUNNO`, `TRNO`, and `TNAM` on every row.
