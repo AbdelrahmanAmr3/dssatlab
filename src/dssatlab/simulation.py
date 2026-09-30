@@ -9,6 +9,7 @@ from .errors import DSSATCheckError, DSSATRunError
 from .filex import _read_filex, _weather_filename
 from .filex_write import _write_management
 from .management import _check_management, _report_lines
+from .management_file import _load_management
 from .runner import RunResult, _create_dated_folder, run
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
@@ -58,9 +59,10 @@ class Simulation:
             soil template, describing one soil profile. When given, run() writes
             SOIL.SOL instead of copying sibling soil files. None skips soil checks
             and keeps copying sibling soil files.
-        management (dict | None): Keyword-only. Management data keyed by
-            'treatments', with optional planting per treatment. Construction
-            only stores it; check() checks every entry and prints a report.
+        management (str | Path | dict | None): Keyword-only. Management data as a
+            path to a YAML file or a plain dict keyed by 'treatments', with optional
+            planting, irrigation and fertilizer per treatment. Construction only stores
+            it; check() checks every entry and prints a report.
     """
 
     def __init__(self, filex, treatment, weather, executable=None, *, soil=None, management=None):
@@ -145,12 +147,17 @@ class Simulation:
             report.extend(_report_lines("Soil data", soil_problems))
         report.extend(_report_lines("FileX", filex_problems))
         if self.management is not None:
-            start_date = _simulation_start_date(values, days)
-            management_problems, management_report = _check_management(
-                self.management, self.filex, self.treatment, rows, start_date
-            )
-            problems.extend(management_problems)
-            report.extend(management_report)
+            management_dict, load_problems = _load_management(self.management)
+            if load_problems:
+                problems.extend(load_problems)
+                report.extend(_report_lines("Management data", load_problems))
+            else:
+                start_date = _simulation_start_date(values, days)
+                management_problems, management_report = _check_management(
+                    management_dict, self.filex, self.treatment, rows, start_date
+                )
+                problems.extend(management_problems)
+                report.extend(management_report)
         return problems, report
 
     def run(self) -> RunResult:
@@ -188,7 +195,10 @@ class Simulation:
         filex = Path(self.filex).resolve()
         sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
         shutil.copy2(filex, sim_folder / filex.name)
-        _write_management(sim_folder / filex.name, self.treatment, self.management)
+        management_dict = None
+        if self.management is not None:
+            management_dict, _ = _load_management(self.management)
+        _write_management(sim_folder / filex.name, self.treatment, management_dict)
         for sibling in filex.parent.iterdir():
             if self.soil is not None and sibling.suffix.upper() == ".SOL":
                 continue

@@ -66,7 +66,7 @@ def test_missing_required_field_names_location_and_action(simulation, planting, 
 
 
 @pytest.mark.parametrize("data,word", [
-    ([], "dict"), (42, "dict"), ("missing.yaml", "dict"), (Path("missing.yaml"), "dict"),
+    ([], "dict"), (42, "dict"),
     ({}, "treatments"), ({"treatment": {}}, "unknown"),
     ({"treatments": []}, "dict"), ({"treatments": None}, "dict"),
     ({"treatments": {1: []}}, "dict"), ({"treatments": {1: None}}, "dict"),
