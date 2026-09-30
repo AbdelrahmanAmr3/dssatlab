@@ -114,6 +114,13 @@ management data, and later cultivar, initial conditions and simulation controls.
 data is one part of it, not a synonym.
 _Avoid_: management (for the whole dict), FileX input
 
+**Example**:
+A complete, ready-to-run folder of filled-in files (a FileX with its genotype files,
+plus weather data, soil data and experiment data) that runs with no edits. Shows what a
+user's own files should look like. Not the same as a template, which shows only the
+fixed shape and is meant to be edited.
+_Avoid_: sample, demo
+
 **Checks**:
 The strict validation of a simulation's inputs, done before any DSSAT files are written or
 DSSAT is run, reporting every problem at once.
