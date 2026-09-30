@@ -108,7 +108,24 @@ _Avoid_: output folder, working directory
 
 **Run result**:
 What `run()` hands back: exit status, run directory, the output files found, and a
-tail of DSSAT's console output. It contains no parsed simulation values.
+tail of DSSAT's console output. It holds no parsed values itself, but gives access to
+the parsed output files (summary and plant growth).
+
+**Output file**:
+A file DSSAT writes into a run directory (`Summary.OUT`, `PlantGro.OUT`, ...). Only the
+summary and plant growth files are read; every other one is only listed.
+_Avoid_: result file
+
+**Summary**:
+The parsed `Summary.OUT` of a run directory: one row per simulation, with DSSAT's own
+column names (`HWAM`, `ADAT`, ...).
+
+**Plant growth**:
+The parsed `PlantGro.OUT` of a run directory: one row per simulation day, with DSSAT's own
+column names (`LAID`, `CWAD`, ...).
+
+**Missing value**:
+DSSAT's `-99` marker in an output file. Read as an empty value (`None`), never as a number.
 
 **Docs site**:
 The published website built from the repository's `docs/` folder. It has two sections:

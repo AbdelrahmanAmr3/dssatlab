@@ -1,5 +1,6 @@
 import dssatlab
-from dssatlab import DSSATError, DSSATRunError, connect, detect, install, run
+from dssatlab import (DSSATError, DSSATOutputError, DSSATRunError, connect, detect,
+                     install, read_summary, run)
 
 
 def test_public_api_is_importable():
@@ -10,6 +11,13 @@ def test_public_api_is_importable():
     assert issubclass(DSSATRunError, DSSATError)
     assert "run" in dssatlab.__all__
     assert "DSSATRunError" in dssatlab.__all__
+
+
+def test_summary_public_api_is_exported():
+    assert callable(read_summary)
+    assert issubclass(DSSATOutputError, DSSATError)
+    assert "read_summary" in dssatlab.__all__
+    assert "DSSATOutputError" in dssatlab.__all__
 
 
 def test_weather_public_api_is_exported():
