@@ -3,7 +3,7 @@
 from .core import connect, detect, install
 from .errors import (DSSATCheckError, DSSATError, DSSATInstallError,
                      DSSATNotFoundError, DSSATOutputError, DSSATRunError)
-from .evaluate import write_observed_template
+from .evaluate import evaluate, write_observed_template
 from .management_file import write_experiment_template, write_management_template
 from .outputs import (read_plant_growth, read_plant_nitrogen, read_soil_water,
                       read_summary, read_weather, to_dataframe)
@@ -17,7 +17,7 @@ from .weather import write_weather_template
 __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunError",
            "connect", "detect", "install", "run",
            "Simulation", "write_weather_template", "write_soil_template",
-           "write_observed_template",
+           "evaluate", "write_observed_template",
            "write_management_template", "write_experiment_template", "DSSATCheckError",
            "read_summary", "read_plant_growth", "to_dataframe", "plot_plant_growth", "DSSATOutputError",
            "read_soil_water", "read_plant_nitrogen", "read_weather",

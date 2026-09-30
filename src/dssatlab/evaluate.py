@@ -1,13 +1,113 @@
-"""Observed data template, loader and checks (v0.8, ticket #94; ADR 0007)."""
+"""Observed data checks and comparison with Summary and Plant growth (ADR 0007)."""
 
 import csv
+from dataclasses import dataclass
 from datetime import date
 import math
 from pathlib import Path
 import re
 
-from .errors import DSSATCheckError, DSSATError
-from .outputs import _SUMMARY_DATES, _date_value
+from .errors import DSSATCheckError, DSSATError, DSSATOutputError
+from .outputs import _SUMMARY_DATES, _date_value, to_dataframe
+from .runner import RunResult
+from ._evaluation_stats import _statistics
+
+
+@dataclass(frozen=True)
+class Evaluation:
+    """Measured/simulated pairs and statistics by variable (ticket #95).
+
+    Each pair has scenario, treatment, date, variable, observed, simulated and
+    error. Dates use YYYYDDD codes; Summary pairs have date=None. Date errors,
+    RMSE and bias are in days. Other values retain DSSAT's units. Statistics
+    contain n, rmse, bias and d_index only for variables with at least two pairs.
+    """
+
+    pairs: list[dict]
+    statistics: dict[str, dict]
+
+    def __repr__(self) -> str:
+        variables = list(dict.fromkeys(pair["variable"] for pair in self.pairs))
+        return f"Evaluation({len(self.pairs)} pairs, variables={variables!r})"
+
+    def to_dataframe(self):
+        """Return the pairs as a DataFrame, importing pandas only when called."""
+        return to_dataframe(self.pairs)
+
+
+def evaluate(results: RunResult | dict[tuple[str, int], RunResult], observed) -> Evaluation:
+    """Compare a run or run_treatments() results with observed measurements.
+
+    Accept a CSV path, DataFrame, or rows returned by load_observed(). A single
+    run uses scenario 'base' and the TRNO values in its Summary. Match Summary
+    by treatment, Plant growth by treatment and YEAR/DOY. Check every requested
+    pair before computing errors; all matching/output problems raise a single
+    DSSATCheckError. Unobserved results are ignored. Pair order follows observed
+    rows and their measurement columns; statistics pool each variable's pairs.
+    """
+    if isinstance(observed, list):
+        observed, problems = _check_rows(observed)
+        if problems:
+            raise DSSATCheckError(problems)
+    else:
+        observed = load_observed(observed)
+    cache, problems, pairs = {}, [], []
+    if isinstance(results, RunResult):
+        try:
+            summary = results.summary()
+        except DSSATOutputError as error:
+            raise DSSATCheckError([f"Scenario 'base': {error}"]) from error
+        cache[results.run_dir, False] = summary
+        results = {("base", row["TRNO"]): results for row in summary}
+    for row in observed:
+        scenario, treatment, day = row["scenario"], row["treatment"], row["date"]
+        where = f"Scenario {scenario!r}, treatment {treatment}, date {day}"
+        result = results.get((scenario, treatment))
+        if result is None:
+            problems.append(f"{where}: no matching result. Check the observed keys "
+                            "against the supplied results.")
+            continue
+        daily = day is not None
+        filename = "PlantGro.OUT" if daily else "Summary.OUT"
+        key = (result.run_dir, daily)
+        if key not in cache:
+            try:
+                cache[key] = result.plant_growth() if daily else result.summary()
+            except DSSATOutputError as error:
+                cache[key] = None
+                problems.append(f"{where}: {error}")
+        if cache[key] is None:
+            continue
+        matches = [sim for sim in cache[key] if sim["TRNO"] == treatment
+                   and (not daily or (sim["YEAR"], sim["DOY"]) == divmod(day, 1000))]
+        if len(matches) != 1:
+            detail = "no simulated row" if not matches else "multiple simulated rows"
+            problems.append(f"{where}: {detail} in {filename}. "
+                            "Supply output with one matching treatment/date row.")
+            continue
+        for variable, measured in row.items():
+            if variable in _KEYS:
+                continue
+            if variable not in matches[0]:
+                problems.append(f"{where}, {variable}: variable absent from {filename}. "
+                                "Check the measurement column against the simulated output.")
+            elif matches[0][variable] is None or matches[0][variable] == -99:
+                problems.append(f"{where}, {variable}: simulated value is missing (-99) "
+                                f"in {filename}. Check the run inputs and rerun DSSAT.")
+            else:
+                pairs.append(dict(scenario=scenario, treatment=treatment, date=day,
+                                  variable=variable, observed=measured,
+                                  simulated=matches[0][variable]))
+    if problems:
+        raise DSSATCheckError(problems)
+    for pair in pairs:
+        simulated, measured = pair["simulated"], pair["observed"]
+        if pair["variable"] in _SUMMARY_DATES:
+            pair["error"] = (simulated - _date_value(pair["variable"], str(measured))).days
+            pair["simulated"] = simulated.year * 1000 + simulated.timetuple().tm_yday
+        else:
+            pair["error"] = simulated - measured
+    return Evaluation(pairs, _statistics(pairs))
 
 
 # Fixed numeric column names from tests/fixtures/output_files/{summary,
