@@ -29,6 +29,7 @@ nav:
       - Run a FileX: guide/run-filex.md
       - Run a Simulation: guide/simulation.md
       - Run with soil data: guide/soil.md
+      - Run with management data: guide/management.md
       - Troubleshooting: guide/troubleshooting.md
   - Reference and Architecture:
       - reference/index.md
@@ -39,6 +40,7 @@ nav:
           - reference/decisions.md
           - adr/0001-short-managed-install-prefix.md
           - adr/0002-optional-pandas.md
+          - adr/0003-optional-pyyaml-for-management.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md

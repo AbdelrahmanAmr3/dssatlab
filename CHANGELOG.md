@@ -2,6 +2,24 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.3.2] - Unreleased
+
+### Added
+- `Simulation(filex, treatment, weather, executable=None, *, soil=None, management=None)`: `management` is optional and keyword-only, accepting the user's own management data as a YAML file path or a plain dict.
+- A fixed YAML management template with commented examples, and `write_management_template(path)` to write it. The template documents planting, irrigation, and fertilizer fields, units, DSSAT codes, and quoting rules.
+- Management data input as a YAML file path or a plain Python dictionary. PyYAML is optional and imported only when a YAML path is passed (ADR 0003); passing a YAML path without PyYAML provides a clear install hint. A dictionary needs zero extra packages.
+- Management checks in `check()`: reports every problem at once, with what is wrong, where, and what to do: unknown keys, invalid types, unquoted dates, non-ascending or duplicate event dates, out-of-range numeric values, planting date before simulation start date, management dates outside the weather date range, and treatment numbers not found in the FileX.
+- Clear distinction between omitting a section (keeps the FileX's original level) and providing an empty list `[]` (specifies no events / level 0).
+- Printed checks report: when `management` is provided (or `verbose=True`), `check()` prints a structured report showing the status of each section for every treatment.
+- Non-destructive FileX updates during `run()`: appends new management levels to the copied FileX inside the simulation folder and repoints the selected treatment without altering untouched sections. The user's original FileX is never modified.
+
+### Changed
+- `Simulation` accepts `management` as an optional keyword-only argument placed after `soil`. Positional and keyword calls from 0.3.1 keep their meaning.
+
+### Notes
+- Upgrading from 0.3.1 needs no changes.
+- Not included yet: other management operations (tillage, organic amendments, harvest, chemical applications, environmental modifications), FileX authoring, unit converters, reading DSSAT output files, and more than one treatment per `Simulation`.
+
 ## [0.3.1] - 2026-09-29
 
 ### Added
@@ -73,6 +91,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Notes
 - Environment diagnostics only. DSSAT discovery, connecting, installation and simulation support were deferred.
 
+[0.3.2]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.2
 [0.3.1]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.1
 [0.3.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.0
 [0.2.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.2.0

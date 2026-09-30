@@ -10,6 +10,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.2 | Run one existing FileX with `run()`, in a new run directory beside it. |
 | 0.3 | A `Simulation` from your own weather data: a fixed weather template, strict `check()`, a generated DSSAT weather file, `run()`. |
 | 0.3.1 | A `Simulation` with your own soil data: a fixed soil template, strict `check()`, a generated `SOIL.SOL` soil file, `run()`. |
+| 0.3.2 | A `Simulation` with your own management data: a fixed YAML management template or dict, strict checks, FileX section writing (planting, irrigation, fertilizer), `run()`. |
 
 ## Deliberately not built yet
 
@@ -19,7 +20,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 |---|---|
 | Full FileX or output parsing | `run()` returns the files DSSAT wrote and does not read them. Parsing needs its own design. |
 | FileX authoring | Users bring an existing FileX; building experiments from Python is a later step. |
-| Management inputs | Weather and soil come first; management data (planting, fertilizer, irrigation) is a later phase. |
+| Other management operations | Planting, irrigation, and inorganic fertilizer are supported; operations like tillage, organic amendments, harvest, and chemical applications wait for later phases. |
 | Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |
 | Unit converters | The weather template is in DSSAT's own units, and nothing is converted silently. |
 | Gap filling or any automatic repair | `check()` reports problems and the user decides how to treat missing data. |
