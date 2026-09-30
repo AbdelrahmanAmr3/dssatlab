@@ -1,0 +1,5 @@
+Source: .work/e2e_run/dssat_sim_2026-09-29_141724/dssat_run_2026-09-29_141724/SoilWat.OUT
+maize: original header and first 20 data rows; DATA PATH omitted (contained NUL bytes).
+no_header: maize with the @YEAR header removed.
+truncated: maize with row 20 cut mid-number and no trailing newline.
+missing_value: maize with SW1D replaced by -99.00 in row 20.

@@ -26,6 +26,18 @@ def test_plant_growth_public_api_is_exported():
     assert "read_plant_growth" in dssatlab.__all__
 
 
+def test_daily_output_public_api_is_exported():
+    for name in ("read_soil_water", "read_plant_nitrogen", "read_weather"):
+        assert name in dssatlab.__all__
+        assert callable(getattr(dssatlab, name))
+
+
+def test_scenario_public_api_is_exported():
+    for name in ("run_treatments", "combine_summaries", "write_scenario_template"):
+        assert name in dssatlab.__all__
+        assert callable(getattr(dssatlab, name))
+
+
 def test_dataframe_public_api_is_exported():
     assert callable(to_dataframe)
     assert "to_dataframe" in dssatlab.__all__

@@ -1,8 +1,9 @@
 # Reading results
 
 DSSAT writes its simulation results as fixed-width text files in the run directory.
-dssatlab provides functions to read and plot the two primary **output files**:
-the **summary** (`Summary.OUT`) and **plant growth** (`PlantGro.OUT`).
+dssatlab provides functions to read five primary **output files**:
+the **summary** (`Summary.OUT`), **plant growth** (`PlantGro.OUT`), **soil water** (`SoilWat.OUT`),
+**plant nitrogen** (`PlantN.OUT`), and **weather** (`Weather.OUT`), as well as plot plant growth.
 
 You can access these directly from a [Run result](run-filex.md#inspect-the-run-result)
 after a simulation, or call the reader functions on any **run directory**, including
@@ -23,6 +24,15 @@ summary_rows = result.summary()
 
 # Read plant growth (one dict per simulation day)
 growth_rows = result.plant_growth()
+
+# Read soil water (one dict per simulation day)
+water_rows = result.soil_water()
+
+# Read plant nitrogen (one dict per simulation day)
+nitrogen_rows = result.plant_nitrogen()
+
+# Read weather as DSSAT saw it (one dict per simulation day)
+weather_rows = result.weather()
 ```
 
 You can also pass a path to any run directory:
@@ -30,9 +40,12 @@ You can also pass a path to any run directory:
 ```python
 summary_rows = dl.read_summary("path/to/dssat_run_2026-09-30_120000")
 growth_rows = dl.read_plant_growth("path/to/dssat_run_2026-09-30_120000")
+water_rows = dl.read_soil_water("path/to/dssat_run_2026-09-30_120000")
+nitrogen_rows = dl.read_plant_nitrogen("path/to/dssat_run_2026-09-30_120000")
+weather_rows = dl.read_weather("path/to/dssat_run_2026-09-30_120000")
 ```
 
-Both functions return a `list[dict]` containing ordinary Python data structures.
+All five reader functions return a `list[dict]` containing ordinary Python data structures.
 
 ## Summary: one row per simulation
 
@@ -75,6 +88,68 @@ for row in result.plant_growth()[:5]:
     print(row["DATE"], "LAI:", row["LAID"], "Biomass:", row["CWAD"])
 ```
 
+## Soil water: one row per day
+
+`SoilWat.OUT` records daily soil water content and water balance components across
+the soil profile.
+
+`read_soil_water(run_dir)` (or `result.soil_water()`) parses this file into a list
+of dictionaries:
+
+- **One row per simulation day**: Each day simulated is returned as a separate dictionary.
+- **Identity on every row**: Each row carries its `RUNNO` and `TRNO`.
+- **DSSAT per-layer column names**: Keys match DSSAT's own column headers without reshaping,
+  such as `SWTD` (total soil water, mm), layer-specific volumetric water contents (`SW1D`,
+  `SW2D`, `SW3D`, ...), `DRAI` (drainage, mm/day), and `ROFC` (runoff, mm/day).
+- **Data types**: Daily measurements are converted to `int` or `float`.
+
+```python
+for row in result.soil_water()[:5]:
+    print(row["DATE"], "Total soil water:", row["SWTD"], "Layer 1:", row.get("SW1D"))
+```
+
+## Plant nitrogen: one row per day
+
+`PlantN.OUT` records daily plant nitrogen uptake, mobilization, and concentrations.
+
+`read_plant_nitrogen(run_dir)` (or `result.plant_nitrogen()`) parses this file into a
+list of dictionaries:
+
+- **One row per simulation day**: Each day simulated is returned as a separate dictionary.
+- **Identity on every row**: Each row carries its `RUNNO` and `TRNO`.
+- **DSSAT column names**: Keys match DSSAT's own column headers, such as `NUPC` (cumulative
+  nitrogen uptake, kg/ha), `NICD` (leaf N concentration), `NSTD` (nitrogen stress factor),
+  and other crop nitrogen metrics.
+- **Data types**: Daily measurements are converted to `int` or `float`.
+
+```python
+for row in result.plant_nitrogen()[:5]:
+    print(row["DATE"], "Cumulative N uptake:", row["NUPC"])
+```
+
+## Weather output: one row per day
+
+`Weather.OUT` records daily weather variables as DSSAT processed and used them during
+the simulation.
+
+`read_weather(run_dir)` (or `result.weather()`) parses this file into a list of
+dictionaries:
+
+- **One row per simulation day**: Each day simulated is returned as a separate dictionary.
+- **Identity on every row**: Each row carries its `RUNNO` and `TRNO`.
+- **DSSAT column names**: Keys match DSSAT's own headers, such as `SRAD` (solar radiation,
+  MJ/m² per day), `TMAX` (maximum temperature, °C), `TMIN` (minimum temperature, °C),
+  and `RAIN` (rainfall, mm).
+- **Dates**: Contains `YEAR`, `DOY`, and `DATE` (`datetime.date`). When DSSAT includes the
+  seven-digit `WDATE` (`YYYYDDD`) column, it is also converted to a `datetime.date` object
+  (or `None`).
+- **Data types**: Daily measurements are converted to `int` or `float`.
+
+```python
+for row in result.weather()[:5]:
+    print(row["DATE"], "Max temp:", row["TMAX"], "Rain:", row["RAIN"])
+```
+
 ## Dates and missing values
 
 DSSAT uses compact conventions in text files that can easily distort analysis if read
@@ -87,9 +162,11 @@ naively. dssatlab converts them during parsing:
   `EDAT` (emergence date), `ADAT` (anthesis date), `MDAT` (maturity date), and `HDAT`
   (harvest date) are converted into Python `datetime.date` objects. Unset or invalid dates
   become `None`.
-- **Plant growth dates**: Growth rows retain the original `YEAR` and `DOY` columns and
-  gain a new `DATE` column containing a `datetime.date` object. If `YEAR` or `DOY` is
-  missing, `DATE` is `None`.
+- **Daily output dates**: Daily output files (`PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`,
+  and `Weather.OUT`) retain the original `YEAR` and `DOY` columns and gain a new `DATE`
+  column containing a `datetime.date` object. If `YEAR` or `DOY` is missing, `DATE` is
+  `None`. In `Weather.OUT`, the `WDATE` column is also parsed into a `datetime.date` object
+  (or `None`).
 
 ### Missing values (`-99`) become `None`
 
@@ -106,15 +183,17 @@ erroneous plot lines.
 | `HDAT` (harvest date) | `-99` | `None` | `NoneType` |
 | `HWAM` (harvest yield) | `3450` | `3450` | `int` |
 | `LAID` (leaf area index) | `2.45` | `2.45` | `float` |
+| `SWTD` (soil water) | `125.4` | `125.4` | `float` |
+| `NUPC` (N uptake) | `45.2` | `45.2` | `float` |
 | `LAID` (missing) | `-99.0` | `None` | `NoneType` |
 
-## Multi-treatment runs
+## Multi-treatment runs and scenarios
 
-When a FileX is run across multiple treatments (e.g., `dl.run("UFGA8201.MZX")`),
-DSSAT writes all treatments into a single `Summary.OUT` and `PlantGro.OUT`.
+When a FileX is run across multiple treatments with `dl.run("UFGA8201.MZX")`, DSSAT writes
+all treatments into single output files (`Summary.OUT`, `PlantGro.OUT`, etc.).
 
-Because `RUNNO` and `TRNO` are preserved on every summary and plant growth row, you can
-filter or group simulations cleanly:
+Because `RUNNO` and `TRNO` are preserved on every parsed row, you can filter or group
+simulations cleanly:
 
 ```python
 result = dl.run("UFGA8201.MZX")  # all treatments
@@ -123,17 +202,33 @@ result = dl.run("UFGA8201.MZX")  # all treatments
 tr2_growth = [row for row in result.plant_growth() if row["TRNO"] == 2]
 ```
 
+When running treatments and scenarios via `run_treatments()`, each `(scenario, treatment)`
+simulation runs in its own directory. Use `combine_summaries(results)` to merge their
+end-of-season summaries into a single table with `scenario` and `treatment` columns:
+
+```python
+results = dl.run_treatments("UFGA8201.MZX", weather="weather.csv")
+all_summaries = dl.combine_summaries(results)
+```
+
+See [Run treatments and scenarios](scenarios.md) for full details.
+
 ## Convert to a pandas DataFrame
 
-If you use pandas for data analysis, convert parsed rows into a `pandas.DataFrame`:
+If you use pandas for data analysis, convert any parsed output list into a
+`pandas.DataFrame`:
 
 ```python
 import dssatlab as dl
 
 growth_rows = result.plant_growth()
-df = dl.to_dataframe(growth_rows)
+df_growth = dl.to_dataframe(growth_rows)
 
-print(df.head())
+water_rows = result.soil_water()
+df_water = dl.to_dataframe(water_rows)
+
+combined_summaries = dl.combine_summaries(results)
+df_summaries = dl.to_dataframe(combined_summaries)
 ```
 
 `to_dataframe(rows)` preserves dictionary key order, `datetime.date` objects, and `None`
@@ -230,12 +325,14 @@ except dl.DSSATOutputError as error:
 
 ## What is not read
 
-dssatlab deliberately restricts output parsing to `Summary.OUT` and `PlantGro.OUT`:
+dssatlab deliberately restricts output parsing to five files: `Summary.OUT`, `PlantGro.OUT`,
+`SoilWat.OUT`, `PlantN.OUT`, and `Weather.OUT`:
 
-- **Other output files**: DSSAT produces over 25 other output files during a run
-  (`SoilWat.OUT`, `ET.OUT`, `Weather.OUT`, `PlantN.OUT`, `SoilNi.OUT`, etc.). These files
+- **Other output files**: DSSAT produces over 20 other output files during a run
+  (`ET.OUT`, `SoilNi.OUT`, `OVERVIEW.OUT`, `Evaluate.OUT`, etc.). These files
   are collected into the run directory and listed in `result.outputs`, but their contents
   are not parsed.
 - **No unit conversions**: Values remain in DSSAT's native output units.
 - **No automated statistics or aggregation**: dssatlab extracts the exact numbers DSSAT
   simulated without computing means, standard errors, or gap-filling.
+- **No new plots**: Plotting functions focus specifically on plant growth curves over time.

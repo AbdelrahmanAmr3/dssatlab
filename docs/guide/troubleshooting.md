@@ -111,9 +111,9 @@ The label identifies either the run directory or the simulation folder.
 Move or copy the FileX and its supporting files to a folder where your Python
 process can create files and directories, then use the new FileX path.
 
-## The weather, soil, or management template already exists
+## The weather, soil, management, or scenario template already exists
 
-`DSSATError` from `write_weather_template()`, `write_soil_template()`, or `write_management_template()`:
+`DSSATError` from `write_weather_template()`, `write_soil_template()`, `write_management_template()`, or `write_scenario_template()`:
 
 ```text
 Weather template path {path} already exists. Choose another path.
@@ -129,6 +129,12 @@ or:
 
 ```text
 Management template path {path} already exists. Choose another path.
+```
+
+or:
+
+```text
+Scenario template path {path} already exists. Choose another path.
 ```
 
 The function preserves existing data. Edit that template, or call
@@ -234,6 +240,30 @@ Management data treatment 1, irrigation, event 2, field 'date': duplicate date '
 
 Event lists for irrigation and fertilizer must have unique and strictly ascending dates.
 
+```text
+Scenario 'base', treatment selection: supply a non-empty list or tuple of treatment numbers, or None for all FileX treatments.
+```
+
+Supply a valid list of integer treatment numbers present in the FileX, or omit `treatments` to run all treatments.
+
+```text
+Unknown scenario key 'bad_key'. Allowed keys: weather, soil, management. Correct or remove the unknown key.
+```
+
+Scenarios only support `weather`, `soil`, and `management` overrides. Remove or correct misspelled keys.
+
+```text
+The scenario name 'base' is reserved for unchanged inputs. Use another name for overrides, or supply base: {}.
+```
+
+The un-overridden run is automatically labelled `"base"`. Choose a different name for custom scenarios.
+
+```text
+Scenario 'dry_year', treatment 1: FileX WSTA 'UFGA8201' expects station 'UFGA', but weather data has station 'DEMO'.
+```
+
+The weather station must match the 4-character station code of `WSTA` for every treatment selected in the run.
+
 ## DSSAT could not start or reported a failed run
 
 `DSSATRunError` may begin with this excerpt:
@@ -278,3 +308,17 @@ The weather checks can pass without covering the full crop period.
 the run, even when DSSAT reports status `0`. Extend the weather data through the
 reported date and the remaining simulation period, then rerun the Simulation.
 The message names the first missing date encountered in the warning file.
+
+## A run failed during run_treatments()
+
+`DSSATRunError`:
+
+```text
+Scenario {name!r}, treatment {treatment}: DSSAT run failed (return code {completed.returncode}).
+...
+Earlier run directories (kept):
+{kept}
+Batch stopped. Inspect the run directories and correct the reported problem before running again.
+```
+
+When a simulation within a multi-treatment or scenario run fails, the batch stops immediately without running subsequent simulations. All previously completed simulation folders and run directories are kept on disk. Inspect the kept run directories and `ERROR.OUT` to diagnose what went wrong before rerunning.

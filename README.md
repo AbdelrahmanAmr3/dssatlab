@@ -27,7 +27,8 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own daily weather into a strictly checked simulation and run it
 - [x] Turn your own soil data into a strictly checked simulation and run it
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
-- [x] Read `Summary.OUT` and `PlantGro.OUT` into Python and plot plant growth
+- [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
+- [x] Read five DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`) and plot plant growth
 
 ```python
 import dssatlab as dl
@@ -43,7 +44,7 @@ How a run works:
 - DSSAT runs in the FileX's own folder, so weather and soil files beside the FileX are found. Its output files are then moved into a new `dssat_run_<date>` folder beside the FileX, and your FileX folder is left as it was.
 - The FileX filename can be at most 12 characters, including the extension (DSSAT's own limit), for example `UFGA8201.MZX`.
 - A failed run raises `DSSATRunError` with the command, the end of DSSAT's console output and the start of `ERROR.OUT`. The run folder is kept so you can look inside.
-- `run()` returns the files DSSAT wrote. Read the summary and plant growth with `result.summary()` and `result.plant_growth()`, or plot with `result.plot(variable)`. Building experiments from Python is not built yet.
+- `run()` returns the files DSSAT wrote. Read outputs with `result.summary()`, `result.plant_growth()`, `result.soil_water()`, `result.plant_nitrogen()`, and `result.weather()`, or plot with `result.plot(variable)`. Building experiments from Python is not built yet.
 
 Upgrading from 0.1.x on Linux or Colab: a DSSAT built by 0.1.x cannot run simulations, so the first `dl.install()` (or `dl.connect()` with consent) rebuilds it once.
 
@@ -86,28 +87,67 @@ What happens:
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading output files other than the summary and plant growth, choosing a soil profile from DSSAT's own soil files, FileX authoring, and more than one treatment per `Simulation`.
+Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, FileX authoring, and parallel or resumed runs.
+
+## Multi-treatment and scenario runs
+
+Real studies often compare all treatments of an experiment or test what-if scenarios.
+`run_treatments()` runs all treatments (or a selected subset) across named scenarios in a
+single call:
+
+```python
+import dssatlab as dl
+
+# Generate a scenario template pre-filled with treatment numbers from the FileX:
+dl.write_scenario_template("scenarios.yaml", filex="UFGA8201.MZX")
+
+# Run treatments across scenarios:
+results = dl.run_treatments(
+    "UFGA8201.MZX",
+    weather="weather.csv",
+    treatments=[1, 3],
+    scenarios="scenarios.yaml",
+)
+
+# Access a specific run (keyed by (scenario, treatment)):
+result = results["base", 1]
+
+# Combine all summaries into a single table:
+combined = dl.combine_summaries(results)
+df = dl.to_dataframe(combined)
+```
+
+How multi-treatment and scenario runs work:
+
+- By default (`treatments=None`), runs all treatments in the FileX; pass a list (e.g. `treatments=[1, 3]`) to select a subset.
+- Each `(scenario, treatment)` simulation runs in its own dated folder beside the FileX (`dssat_sim_<date>`).
+- Scenarios are defined in a YAML file or plain dictionary. Allowed overrides: `weather`, `soil`, `management`. Overrides replace the whole input without partial merging. The baseline un-overridden run is always included as `"base"`.
+- Every weather input must match the station code of `WSTA` for all selected treatments.
+- All scenario and treatment inputs are verified before any run; a single `DSSATCheckError` lists all problems across all scenarios and treatments.
+- A failed run halts execution immediately and reports all completed run directories kept on disk.
 
 ## Reading results
 
-Read summary and plant growth outputs directly from a run result or any run directory:
+Read outputs directly from a run result or any run directory:
 
 ```python
 import dssatlab as dl
 
 # After a run:
-summary_rows = result.summary()          # one dict per simulation (yield, dates, ...)
-growth_rows = result.plant_growth()       # one dict per simulation day (leaf area, ...)
+summary_rows = result.summary()          # one dict per simulation (Summary.OUT)
+growth_rows = result.plant_growth()       # daily crop development (PlantGro.OUT)
+water_rows = result.soil_water()          # daily soil water by layer (SoilWat.OUT)
+nitro_rows = result.plant_nitrogen()      # daily nitrogen uptake (PlantN.OUT)
+weather_rows = result.weather()           # daily weather as DSSAT saw it (Weather.OUT)
 
 # Convert to a pandas DataFrame (pandas is optional):
 df = dl.to_dataframe(growth_rows)
 
-# Plot a variable against date (requires pip install dssatlab[plot]):
+# Plot plant growth against date (requires pip install dssatlab[plot]):
 ax = result.plot("LAID")                 # leaf area index over time
 
 # Compare treatments across run directories:
 ax = dl.plot_plant_growth([run_dir_rainfed, run_dir_irrigated], "LAID")
 ```
 
-Dates are parsed into `datetime.date` objects, DSSAT's `-99` missing values become `None`, and column names match DSSAT's own (`HWAM`, `ADAT`, `LAID`). Only `Summary.OUT` and `PlantGro.OUT` are read; other output files remain listed in `result.outputs`.
-
+Dates are parsed into `datetime.date` objects, DSSAT's `-99` missing values become `None`, and column names match DSSAT's own (`HWAM`, `ADAT`, `LAID`, `SWTD`, `NUPC`). Five output files are parsed (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, and `Weather.OUT`); other output files remain listed in `result.outputs`.

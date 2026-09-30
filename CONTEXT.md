@@ -131,11 +131,12 @@ _Avoid_: output folder, working directory
 **Run result**:
 What `run()` hands back: exit status, run directory, the output files found, and a
 tail of DSSAT's console output. It holds no parsed values itself, but gives access to
-the parsed output files (summary and plant growth).
+the parsed output files (summary, plant growth, soil water, plant nitrogen, and weather).
 
 **Output file**:
-A file DSSAT writes into a run directory (`Summary.OUT`, `PlantGro.OUT`, ...). Only the
-summary and plant growth files are read; every other one is only listed.
+A file DSSAT writes into a run directory (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`,
+`PlantN.OUT`, `Weather.OUT`, ...). Five output files are read (summary, plant growth,
+soil water, plant nitrogen, and weather); every other one is only listed.
 _Avoid_: result file
 
 **Summary**:
@@ -145,6 +146,18 @@ column names (`HWAM`, `ADAT`, ...).
 **Plant growth**:
 The parsed `PlantGro.OUT` of a run directory: one row per simulation day, with DSSAT's own
 column names (`LAID`, `CWAD`, ...).
+
+**Soil water**:
+The parsed `SoilWat.OUT` of a run directory: one row per simulation day, with DSSAT's own
+column names (`SWTD`, `SW1D`, ...).
+
+**Plant nitrogen**:
+The parsed `PlantN.OUT` of a run directory: one row per simulation day, with DSSAT's own
+column names (`NUPC`, `NICD`, ...).
+
+**Weather output**:
+The parsed `Weather.OUT` of a run directory: one row per simulation day, with DSSAT's own
+column names (`SRAD`, `TMAX`, ...).
 
 **Missing value**:
 DSSAT's `-99` marker in an output file. Read as an empty value (`None`), never as a number.

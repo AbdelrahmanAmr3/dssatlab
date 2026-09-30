@@ -12,6 +12,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.3.1 | A `Simulation` with your own soil data: a fixed soil template, strict `check()`, a generated `SOIL.SOL` soil file, `run()`. |
 | 0.3.2 | A `Simulation` with your own management data: a fixed YAML management template or dict, strict checks, FileX section writing (planting, irrigation, fertilizer), `run()`. |
 | 0.4 | Read and plot DSSAT outputs: `read_summary()`, `read_plant_growth()`, `to_dataframe()`, and `plot_plant_growth()`. Access via `result.summary()`, `result.plant_growth()`, and `result.plot()`. |
+| 0.5 | Run all or selected FileX treatments and what-if scenarios in separate folders (`run_treatments()`), scenario template (`write_scenario_template()`), merge summaries (`combine_summaries()`), and read three more output files: `SoilWat.OUT` (`read_soil_water()`), `PlantN.OUT` (`read_plant_nitrogen()`), and `Weather.OUT` (`read_weather()`). Access via `result.soil_water()`, `result.plant_nitrogen()`, and `result.weather()`. |
 
 ## Deliberately not built yet
 
@@ -19,7 +20,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 
 | Not built | Why it waits |
 |---|---|
-| Full FileX or other output parsing | Only Summary.OUT and PlantGro.OUT are read in 0.4; reading other output files (SoilWat, ET, etc.) and FileX parsing wait for later phases. |
+| Full FileX or other output parsing | Five output files (Summary.OUT, PlantGro.OUT, SoilWat.OUT, PlantN.OUT, Weather.OUT) are read in 0.5; reading other output files (ET.OUT, OVERVIEW.OUT, Evaluate.OUT, etc.) and full FileX parsing wait for later phases. |
 | FileX authoring | Users bring an existing FileX; building experiments from Python is a later step. |
 | Other management operations | Planting, irrigation, and inorganic fertilizer are supported; operations like tillage, organic amendments, harvest, and chemical applications wait for later phases. |
 | Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |
@@ -28,5 +29,5 @@ Each of these is a later phase, kept out so the package stays small and each ste
 | Warnings | `check()` either reports a problem or passes; there is no softer level yet. |
 | Optional weather columns beyond the template | The template is one fixed shape so it can be checked strictly. |
 | Model selection | Not needed to run one FileX treatment. |
-| Batch mode and timeouts | One `Simulation` is one treatment; more than one per object is later. |
+| Parallel execution, resume, and timeouts | Multi-treatment and scenario runs execute sequentially in isolated folders; parallel execution, resuming interrupted runs, retries, and timeouts wait for later phases. |
 | Managed cleanup | Removing managed installs is out of scope for now. |

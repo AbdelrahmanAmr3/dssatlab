@@ -2,6 +2,31 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.5.0] - UNDATED
+
+### Added
+- `run_treatments(filex, weather, treatments=None, soil=None, management=None, executable=None, scenarios=None)` runs all treatments (or a selected subset) of a FileX across named scenarios in separate, isolated folders and returns a `dict[(scenario, treatment)] -> RunResult`.
+- Scenario overrides: named overrides of `weather`, `soil`, or `management` that replace the whole input without partial merging, with the un-overridden run always included as `"base"`.
+- `write_scenario_template(path, filex=None)` creates a commented YAML template, optionally pre-filling treatment numbers found in a FileX. Refuses existing files with `DSSATError`.
+- Scenario input as a YAML file path (using optional PyYAML and strict validation) or a plain Python dictionary.
+- Pre-run validation: checks all scenario-treatment pairs before any DSSAT execution and collects all issues into a single `DSSATCheckError`.
+- Station check rule: weather data (base and scenario overrides) must match the `WSTA` station code of every selected treatment.
+- Stop on first run failure: halts execution immediately if any run fails, reporting what failed and listing all kept run directories.
+- `combine_summaries(results)` combines summary rows across all scenario-treatment runs into a single list of dicts with added `scenario` and `treatment` columns, ready for `to_dataframe()`.
+- `read_soil_water(run_dir)` reads daily soil water by layer from `SoilWat.OUT` into a list of dicts with DSSAT's per-layer column names, parsed `DATE`, `-99` missing values as `None`, and `RUNNO` and `TRNO` on each row.
+- `read_plant_nitrogen(run_dir)` reads daily plant nitrogen from `PlantN.OUT` into a list of dicts with DSSAT column names, parsed `DATE`, `-99` missing values as `None`, and `RUNNO` and `TRNO` on each row.
+- `read_weather(run_dir)` reads daily weather data from `Weather.OUT` into a list of dicts with DSSAT column names, parsed `DATE` and `WDATE` (`datetime.date`), `-99` missing values as `None`, and `RUNNO` and `TRNO` on each row.
+- `RunResult` convenience methods: `result.soil_water()`, `result.plant_nitrogen()`, and `result.weather()`.
+- Guide page: "Run treatments and scenarios" (`docs/guide/scenarios.md`).
+
+### Changed
+- Output file parsing expanded from two files to five (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, and `Weather.OUT`). All other output files remain listed in `RunResult.outputs`.
+
+### Notes
+- Upgrading from 0.4.0 needs no changes.
+- Existing single-treatment `Simulation` and `run()` behavior remains unchanged.
+- Not included yet: per-station weather, deep merging of scenario overrides, other management operations, FileX authoring, reading other output files (`ET.OUT`, `OVERVIEW.OUT`, etc.), parallel runs, retries, and timeouts.
+
 ## [0.4.0] - 2026-09-30
 
 ### Added
@@ -112,6 +137,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Notes
 - Environment diagnostics only. DSSAT discovery, connecting, installation and simulation support were deferred.
 
+[0.5.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.5.0
 [0.4.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.4.0
 [0.3.2]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.2
 [0.3.1]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.1

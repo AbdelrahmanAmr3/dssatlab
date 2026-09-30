@@ -8,7 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from dssatlab import DSSATError, read_plant_growth, read_summary, to_dataframe
+import dssatlab
+from dssatlab import DSSATError, DSSATOutputError, read_plant_growth, read_summary, to_dataframe
 from dssatlab.runner import RunResult
 
 
@@ -16,7 +17,7 @@ from dssatlab.runner import RunResult
 def result(tmp_path):
     fixtures = Path(__file__).parent / "fixtures" / "output_files"
     run_dir = tmp_path / "run directory"
-    for kind in ("summary", "plant_growth"):
+    for kind in ("summary", "plant_growth", "soil_water", "plant_nitrogen", "weather"):
         shutil.copytree(fixtures / kind / "maize", run_dir, dirs_exist_ok=True)
     return RunResult(0, run_dir, sorted(run_dir.glob("*.OUT")), "DSSAT finished")
 
@@ -24,6 +25,21 @@ def result(tmp_path):
 def test_result_readers_use_its_run_directory(result):
     assert result.summary() == read_summary(result.run_dir)
     assert result.plant_growth() == read_plant_growth(result.run_dir)
+
+
+@pytest.mark.parametrize("kind,filename,column,expected", [
+    ("soil_water", "SoilWat.OUT", "SW1D", 0.086),
+    ("plant_nitrogen", "PlantN.OUT", "CNAD", 0.0),
+    ("weather", "Weather.OUT", "SRAD", 14.8),
+])
+def test_result_daily_readers_and_missing_files(result, kind, filename, column, expected):
+    rows = getattr(result, kind)()
+    assert len(rows) == 20
+    assert rows[0][column] == expected
+    assert rows == getattr(dssatlab, "read_" + kind)(result.run_dir)
+    (result.run_dir / filename).unlink()
+    with pytest.raises(DSSATOutputError, match=filename):
+        getattr(result, kind)()
 
 
 @pytest.mark.parametrize("name", ["returncode", "run_dir", "outputs", "stdout_tail"])

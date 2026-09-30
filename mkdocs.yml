@@ -30,6 +30,7 @@ nav:
       - Run a Simulation: guide/simulation.md
       - Run with soil data: guide/soil.md
       - Run with management data: guide/management.md
+      - Run treatments and scenarios: guide/scenarios.md
       - Reading results: guide/reading-results.md
       - Troubleshooting: guide/troubleshooting.md
   - Reference and Architecture:

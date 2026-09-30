@@ -22,11 +22,25 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.write_management_template
 
+## Treatments and scenarios
+
+::: dssatlab.run_treatments
+
+::: dssatlab.combine_summaries
+
+::: dssatlab.write_scenario_template
+
 ## Reading outputs and plotting
 
 ::: dssatlab.read_summary
 
 ::: dssatlab.read_plant_growth
+
+::: dssatlab.read_soil_water
+
+::: dssatlab.read_plant_nitrogen
+
+::: dssatlab.read_weather
 
 ::: dssatlab.to_dataframe
 
