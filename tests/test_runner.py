@@ -301,3 +301,18 @@ def test_untouched_error_out_does_not_fail_new_run(fake_dssat):
     assert result.returncode == 0
     assert result.outputs == [result.run_dir / "Summary.OUT"]
     assert previous.read_text() == "old error"
+
+
+@pytest.mark.parametrize("name", ["weather.csv", "Summary.CSV"])
+def test_refuses_to_run_beside_a_csv_dssat_deletes(fake_dssat, name):
+    (fake_dssat.filex.parent / name).write_text("mine", encoding="utf-8")
+    with pytest.raises(DSSATRunError, match=name) as error:
+        run(fake_dssat.filex)
+    assert "Nothing was run" in str(error.value)
+    assert fake_dssat.calls == []
+    assert [p for p in fake_dssat.filex.parent.iterdir() if p.name.startswith("dssat_run_")] == []
+
+
+def test_other_csv_files_do_not_stop_a_run(fake_dssat):
+    (fake_dssat.filex.parent / "notes.csv").write_text("mine", encoding="utf-8")
+    assert run(fake_dssat.filex).returncode == 0

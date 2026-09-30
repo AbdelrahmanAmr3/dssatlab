@@ -71,6 +71,12 @@ def _create_dated_folder(parent: Path, prefix: str, label: str) -> Path:
             ) from error
 
 
+# DSSAT removes <name>.csv from its working directory when it writes that Output file.
+# Checked on real DSSAT 4.8 (Windows); other names may exist.
+_DELETED_CSV = {"et", "evaluate", "mulch", "plantgro", "plantn", "soilni", "soilwat",
+                "summary", "weather"}
+
+
 def run(
     filex: str | Path,
     treatment: int | None = None,
@@ -96,6 +102,7 @@ def run(
 
     Raises:
         DSSATRunError: If the FileX does not exist, its filename exceeds 12 characters,
+            the FileX folder holds a .csv file DSSAT would delete (such as weather.csv),
             the DSSAT executable cannot be executed, DSSAT exits with a non-zero code,
             or ERROR.OUT is generated during the run.
     """
@@ -110,6 +117,17 @@ def run(
             f"Cannot run FileX {filex.name!r}: its filename has {len(filex.name)} "
             "characters; DSSAT accepts at most 12. Rename the FileX to at most "
             "12 characters, including the extension, using DSSAT's 8.3 style."
+        )
+
+    at_risk = sorted(path.name for path in filex.parent.iterdir()
+                     if path.is_file() and path.suffix.lower() == ".csv"
+                     and path.stem.lower() in _DELETED_CSV)
+    if at_risk:
+        raise DSSATRunError(
+            f"Cannot run FileX {filex.name}: DSSAT deletes files named like its own "
+            f"Output files from the FileX folder, and {filex.parent} holds "
+            f"{', '.join(at_risk)}. Nothing was run. Rename or move them "
+            "(for example my_weather.csv), or use Simulation, which runs in its own folder."
         )
 
     if executable is None:
