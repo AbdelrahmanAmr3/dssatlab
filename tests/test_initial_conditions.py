@@ -206,6 +206,10 @@ def test_all_treatments_and_fields_reported_at_once(sim, capsys):
 def test_template_initial_conditions_load_check_and_apply(sim, tmp_path, fake_dssat, capsys):
     pytest.importorskip("yaml")
     template = tmp_path / "experiment.yaml"
+    # The shared fixture adds an odd-cased MZCER048.cUl; two .CUL files for one crop are rejected.
+    for old in sim.filex.parent.iterdir():
+        if old.suffix.lower() == ".cul":
+            old.unlink()
     cul = Path(__file__).parent / "fixtures" / "cultivar" / "MZCER048.CUL"
     (sim.filex.parent / cul.name).write_bytes(cul.read_bytes())
     write_experiment_template(template, filex=sim.filex)

@@ -156,6 +156,10 @@ def test_all_treatment_and_other_input_problems_collected(sim):
 def test_template_loads_checks_and_writes_controls(sim, tmp_path, fake_dssat):
     pytest.importorskip("yaml")
     path = tmp_path / "experiment.yaml"
+    # The shared fixture adds an odd-cased MZCER048.cUl; two .CUL files for one crop are rejected.
+    for old in sim.filex.parent.iterdir():
+        if old.suffix.lower() == ".cul":
+            old.unlink()
     cul = Path(__file__).parent / "fixtures" / "cultivar" / "MZCER048.CUL"
     (sim.filex.parent / cul.name).write_bytes(cul.read_bytes())
     write_experiment_template(path, filex=sim.filex)

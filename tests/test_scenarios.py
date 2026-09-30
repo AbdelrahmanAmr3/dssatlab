@@ -186,6 +186,10 @@ def test_combined_summaries_work_with_dataframe(batch_inputs, request):
 def test_scenario_management_override_can_use_cultivar_initial_conditions_and_controls(
         inputs, fake_dssat):
     inputs.filex.write_bytes((FIXTURES / "initial_conditions" / "UFGA8201.MZX").read_bytes())
+    # The shared fixture adds an odd-cased MZCER048.cUl; two .CUL files for one crop are rejected.
+    for old in inputs.filex.parent.iterdir():
+        if old.suffix.lower() == ".cul":
+            old.unlink()
     cul = FIXTURES / "cultivar" / "MZCER048.CUL"
     (inputs.filex.parent / cul.name).write_bytes(cul.read_bytes())
     experiment = {
