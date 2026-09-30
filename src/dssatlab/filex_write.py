@@ -242,6 +242,25 @@ def _event_text(text, treatment, events, section="irrigation"):
     return "".join(lines)
 
 
+def _cultivar_text(text, treatment, cultivar):
+    """Add a CULTIVARS level and repoint CU, using the management edit helpers."""
+    _section_row(text, "TREATMENTS", "N", treatment, ("CU",))
+    lines = text.splitlines(keepends=True)
+    header = "@C CR INGENO CNAME"
+    blocks, highest = _event_blocks(lines, "CULTIVARS", (header,))
+    columns, index, _ = blocks[0]
+    level = highest + 1
+    # CNAME is descriptive; -99 avoids retaining the previous cultivar's name.
+    row = _event_row(columns, {"C": level, "CR": cultivar["crop"],
+                               "INGENO": cultivar["code"], "CNAME": -99}, "CULTIVARS")
+    _repoint(lines, treatment, "CU", level)
+    if index is None:
+        lines = _insert_section(lines, "CULTIVARS", [header, row])
+    else:
+        _append_rows(lines, index, [row])
+    return "".join(lines)
+
+
 def _write_management(filex, treatment, management):
     """Apply only the selected, checked entry to the already-copied FileX."""
     if management is None:
@@ -250,6 +269,8 @@ def _write_management(filex, treatment, management):
         if int(key) == int(treatment):
             path = Path(filex)
             text = path.read_bytes().decode("latin-1")
+            if "cultivar" in entry:
+                text = _cultivar_text(text, int(treatment), entry["cultivar"])
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])
             for section in ("irrigation", "fertilizer"):

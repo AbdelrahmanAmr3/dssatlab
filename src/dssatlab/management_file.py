@@ -56,9 +56,12 @@ treatments:
 
 _EXPERIMENT_SECTIONS_TEXT = """
     # Omit a section to keep the FileX's own level.
-    # Cultivar currently has shape checks only; it is not applied to FileX yet.
+    # Cultivar adds a new CULTIVARS level in the copy and repoints this treatment.
     cultivar:
-      code: "IB0035"             # Required existing DSSAT cultivar code from the .CUL file
+      crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
+      code: "IB0035"             # Required INGENO: six printable ASCII characters, no spaces; case-sensitive
+      # Code must exist in the one crop-matching .CUL beside the FileX (e.g., MZCER048.CUL).
+      # That .CUL is copied into the simulation folder; no coefficients are edited.
 
     initial_conditions:          # Checked and written as a new level in the FileX copy
       date: "1982-02-25"          # Required initial-conditions date (quoted "YYYY-MM-DD")
@@ -100,8 +103,9 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
     """Write commented YAML for management, cultivar, initial conditions and controls.
 
-    The new sections are accepted and checked for shape only, not applied to
-    FileX yet. Dates are quoted ISO calendar strings; units and codes are DSSAT's.
+    Cultivar is checked against the local .CUL and applied to the FileX copy.
+    Initial conditions and controls have shape checks only, not applied yet.
+    Dates are quoted ISO calendar strings; units and codes are DSSAT's.
     With filex, use its treatment numbers in file order, keeping example values.
     Without filex, write one example treatment numbered 1. No PyYAML is needed.
     Raise DSSATError if the destination exists or FileX treatments cannot be read.

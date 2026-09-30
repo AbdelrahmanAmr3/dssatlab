@@ -46,17 +46,14 @@ def _check_fields(data, required, optional, where, template="Management"):
 def _check_experiment_section(data, section, where):
     """Check keys, required fields and scalar/container types, without FileX edits.
 
-    Cultivar lookup and control values belong to the later section tickets.
-    Dates follow the existing strict ISO contract.
+    Cultivar and initial conditions have their own checks; control values
+    belong to the later controls ticket. Dates follow the existing strict ISO contract.
     """
     where = f"{where}, {section}"
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply fields from the Experiment "
                 "template or omit the section to keep the FileX level."]
-    if section == "cultivar":
-        required, optional = ("code",), ()
-    else:
-        required, optional = (), ("start_date", "water", "nitrogen", "output_interval")
+    required, optional = (), ("start_date", "water", "nitrogen", "output_interval")
     problems = _check_fields(data, required, optional, where, "Experiment")
     for field in required + optional:
         if field not in data:

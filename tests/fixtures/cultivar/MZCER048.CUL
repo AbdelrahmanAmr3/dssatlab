@@ -1,0 +1,5 @@
+*MAIZE CULTIVAR COEFFICIENTS: MZCER048 MODEL
+! Narrow lookup fixture; coefficient values are not used by these tests.
+@VAR#  VRNAME.......... EXPNO   ECO#    P1    P2    P5    G2    G3 PHINT
+IB0035 McCurdy 84aa         . IB0001 259.0 1.193 947.1 924.3 8.168 43.00
+IB0060 H610(UH)             . IB0001 314.4 1.109 944.4 648.9 6.362 38.90

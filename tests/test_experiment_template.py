@@ -3,6 +3,7 @@
 from copy import deepcopy
 from pathlib import Path
 import sys
+import shutil
 
 import pytest
 
@@ -13,7 +14,7 @@ from test_simulation_run import fake_dssat, inputs
 
 
 SECTIONS = {
-    "cultivar": {"code": "IB0035"},
+    "cultivar": {"crop": "MZ", "code": "IB0035"},
     "initial_conditions": {
         "date": "1982-02-25", "previous_crop": "MZ", "residue_mass": 0.0,
         "layers": [{"depth": 15, "water": 0.2, "nh4": 0.5, "no3": 2.0}],
@@ -23,6 +24,12 @@ SECTIONS = {
     },
 }
 WRITERS = ("write_management_template", "write_experiment_template")
+
+
+@pytest.fixture(autouse=True)
+def cultivar_table(tmp_path):
+    fixture = Path(__file__).parent / "fixtures" / "cultivar" / "MZCER048.CUL"
+    shutil.copyfile(fixture, tmp_path / fixture.name)
 
 
 @pytest.mark.parametrize("writer_name", WRITERS)
@@ -170,6 +177,7 @@ def test_remaining_shape_only_sections_are_not_applied_to_filex(inputs, fake_dss
     original = inputs.filex.read_bytes()
     entry = deepcopy(SECTIONS)
     del entry["initial_conditions"]
+    del entry["cultivar"]
     entry["controls"]["start_date"] = "2000-01-01"
     sim = Simulation(inputs.filex, 2, inputs.weather, management={"treatments": {2: entry}})
     assert sim.check() == []
