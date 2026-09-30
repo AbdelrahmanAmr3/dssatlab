@@ -55,7 +55,7 @@ treatments:
 
 
 _EXPERIMENT_SECTIONS_TEXT = """
-    # These three sections currently have shape checks only; they are not yet
+    # Cultivar and initial_conditions currently have shape checks only; they are not yet
     # applied to the FileX. Omit a section to keep the FileX's own level.
     cultivar:
       code: "IB0035"             # Required existing DSSAT cultivar code from the .CUL file
@@ -70,11 +70,14 @@ _EXPERIMENT_SECTIONS_TEXT = """
           nh4: 0.5               # Soil ammonium, mg/kg
           no3: 2.0               # Soil nitrate, mg/kg
 
-    controls:                    # All fields optional; supply only the fields to change
+    # Controls are checked and applied to a new level in a copy of the FileX.
+    # Omitted fields keep their base values; omit controls to keep the FileX level.
+    # start_date replaces SDATE in weather and management date checks; START stays unchanged.
+    controls:                    # All fields optional; an empty dict keeps the FileX level
       start_date: "1982-02-25"    # Simulation start date (quoted "YYYY-MM-DD")
       water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)
       nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
-      output_interval: 1          # Output interval, integer days
+      output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column
 """
 
 
@@ -99,8 +102,8 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
     """Write commented YAML for management, cultivar, initial conditions and controls.
 
-    The new sections are accepted and checked for shape only, not applied to
-    FileX yet. Dates are quoted ISO calendar strings; units and codes are DSSAT's.
+    Controls are checked and applied to a copy of FileX; cultivar and initial
+    conditions have shape checks only. Dates are quoted ISO calendar strings.
     With filex, use its treatment numbers in file order, keeping example values.
     Without filex, write one example treatment numbered 1. No PyYAML is needed.
     Raise DSSATError if the destination exists or FileX treatments cannot be read.

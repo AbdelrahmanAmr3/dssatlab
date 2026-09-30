@@ -1,4 +1,4 @@
-"""Shared experiment field checks and shape-only checks for the v0.6 sections."""
+"""Shared experiment field checks, including control values and section shapes."""
 
 from datetime import date
 import math
@@ -64,7 +64,7 @@ def _check_layers(layers, where):
 def _check_experiment_section(data, section, where):
     """Check keys, required fields and scalar/container types, without FileX edits.
 
-    Cultivar lookup, ranges, layer ordering and cross-input checks belong to
+    Cultivar lookup, layer ranges, ordering and cross-input checks belong to
     the later section tickets. Dates follow the existing strict ISO contract.
     """
     where = f"{where}, {section}"
@@ -89,9 +89,15 @@ def _check_experiment_section(data, section, where):
         elif field == "residue_mass":
             problems.extend(_check_number(value, location))
         elif field == "output_interval":
-            if isinstance(value, bool) or not isinstance(value, int):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 problems.append(f"{location}: found {_show_value(value)}. "
-                                "Supply an integer number of days, not a boolean.")
+                                "Supply a positive integer number of days, not a boolean.")
+            else:
+                problems.extend(_check_number(value, location))
+        elif section == "controls" and field in ("water", "nitrogen"):
+            if not isinstance(value, str) or value not in ("Y", "N"):
+                problems.append(f"{location}: found {_show_value(value)}. "
+                                'Supply the quoted string "Y" or "N".')
         elif not isinstance(value, str):
             problems.append(f"{location}: found {_show_value(value)}. "
                             "Supply a quoted string following the Experiment template.")

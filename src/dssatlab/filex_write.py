@@ -255,5 +255,8 @@ def _write_management(filex, treatment, management):
             for section in ("irrigation", "fertilizer"):
                 if section in entry:
                     text = _event_text(text, int(treatment), entry[section], section)
+            if "controls" in entry:
+                from .controls import _controls_text
+                text = _controls_text(text, int(treatment), entry["controls"])
             path.write_bytes(text.encode("latin-1"))
             return

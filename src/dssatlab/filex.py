@@ -58,11 +58,12 @@ def _section_row(text, section, key, level, required):
                      "block. Choose an existing level or correct the FileX.")
 
 
-def _read_filex(source, treatment) -> tuple[dict[str, str], list[str]]:
+def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], list[str]]:
     """Return available WSTA/ID_SOIL/START/SDATE values and problems, without writing.
 
     Partial results let check() compare a valid station even if the start is bad,
     or compare a valid start even if the field cannot be resolved.
+    A checked start_date override replaces SDATE before its value is checked.
     """
     if (isinstance(treatment, bool) or
             not isinstance(treatment, (int, str)) or
@@ -108,6 +109,8 @@ def _read_filex(source, treatment) -> tuple[dict[str, str], list[str]]:
         problems.append(f"FileX {source}: WSTA {values['WSTA']!r} has an invalid length. "
                         "Supply a four-character station or eight-character weather file name.")
         del values["WSTA"]
+    if "SDATE" in values and start_date is not None:
+        values["SDATE"] = f"{start_date.year % 100:02d}{start_date.timetuple().tm_yday:03d}"
     if "SDATE" in values and not re.fullmatch(r"[0-9]{5}", values["SDATE"]):
         problems.append(f"FileX {source}: SDATE {values['SDATE']!r} is invalid. "
                         "Supply five digits: two-digit year followed by three-digit day of year.")

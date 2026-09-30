@@ -1,0 +1,14 @@
+UFGA8201.MZX uses the existing scenarios fixture's treatments, fields and
+planting. Its SIMULATION CONTROLS is copied from C:/DSSAT48/Maize/UFGA8201.MZX
+(installed DSSAT 4.8 sample), including METHODS, MANAGEMENT, OUTPUTS and all
+five AUTOMATIC MANAGEMENT blocks. It is a focused fixture, not a runnable
+standalone DSSAT experiment.
+
+Confirmed against the installed 4.8 Help/DSSAT_Input_Files.chm,
+experimentfiles.htm and hmpopup_html.js: SDATE is year + day of year;
+FROPT is frequency of output in days. SIMULATION.CDE lists Y/N switches.
+Column positions (one-based, including left padding, from header token ends):
+N: 1-2; GENERAL/SDATE: 33-38; OPTIONS/WATER: 11-20;
+OPTIONS/NITRO: 21-26; OUTPUTS/FROPT: 33-38; TREATMENTS/SM: 71-73.
+The wide first field includes the unused gap after the two-letter block code.
+Every other byte in a copied controls row is retained, including that code.

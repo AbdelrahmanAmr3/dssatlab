@@ -8,7 +8,7 @@ import pytest
 
 import dssatlab
 from dssatlab import DSSATError, Simulation
-from test_management_file import sim_inputs
+from test_management_file import sim_inputs as management_inputs
 from test_simulation_run import fake_dssat, inputs
 
 
@@ -23,6 +23,16 @@ SECTIONS = {
     },
 }
 WRITERS = ("write_management_template", "write_experiment_template")
+
+
+@pytest.fixture
+def sim_inputs(management_inputs):
+    filex, weather = management_inputs
+    fixture = Path(__file__).parent / "fixtures" / "controls" / "UFGA8201.MZX"
+    controls = fixture.read_bytes().split(b"*SIMULATION CONTROLS")[1]
+    filex.write_bytes(filex.read_bytes().split(b"*SIMULATION CONTROLS")[0]
+                      + b"*SIMULATION CONTROLS" + controls)
+    return filex, weather
 
 
 @pytest.mark.parametrize("writer_name", WRITERS)
@@ -51,7 +61,7 @@ def test_filex_prefills_only_treatment_numbers(tmp_path, sim_inputs, writer_name
     yaml = pytest.importorskip("yaml")
     _, weather = sim_inputs
     filex = tmp_path / "MULTI.MZX"
-    fixture = Path(__file__).parent / "fixtures" / "scenarios" / "UFGA8201.MZX"
+    fixture = Path(__file__).parent / "fixtures" / "controls" / "UFGA8201.MZX"
     # Nonconsecutive, out-of-order numbers catch guessed ranges and sorting.
     filex.write_bytes(fixture.read_bytes().replace(b" 1 1 0 0 RAINFED", b" 7 1 0 0 RAINFED"))
     before = filex.read_bytes()
@@ -166,10 +176,10 @@ def test_new_fields_use_strict_yaml_checks(tmp_path, sim_inputs, fragment, word)
     assert any(word in p for p in problems)
 
 
-def test_new_sections_are_not_applied_to_filex(inputs, fake_dssat):
+def test_remaining_shape_only_sections_are_not_applied_to_filex(inputs, fake_dssat):
     original = inputs.filex.read_bytes()
     entry = deepcopy(SECTIONS)
-    entry["controls"]["start_date"] = "2000-01-01"
+    del entry["controls"]
     sim = Simulation(inputs.filex, 2, inputs.weather, management={"treatments": {2: entry}})
     assert sim.check() == []
     result = sim.run()
