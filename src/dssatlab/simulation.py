@@ -7,6 +7,7 @@ import shutil
 
 from .errors import DSSATCheckError, DSSATRunError
 from .filex import _read_filex, _weather_filename
+from .filex_write import _write_planting
 from .management import _check_management, _report_lines
 from .runner import RunResult, _create_dated_folder, run
 from .soil import _parse_soil, write_soil_file
@@ -129,8 +130,11 @@ class Simulation:
         if any problems are found.
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
         FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
-        and generates the weather file (*.WTH). When soil data is given, writes
-        its soil profile to SOIL.SOL and copies no sibling .SOL files; otherwise
+        and generates the weather file (*.WTH).
+        With management planting, adds a new level in the copy and repoints only
+        the selected treatment; the original FileX is never changed.
+        When soil data is given, writes its soil profile to SOIL.SOL and copies
+        no sibling .SOL files; otherwise
         copies all sibling .SOL files. Invokes the DSSAT executable for the
         treatment and scans WARNING.OUT for missing weather records. Soil
         failures use the existing run error, keeping ERROR.OUT in the run directory.
@@ -154,6 +158,7 @@ class Simulation:
         filex = Path(self.filex).resolve()
         sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
         shutil.copy2(filex, sim_folder / filex.name)
+        _write_planting(sim_folder / filex.name, self.treatment, self.management)
         for sibling in filex.parent.iterdir():
             if self.soil is not None and sibling.suffix.upper() == ".SOL":
                 continue

@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 
 from .filex import _section_row
+from .filex_write import _planting_text
 from .weather import _show_value
 
 
@@ -137,8 +138,9 @@ def _check_events(events, section, where):
 def _check_management(source, filex):
     """Check every treatment, returning problems and report lines without mutation.
 
-    Only treatment membership is read from the FileX. When it is unreadable,
-    Simulation's FileX checks report that failure and shape checks still run.
+    Treatment membership and planting writer columns are read from the FileX.
+    When it is unreadable, Simulation's FileX checks report that failure and
+    shape checks still run.
     Optional planting numbers pass through without crop-specific range checks.
     """
     label = "Management data"
@@ -191,6 +193,11 @@ def _check_management(source, filex):
         has_planting = isinstance(entry, dict) and "planting" in entry
         if has_planting:
             planting_problems = _check_planting(entry["planting"], f"{where}, planting")
+            if not planting_problems and not entry_problems and text is not None:
+                try:
+                    _planting_text(text, number, entry["planting"])
+                except ValueError as error:
+                    planting_problems.append(f"{where}, planting: FileX {filex}: {error}")
         treatment_problems = entry_problems + planting_problems
         event_report = []
         if isinstance(entry, dict):
