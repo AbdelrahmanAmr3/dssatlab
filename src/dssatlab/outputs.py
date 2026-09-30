@@ -57,17 +57,23 @@ def _summary_value(name: str, value: str, text_columns: set[str]):
     if name in text_columns:
         return value
     if name in _SUMMARY_DATES:
-        if not re.fullmatch(r"\d{7}", value):
-            raise ValueError(f"invalid YYYYDDD date in {name}: {value!r}")
-        year, day = int(value[:4]), int(value[4:])
-        try:
-            result = date(year, 1, 1) + timedelta(days=day - 1)
-        except (ValueError, OverflowError) as exc:
-            raise ValueError(f"invalid YYYYDDD date in {name}: {value!r}") from exc
-        if day < 1 or result.year != year:
-            raise ValueError(f"invalid YYYYDDD date in {name}: {value!r}")
-        return result
+        return _date_value(name, value)
     return _numeric_value(name, value)
+
+
+def _date_value(name: str, value: str):
+    if re.fullmatch(r"-99(?:\.0+)?", value):
+        return None
+    if not re.fullmatch(r"\d{7}", value):
+        raise ValueError(f"invalid YYYYDDD date in {name}: {value!r}")
+    year, day = int(value[:4]), int(value[4:])
+    try:
+        result = date(year, 1, 1) + timedelta(days=day - 1)
+    except (ValueError, OverflowError) as exc:
+        raise ValueError(f"invalid YYYYDDD date in {name}: {value!r}") from exc
+    if day < 1 or result.year != year:
+        raise ValueError(f"invalid YYYYDDD date in {name}: {value!r}")
+    return result
 
 
 def _numeric_value(name: str, value: str):
@@ -143,21 +149,51 @@ def read_plant_growth(run_dir: str | Path) -> list[dict]:
     Raises DSSATOutputError for missing or malformed output, never returning
     partial rows from a damaged file.
     """
-    path = Path(run_dir) / "PlantGro.OUT"
+    return _read_daily(run_dir, "PlantGro.OUT")
+
+
+def read_soil_water(run_dir: str | Path) -> list[dict]:
+    """Read SoilWat.OUT by day, retaining DSSAT's per-layer column names.
+
+    Uses read_plant_growth's dates, missing values and DSSATOutputError rules.
+    """
+    return _read_daily(run_dir, "SoilWat.OUT")
+
+
+def read_plant_nitrogen(run_dir: str | Path) -> list[dict]:
+    """Read PlantN.OUT by day with DSSAT's own column names.
+
+    Uses read_plant_growth's dates, missing values and DSSATOutputError rules.
+    """
+    return _read_daily(run_dir, "PlantN.OUT")
+
+
+def read_weather(run_dir: str | Path) -> list[dict]:
+    """Read Weather.OUT by day with DSSAT's own column names.
+
+    Uses read_plant_growth's dates, missing values and DSSATOutputError rules.
+    The additional YYYYDDD column WDATE also becomes datetime.date or None.
+    """
+    return _read_daily(run_dir, "Weather.OUT")
+
+
+def _read_daily(run_dir: str | Path, filename: str) -> list[dict]:
+    """Read numeric daily columns and dates from each run's fixed-width header."""
+    path = Path(run_dir) / filename
     checked = (f"Checked {path} in the run directory for *RUN and TREATMENT lines, "
                "an @YEAR header in each run block, and complete data rows.")
-    next_step = "Check the run directory and output file, or rerun DSSAT to produce a complete PlantGro.OUT."
+    next_step = f"Check the run directory and output file, or rerun DSSAT to produce a complete {filename}."
     try:
         lines = path.read_text(encoding="latin-1").splitlines()
     except OSError as exc:
         raise DSSATOutputError(
-            f"PlantGro.OUT is missing or unreadable ({exc}). {checked} {next_step}"
+            f"{filename} is missing or unreadable ({exc}). {checked} {next_step}"
         ) from exc
 
     starts = [i for i, line in enumerate(lines) if re.match(r"\*RUN\b", line)]
     if not starts:
         raise DSSATOutputError(
-            f"Plant growth has no data rows in *RUN blocks; RUNNO not found. {checked} {next_step}"
+            f"{filename} has no data rows in *RUN blocks; RUNNO not found. {checked} {next_step}"
         )
     rows = []
     for start, end in zip(starts, starts[1:] + [len(lines)]):
@@ -181,11 +217,14 @@ def read_plant_growth(run_dir: str | Path) -> list[dict]:
             if (not {"YEAR", "DOY"}.issubset(names) or len(names) != len(set(names))
                     or {"RUNNO", "TRNO", "DATE"}.intersection(names)):
                 raise ValueError("invalid @YEAR header: expected unique DSSAT columns including YEAR and DOY")
+            rows_before = len(rows)
             for line_number, line in enumerate(lines[header_index + 1:end], header_index + 2):
                 if not line.strip() or line.lstrip().startswith(("!", "*")):
                     continue
                 values = _split_fixed_width(header, line)
                 row = {name: _numeric_value(name, value) for name, value in values.items()}
+                if "WDATE" in values:
+                    row["WDATE"] = _date_value("WDATE", values["WDATE"])
                 year, day = row["YEAR"], row["DOY"]
                 if year is None or day is None:
                     row["DATE"] = None
@@ -197,11 +236,11 @@ def read_plant_growth(run_dir: str | Path) -> list[dict]:
                         raise ValueError(f"invalid DATE from YEAR {year} and DOY {day}")
                 row.update(RUNNO=runno, TRNO=trno)
                 rows.append(row)
+            if len(rows) == rows_before:
+                raise ValueError(f"no data rows in run block {runno}")
         except (ValueError, OverflowError) as exc:
             raise DSSATOutputError(
-                f"Malformed Plant growth header or data row at line {line_number} "
+                f"Malformed {filename} header or data row at line {line_number} "
                 f"in run block starting at line {start + 1}: {exc}. {checked} {next_step}"
             ) from exc
-    if not rows:
-        raise DSSATOutputError(f"Plant growth has no data rows. {checked} {next_step}")
     return rows

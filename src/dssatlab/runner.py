@@ -12,7 +12,8 @@ import subprocess
 from . import core
 from .core import connect
 from .errors import DSSATRunError
-from .outputs import read_plant_growth, read_summary
+from .outputs import (read_plant_growth, read_plant_nitrogen, read_soil_water,
+                      read_summary, read_weather)
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,18 @@ class RunResult:
     def plant_growth(self) -> list[dict]:
         """Read the Plant growth from this run directory."""
         return read_plant_growth(self.run_dir)
+
+    def soil_water(self) -> list[dict]:
+        """Read soil water from this run directory."""
+        return read_soil_water(self.run_dir)
+
+    def plant_nitrogen(self) -> list[dict]:
+        """Read plant nitrogen from this run directory."""
+        return read_plant_nitrogen(self.run_dir)
+
+    def weather(self) -> list[dict]:
+        """Read the weather DSSAT used from this run directory."""
+        return read_weather(self.run_dir)
 
     def plot(self, variable: str):
         """Plot a Plant growth variable from this run directory."""
