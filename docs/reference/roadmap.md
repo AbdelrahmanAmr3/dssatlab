@@ -11,6 +11,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.3 | A `Simulation` from your own weather data: a fixed weather template, strict `check()`, a generated DSSAT weather file, `run()`. |
 | 0.3.1 | A `Simulation` with your own soil data: a fixed soil template, strict `check()`, a generated `SOIL.SOL` soil file, `run()`. |
 | 0.3.2 | A `Simulation` with your own management data: a fixed YAML management template or dict, strict checks, FileX section writing (planting, irrigation, fertilizer), `run()`. |
+| 0.4 | Read and plot DSSAT outputs: `read_summary()`, `read_plant_growth()`, `to_dataframe()`, and `plot_plant_growth()`. Access via `result.summary()`, `result.plant_growth()`, and `result.plot()`. |
 
 ## Deliberately not built yet
 
@@ -18,7 +19,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 
 | Not built | Why it waits |
 |---|---|
-| Full FileX or output parsing | `run()` returns the files DSSAT wrote and does not read them. Parsing needs its own design. |
+| Full FileX or other output parsing | Only Summary.OUT and PlantGro.OUT are read in 0.4; reading other output files (SoilWat, ET, etc.) and FileX parsing wait for later phases. |
 | FileX authoring | Users bring an existing FileX; building experiments from Python is a later step. |
 | Other management operations | Planting, irrigation, and inorganic fertilizer are supported; operations like tillage, organic amendments, harvest, and chemical applications wait for later phases. |
 | Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |

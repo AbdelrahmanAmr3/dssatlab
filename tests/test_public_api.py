@@ -1,5 +1,7 @@
 import dssatlab
-from dssatlab import DSSATError, DSSATRunError, connect, detect, install, run
+from dssatlab import (DSSATError, DSSATOutputError, DSSATRunError, connect, detect,
+                     install, plot_plant_growth, read_plant_growth, read_summary, run,
+                     to_dataframe)
 
 
 def test_public_api_is_importable():
@@ -10,6 +12,28 @@ def test_public_api_is_importable():
     assert issubclass(DSSATRunError, DSSATError)
     assert "run" in dssatlab.__all__
     assert "DSSATRunError" in dssatlab.__all__
+
+
+def test_summary_public_api_is_exported():
+    assert callable(read_summary)
+    assert issubclass(DSSATOutputError, DSSATError)
+    assert "read_summary" in dssatlab.__all__
+    assert "DSSATOutputError" in dssatlab.__all__
+
+
+def test_plant_growth_public_api_is_exported():
+    assert callable(read_plant_growth)
+    assert "read_plant_growth" in dssatlab.__all__
+
+
+def test_dataframe_public_api_is_exported():
+    assert callable(to_dataframe)
+    assert "to_dataframe" in dssatlab.__all__
+
+
+def test_plot_public_api_is_exported():
+    assert callable(plot_plant_growth)
+    assert "plot_plant_growth" in dssatlab.__all__
 
 
 def test_weather_public_api_is_exported():

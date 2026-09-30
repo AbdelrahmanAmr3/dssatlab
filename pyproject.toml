@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dssatlab"
-version = "0.3.2"
+version = "0.4.0"
 description = "A small Python interface to DSSAT-CSM: find or build DSSAT, run a FileX, or run a simulation from your own weather data."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,8 +24,9 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "build>=1", "twine>=6", "pyyaml>=6"]
+dev = ["pytest>=8", "build>=1", "twine>=6", "pyyaml>=6", "matplotlib>=3.8"]
 docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "mkdocs-include-markdown-plugin>=7"]
+plot = ["matplotlib>=3.8"]
 yaml = ["pyyaml>=6"]
 
 [project.urls]

@@ -22,6 +22,19 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.write_management_template
 
+## Reading outputs and plotting
+
+::: dssatlab.read_summary
+
+::: dssatlab.read_plant_growth
+
+::: dssatlab.to_dataframe
+
+::: dssatlab.plot_plant_growth
+    options:
+      docstring_options:
+        warn_missing_types: false
+
 ## Exceptions
 
 ::: dssatlab.DSSATError
@@ -31,5 +44,7 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 ::: dssatlab.DSSATInstallError
 
 ::: dssatlab.DSSATRunError
+
+::: dssatlab.DSSATOutputError
 
 ::: dssatlab.DSSATCheckError

@@ -2,6 +2,27 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.4.0] - Unreleased
+
+### Added
+- `read_summary(run_dir)` reads `Summary.OUT` from any run directory into a list of dicts (one row per simulation) with DSSAT column names, summary dates (`SDAT`, `PDAT`, `EDAT`, `ADAT`, `MDAT`, `HDAT`) as `datetime.date` objects, `-99` missing values as `None`, and `RUNNO`, `TRNO`, and `TNAM` on every row.
+- `read_plant_growth(run_dir)` reads `PlantGro.OUT` from any run directory into a list of dicts (one row per simulation day) with DSSAT column names, a parsed `DATE` column (`datetime.date`) alongside `YEAR` and `DOY`, `-99` missing values as `None`, and `RUNNO` and `TRNO` on every row.
+- `to_dataframe(rows)` converts parsed summary or plant growth rows into a pandas DataFrame in row key order. pandas is imported only when called (ADR 0002).
+- `plot_plant_growth(run_dirs, variable)` plots a plant growth variable against `DATE` across simulations, drawing one line per simulation labelled by treatment name, and returns the matplotlib `Axes`. Accepts a single run directory or a sequence of run directories to compare treatments.
+- `RunResult` convenience methods: `result.summary()`, `result.plant_growth()`, and `result.plot(variable)`.
+- `DSSATOutputError` exception for missing, empty, or malformed output files or unknown plot variables, with messages reporting what failed, what was checked, and what to do next.
+- Optional `plot` installation extra (`pip install dssatlab[plot]`) providing matplotlib for plotting.
+- ADR 0004: matplotlib is an optional extra, used only for plots.
+- Guide page: "Reading results" (`docs/guide/reading-results.md`).
+
+### Changed
+- None for existing behavior. `Summary.OUT` and `PlantGro.OUT` are the only output files parsed; all other output files remain listed in `RunResult.outputs`.
+
+### Notes
+- Upgrading from 0.3.2 needs no changes.
+- Reading and plotting functions work on any run directory, including runs made outside dssatlab.
+- Not included yet: reading other output files (`SoilWat.OUT`, `ET.OUT`, `Weather.OUT`, etc.), plot styling options, unit converters, and automated result statistics.
+
 ## [0.3.2] - 2026-09-29
 
 ### Added
@@ -91,6 +112,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Notes
 - Environment diagnostics only. DSSAT discovery, connecting, installation and simulation support were deferred.
 
+[0.4.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.4.0
 [0.3.2]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.2
 [0.3.1]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.1
 [0.3.0]: https://github.com/AbdelrahmanAmr3/dssatlab/releases/tag/v0.3.0

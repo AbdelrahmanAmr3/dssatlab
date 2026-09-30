@@ -4,7 +4,7 @@
 
 ## Module map
 
-The codebase under `src/dssatlab/` consists of thirteen modules:
+The codebase under `src/dssatlab/` consists of fifteen modules:
 
 - `__init__.py`: Defines `__version__` and exports the public API via `__all__`.
 - `config.py`: Reads and writes persistent JSON configuration storing the remembered DSSAT executable path.
@@ -15,6 +15,8 @@ The codebase under `src/dssatlab/` consists of thirteen modules:
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
 - `management.py`: Validates management dictionary shape, field keys, numeric bounds, date order, and start date / weather bounds; formats structured check report lines.
 - `management_file.py`: Writes the YAML management template (`write_management_template`) and provides strict YAML loading (`_load_management`) using PyYAML SafeLoader with duplicate key rejection.
+- `outputs.py`: Reads `Summary.OUT` and `PlantGro.OUT` using fixed-width headers, converts dates and `-99` missing values, and builds DataFrames (`to_dataframe`).
+- `plot.py`: Plots plant growth variables against date across simulations (`plot_plant_growth`) using optional matplotlib.
 - `runner.py`: Executes the DSSAT executable on a FileX and moves generated output files into a dated run directory.
 - `simulation.py`: Coordinates pre-run checks, staging, weather, soil, and management file generation, execution, and output scanning for a single simulation.
 - `soil.py`: Writes the soil template, parses CSV/DataFrame/dict soil data, validates ranges and layer depths, and formats DSSAT soil files (`*.SOL`).

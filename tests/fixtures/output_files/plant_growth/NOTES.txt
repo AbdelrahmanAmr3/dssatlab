@@ -1,0 +1,7 @@
+maize: .work/e2e_v032/maize/.../PlantGro.OUT; cut to header + first 20 data rows.
+wheat: .work/e2e_v032/wheat/.../PlantGro.OUT; cut to header + first 20 data rows.
+two_treatments: maize; assembled two *RUN blocks (RUN 1/2, TR 1/2), 10 rows each.
+no_header: maize; removed the @YEAR header line.
+truncated: maize; cut mid-row on row 20 with no trailing newline.
+wrong_columns: maize; removed last column (DTTD) on row 20 (48 values vs 49).
+missing_value: maize; replaced LAID (-99.00) and HIAD (-99.000) in row 20.

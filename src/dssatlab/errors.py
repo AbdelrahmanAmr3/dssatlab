@@ -14,6 +14,10 @@ class DSSATRunError(DSSATError):
     """Raised when a DSSAT run cannot be performed."""
 
 
+class DSSATOutputError(DSSATError):
+    """Raised when a DSSAT output file is missing or malformed."""
+
+
 class DSSATCheckError(DSSATError):
     """Problems found by the checks before a Simulation can run.
 
