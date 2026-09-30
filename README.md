@@ -19,7 +19,7 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
-The project can get a working DSSAT into Python, run an existing experiment file, and run a simulation from your own weather, soil, and management data. This part is done:
+The project can get a working DSSAT into Python, run an existing experiment file, run a simulation from your own weather, soil, and management data, and read and plot the results. This part is done:
 
 - [x] Find an existing DSSAT-CSM installation on Windows and Linux (including Google Colab)
 - [x] Build DSSAT-CSM from the official release on Linux and Colab
@@ -27,6 +27,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own daily weather into a strictly checked simulation and run it
 - [x] Turn your own soil data into a strictly checked simulation and run it
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
+- [x] Read `Summary.OUT` and `PlantGro.OUT` into Python and plot plant growth
 
 ```python
 import dssatlab as dl
@@ -42,7 +43,7 @@ How a run works:
 - DSSAT runs in the FileX's own folder, so weather and soil files beside the FileX are found. Its output files are then moved into a new `dssat_run_<date>` folder beside the FileX, and your FileX folder is left as it was.
 - The FileX filename can be at most 12 characters, including the extension (DSSAT's own limit), for example `UFGA8201.MZX`.
 - A failed run raises `DSSATRunError` with the command, the end of DSSAT's console output and the start of `ERROR.OUT`. The run folder is kept so you can look inside.
-- `run()` returns the files DSSAT wrote and does not read them. Reading input or output files, building experiments and plotting are not built yet.
+- `run()` returns the files DSSAT wrote. Read the summary and plant growth with `result.summary()` and `result.plant_growth()`, or plot with `result.plot(variable)`. Building experiments from Python is not built yet.
 
 Upgrading from 0.1.x on Linux or Colab: a DSSAT built by 0.1.x cannot run simulations, so the first `dl.install()` (or `dl.connect()` with consent) rebuilds it once.
 
