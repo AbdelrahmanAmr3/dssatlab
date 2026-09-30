@@ -15,7 +15,7 @@
 pip install dssatlab
 ```
 
-Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab`.
+Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab`. To include plotting support: `pip install dssatlab[plot]`.
 
 ## Current stage
 
@@ -85,4 +85,28 @@ What happens:
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading DSSAT's output files, choosing a soil profile from DSSAT's own soil files, FileX authoring, and more than one treatment per `Simulation`.
+Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading output files other than the summary and plant growth, choosing a soil profile from DSSAT's own soil files, FileX authoring, and more than one treatment per `Simulation`.
+
+## Reading results
+
+Read summary and plant growth outputs directly from a run result or any run directory:
+
+```python
+import dssatlab as dl
+
+# After a run:
+summary_rows = result.summary()          # one dict per simulation (yield, dates, ...)
+growth_rows = result.plant_growth()       # one dict per simulation day (leaf area, ...)
+
+# Convert to a pandas DataFrame (pandas is optional):
+df = dl.to_dataframe(growth_rows)
+
+# Plot a variable against date (requires pip install dssatlab[plot]):
+ax = result.plot("LAID")                 # leaf area index over time
+
+# Compare treatments across run directories:
+ax = dl.plot_plant_growth([run_dir_rainfed, run_dir_irrigated], "LAID")
+```
+
+Dates are parsed into `datetime.date` objects, DSSAT's `-99` missing values become `None`, and column names match DSSAT's own (`HWAM`, `ADAT`, `LAID`). Only `Summary.OUT` and `PlantGro.OUT` are read; other output files remain listed in `result.outputs`.
+
