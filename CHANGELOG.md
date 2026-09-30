@@ -23,7 +23,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Reading and plotting functions work on any run directory, including runs made outside dssatlab.
 - Not included yet: reading other output files (`SoilWat.OUT`, `ET.OUT`, `Weather.OUT`, etc.), plot styling options, unit converters, and automated result statistics.
 
-## [0.3.2] - Unreleased
+## [0.3.2] - 2026-09-29
 
 ### Added
 - `Simulation(filex, treatment, weather, executable=None, *, soil=None, management=None)`: `management` is optional and keyword-only, accepting the user's own management data as a YAML file path or a plain dict.
