@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 
 from .filex import _section_row
+from .weather import _dssat_date
 
 
 _PLANTING_HEADER = (
@@ -89,7 +90,7 @@ def _planting_row(columns, level, planting):
     for column in ("PDATE", "EDATE"):
         if values[column] != -99:
             day = date.fromisoformat(values[column])
-            values[column] = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
+            values[column] = _dssat_date(day)
     return "".join(_cell(values.get(column, -99), end - start,
                          "PLANTING DETAILS", column)
                    for column, (start, end) in columns.items())
@@ -222,7 +223,7 @@ def _event_text(text, treatment, events, section="irrigation"):
         rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": 1}, name)])
     for event in events:
         day = date.fromisoformat(event["date"])
-        day_code = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
+        day_code = _dssat_date(day)
         if section == "irrigation":
             values = {"I": level, "IDATE": day_code, "IROP": event["method"], "IRVAL": event["amount"]}
         else:

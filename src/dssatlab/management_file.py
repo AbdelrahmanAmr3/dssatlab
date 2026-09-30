@@ -111,10 +111,13 @@ def write_experiment_template(path: str | Path, filex: str | Path | None = None)
     Without filex, write one example treatment numbered 1. No PyYAML is needed.
     Raise DSSATError if the destination exists or FileX treatments cannot be read.
     """
-    text = _MANAGEMENT_TEMPLATE_TEXT.replace(
-        "# DSSATLab Management Template", "# DSSATLab Experiment Template", 1)
+    title = "# DSSATLab Management Template"
+    intro = "# Management operations (planting, irrigation, fertilizer) by treatment number."
+    assert title in _MANAGEMENT_TEMPLATE_TEXT and intro in _MANAGEMENT_TEMPLATE_TEXT, (
+        "management template wording changed; update write_experiment_template")
+    text = _MANAGEMENT_TEMPLATE_TEXT.replace(title, "# DSSATLab Experiment Template", 1)
     text = text.replace(
-        "# Management operations (planting, irrigation, fertilizer) by treatment number.",
+        intro,
         "# Experiment data by treatment number: planting, irrigation, fertilizer,\n"
         "# cultivar, initial_conditions and controls.", 1)
     _write_template(path, text + _EXPERIMENT_SECTIONS_TEXT, "Experiment", filex)

@@ -3,6 +3,8 @@
 from pathlib import Path
 import re
 
+from .weather import _dssat_date
+
 
 def _section_row(text, section, key, level, required):
     """Find a level across blocks with the needed columns, using header token ends."""
@@ -110,7 +112,7 @@ def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], 
                         "Supply a four-character station or eight-character weather file name.")
         del values["WSTA"]
     if "SDATE" in values and start_date is not None:
-        values["SDATE"] = f"{start_date.year % 100:02d}{start_date.timetuple().tm_yday:03d}"
+        values["SDATE"] = _dssat_date(start_date)
     if "SDATE" in values and not re.fullmatch(r"[0-9]{5}", values["SDATE"]):
         problems.append(f"FileX {source}: SDATE {values['SDATE']!r} is invalid. "
                         "Supply five digits: two-digit year followed by three-digit day of year.")

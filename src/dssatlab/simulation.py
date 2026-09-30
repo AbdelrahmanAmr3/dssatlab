@@ -62,8 +62,9 @@ class Simulation:
             and keeps copying sibling soil files.
         management (str | Path | dict | None): Keyword-only. Management data as a
             path to a YAML file or a plain dict keyed by 'treatments', with optional
-            planting, irrigation and fertilizer per treatment. Construction only stores
-            it; check() checks every entry and prints a report.
+            planting, irrigation, fertilizer, cultivar, initial_conditions and controls
+            per treatment. Construction only stores it; check() checks every entry
+            and prints a report.
     """
 
     def __init__(self, filex, treatment, weather, executable=None, *, soil=None, management=None):
@@ -177,8 +178,9 @@ class Simulation:
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
         FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
         and generates the weather file (*.WTH).
-        With management planting, adds a new level in the copy and repoints only
-        the selected treatment; the original FileX is never changed.
+        With management data, adds a new level for each section given (planting,
+        irrigation, fertilizer, cultivar, initial conditions, controls) in the copy
+        and repoints only the selected treatment; the original FileX is never changed.
         When soil data is given, writes its soil profile to SOIL.SOL and copies
         no sibling .SOL files; otherwise
         copies all sibling .SOL files. Invokes the DSSAT executable for the

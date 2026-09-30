@@ -7,7 +7,7 @@ from .experiment import _check_date, _check_fields, _check_number
 from .filex import _section_row
 from .filex_write import (_append_rows, _event_blocks, _event_row,
                           _insert_section, _repoint)
-from .weather import _show_value
+from .weather import _dssat_date, _show_value
 
 
 # DSSAT 4.8 Input Files help and UFGA8201.MZX: surface row then layer rows.
@@ -94,7 +94,7 @@ def _initial_conditions_text(text, treatment, data):
     level = highest + 1
     day = date.fromisoformat(data["date"])
     values = {"C": level, "PCR": data.get("previous_crop", -99),
-              "ICDAT": f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}",
+              "ICDAT": _dssat_date(day),
               "ICRES": data.get("residue_mass", -99)}
     body = [blocks[0][2], _event_row(blocks[0][0], values, name), blocks[1][2]]
     for layer in data["layers"]:

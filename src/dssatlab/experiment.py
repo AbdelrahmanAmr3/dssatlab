@@ -43,35 +43,31 @@ def _check_fields(data, required, optional, where, template="Management"):
     return problems
 
 
-def _check_experiment_section(data, section, where):
-    """Check keys, required fields and scalar/container types, without FileX edits.
+def _check_controls(data, where):
+    """Check the controls section's keys and value types, without FileX edits.
 
-    Cultivar and initial conditions have their own checks; this checks the
-    controls section. Dates follow the existing strict ISO contract.
+    Cultivar and initial conditions have their own checks. The start date
+    follows the existing strict ISO contract.
     """
-    where = f"{where}, {section}"
+    where = f"{where}, controls"
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply fields from the Experiment "
                 "template or omit the section to keep the FileX level."]
-    required, optional = (), ("start_date", "water", "nitrogen", "output_interval")
-    problems = _check_fields(data, required, optional, where, "Experiment")
-    for field in required + optional:
-        if field not in data:
-            continue
-        value, location = data[field], f"{where}, field {field!r}"
-        if field in ("date", "start_date"):
+    problems = _check_fields(data, (), ("start_date", "water", "nitrogen", "output_interval"),
+                             where, "Experiment")
+    for field, value in data.items():
+        location = f"{where}, field {field!r}"
+        if field == "start_date":
             problems.extend(_check_date(value, location))
         elif field == "output_interval":
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 problems.append(f"{location}: found {_show_value(value)}. "
                                 "Supply a positive integer number of days, not a boolean.")
             else:
+                # _check_number also rejects integers too large to convert to a float.
                 problems.extend(_check_number(value, location))
-        elif section == "controls" and field in ("water", "nitrogen"):
-            if not isinstance(value, str) or value not in ("Y", "N"):
+        elif field in ("water", "nitrogen"):
+            if value not in ("Y", "N"):
                 problems.append(f"{location}: found {_show_value(value)}. "
                                 'Supply the quoted string "Y" or "N".')
-        elif not isinstance(value, str):
-            problems.append(f"{location}: found {_show_value(value)}. "
-                            "Supply a quoted string following the Experiment template.")
     return problems

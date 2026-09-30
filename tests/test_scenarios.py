@@ -181,3 +181,25 @@ def test_combined_summaries_work_with_dataframe(batch_inputs, request):
     assert frame["scenario"].tolist() == ["base", "base"]
     assert frame["treatment"].tolist() == [1, 1]
     assert frame["HWAM"].tolist() == [2295, 2295]
+
+
+def test_scenario_management_override_can_use_cultivar_initial_conditions_and_controls(
+        inputs, fake_dssat):
+    inputs.filex.write_bytes((FIXTURES / "initial_conditions" / "UFGA8201.MZX").read_bytes())
+    cul = FIXTURES / "cultivar" / "MZCER048.CUL"
+    (inputs.filex.parent / cul.name).write_bytes(cul.read_bytes())
+    experiment = {
+        "cultivar": {"crop": "MZ", "code": "IB0035"},
+        "initial_conditions": {"date": "1982-02-25",
+                               "layers": [dict(depth=15, water=0.25, nh4=1, no3=2)]},
+        "controls": {"water": "N"},
+    }
+    scenarios = {"what_if": {"management": {"treatments": {2: experiment}}}}
+    results = lab.run_treatments(inputs.filex, inputs.rows, treatments=[2], scenarios=scenarios)
+    assert list(results) == [("base", 2), ("what_if", 2)]
+    base = (results["base", 2].run_dir.parent / inputs.filex.name).read_bytes()
+    changed = (results["what_if", 2].run_dir.parent / inputs.filex.name).read_bytes()
+    assert base == inputs.filex.read_bytes()
+    assert b" 2 MZ IB0035" in changed
+    assert b" 2    15  0.25     1     2" in changed
+    assert b" 2 OP              N     Y" in changed

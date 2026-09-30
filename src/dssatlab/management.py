@@ -7,7 +7,7 @@ import re
 from .filex import _section_row
 from .cultivar import _check_cultivar
 from .filex_write import _event_text, _planting_text
-from .experiment import (_check_date, _check_experiment_section, _check_fields,
+from .experiment import (_check_controls, _check_date, _check_fields,
                          _check_number, _unknown_keys)
 from .weather import _show_value
 from .initial_conditions import _check_initial_conditions, _initial_conditions_text
@@ -215,7 +215,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                     except ValueError as error:
                         section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
             else:
-                section_problems = _check_experiment_section(entry[section], section, where)
+                section_problems = _check_controls(entry[section], where)
                 if not section_problems and not entry_problems and text is not None:
                     try:
                         _controls_text(text, number, entry[section])

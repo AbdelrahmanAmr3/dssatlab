@@ -5,6 +5,7 @@ import re
 
 from .experiment import _check_date
 from .filex import _section_row
+from .weather import _dssat_date
 from .filex_write import _append_rows, _cell, _columns, _repoint, _section_bounds
 
 
@@ -50,7 +51,7 @@ def _controls_text(text, treatment, controls):
     changes = {}
     if "start_date" in controls:
         day = date.fromisoformat(controls["start_date"])
-        changes["GENERAL", "SDATE"] = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}"
+        changes["GENERAL", "SDATE"] = _dssat_date(day)
     for field, block, column in (("water", "OPTIONS", "WATER"),
                                  ("nitrogen", "OPTIONS", "NITRO"),
                                  ("output_interval", "OUTPUTS", "FROPT")):
