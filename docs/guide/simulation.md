@@ -27,7 +27,7 @@ Values use DSSAT's own units; nothing is converted.
 
 | Column | Required | Meaning and checks |
 | --- | --- | --- |
-| `station` | Yes | Exactly four ASCII letters or digits; match the first four characters of the treatment's FileX `WSTA` exactly |
+| `station` | Yes | Exactly four ASCII letters or digits; match the first four characters of the treatment's FileX `WSTA` unless experiment overrides are supplied |
 | `latitude` | Yes | Degrees north, from -90 to 90 |
 | `longitude` | Yes | Degrees east, from -180 to 180 |
 | `elevation` | Yes | Station elevation in m, from -500 to 9000 |
@@ -76,6 +76,14 @@ case. `WSTA` must have four or eight characters, and `SDATE` must contain five
 digits: two for the year and three for the day of year. The FileX filename must
 also fit the 12-character limit.
 
+When `management` supplies experiment overrides for the selected treatment,
+the copied FileX uses the weather data's station and, if supplied, the soil
+data's profile ID. These IDs need not match the source FileX. An omitted or empty
+treatment entry keeps the matching checks above. You can also pass `name="own site"`
+to write a name into the copied treatment's `TNAME` (or `TNAM`) column, reported
+as `TNAM` in Summary. Without `name`, the source treatment name is retained.
+Names that exceed the FileX column width are rejected during checks.
+
 **Start-date coverage is checked only when `START` is `S`.** In that case, a
 weather date must match the two-digit year and day of year in `SDATE`. These
 checks do not establish how long the crop will need weather. Supply weather for
@@ -121,6 +129,9 @@ eight characters, the generated weather file is named `<WSTA>.WTH`. If it has
 four, the name is `<WSTA><two-digit year from SDATE>01.WTH`. This naming uses
 `SDATE` for every `START` option. Your original FileX and supporting files are
 left unchanged; DSSAT runs against the copies.
+
+With experiment overrides, `WSTA` is the weather data's four-character station,
+so the weather filename uses that station and the year from `SDATE`.
 
 A successful call returns the same [RunResult fields](run-filex.md#inspect-the-run-result)
 as `dl.run()`. The simulation folder is kept on failure. For failures after DSSAT

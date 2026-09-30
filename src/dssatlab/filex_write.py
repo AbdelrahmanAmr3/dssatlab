@@ -43,9 +43,15 @@ def _section_bounds(lines, section):
 def _columns(header):
     """Use the same header-token ends as the narrow FileX reader."""
     columns, start = {}, 0
-    for token in re.finditer(r"\S+", header):
-        columns[token.group().lstrip("@").rstrip(".")] = (start, token.end())
-        start = token.end()
+    tokens = list(re.finditer(r"\S+", header))
+    for index, token in enumerate(tokens):
+        name, end = token.group().lstrip("@").rstrip("."), token.end()
+        if name == "ID_SOIL":
+            end = token.start() + 10
+            if index + 1 < len(tokens):
+                end = min(end, tokens[index + 1].start())
+        columns[name] = (start, end)
+        start = end
     return columns
 
 
@@ -141,22 +147,25 @@ def _planting_text(text, treatment, planting):
     return "".join(lines)
 
 
-def _repoint(lines, treatment, column, level):
-    start, end = _section_bounds(lines, "TREATMENTS")
+def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N"):
+    _section_row("".join(lines), section, key, treatment, (column,))
+    start, end = _section_bounds(lines, section)
     columns = {}
     for index in range(start + 1, end):
         line = lines[index]
         if line.startswith("@"):
             columns = _columns(line)
-        elif "N" in columns and column in columns:
-            left, right = columns["N"]
+        elif key in columns and column in columns:
+            left, right = columns[key]
             try:
                 number = int(line[left:right])
             except ValueError:
                 continue
             if number == treatment:
                 left, right = columns[column]
-                lines[index] = (line[:left] + _cell(level, right - left, "TREATMENTS", column)
+                if line[left:right].strip() == str(level):
+                    break
+                lines[index] = (line[:left] + _cell(level, right - left, section, column)
                                 + line[right:])
                 break
 
@@ -262,14 +271,32 @@ def _cultivar_text(text, treatment, cultivar):
     return "".join(lines)
 
 
-def _write_management(filex, treatment, management):
+def _identity_text(text, treatment, name, station, soil_id):
+    """Render the selected treatment's label and field IDs, also for checks."""
+    row = _section_row(text, "TREATMENTS", "N", treatment, ("FL",))
+    lines = text.splitlines(keepends=True)
+    if name is not None:
+        if not isinstance(name, str) or not name.strip() or not name.isprintable():
+            raise ValueError("Scenario name must be a non-empty printable string.")
+        name.encode("latin-1")
+        _repoint(lines, treatment, "TNAM" if "TNAM" in row else "TNAME", name)
+    field = int(row["FL"])
+    if station is not None:
+        _repoint(lines, field, "WSTA", station, "FIELDS", "L")
+    if soil_id is not None:
+        _repoint(lines, field, "ID_SOIL", soil_id, "FIELDS", "L")
+    return "".join(lines)
+
+
+def _write_management(filex, treatment, management, *, name=None, station=None, soil_id=None):
     """Apply only the selected, checked entry to the already-copied FileX."""
     if management is None:
         return
     for key, entry in management["treatments"].items():
-        if int(key) == int(treatment):
+        if int(key) == int(treatment) and entry:
             path = Path(filex)
             text = path.read_bytes().decode("latin-1")
+            text = _identity_text(text, int(treatment), name, station, soil_id)
             if "cultivar" in entry:
                 text = _cultivar_text(text, int(treatment), entry["cultivar"])
             if "planting" in entry:
