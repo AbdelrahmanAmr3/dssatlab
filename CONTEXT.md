@@ -49,6 +49,11 @@ one set of results. The unit a future `Simulation` object stands for. A run carr
 one or more simulations (one per treatment it covers).
 _Avoid_: job, experiment (an experiment holds several simulations)
 
+**Scenario**:
+A named set of input overrides applied to a base Simulation's inputs (weather, soil, or
+experiment data), run as its own simulation. Results are labelled with the scenario's name.
+_Avoid_: treatment (a treatment is a row of the FileX, a scenario is not), variant
+
 **Weather data**:
 A user's own daily weather, as they hold it (a table), before it is converted into a
 DSSAT weather file.
@@ -91,6 +96,23 @@ The one fixed shape (named fields, DSSAT's own units and codes) a user must put 
 management data in. Management data that does not follow it is rejected by the checks,
 never guessed at.
 _Avoid_: management input, management schema
+
+**Scenario template**:
+The one fixed YAML shape a user writes their scenarios in: each scenario's name and the
+inputs it overrides. Scenarios that do not follow it are rejected by the checks, never
+guessed at.
+
+**Experiment template**:
+The one fixed YAML shape (named fields, DSSAT's own units and codes) a user must put their
+experiment data in. A superset of the management template; a management-only file stays
+valid.
+_Avoid_: experiment input, FileX template
+
+**Experiment data**:
+The one user-supplied dict of everything written into a copy of the FileX for a treatment:
+management data, and later cultivar, initial conditions and simulation controls. Management
+data is one part of it, not a synonym.
+_Avoid_: management (for the whole dict), FileX input
 
 **Checks**:
 The strict validation of a simulation's inputs, done before any DSSAT files are written or
