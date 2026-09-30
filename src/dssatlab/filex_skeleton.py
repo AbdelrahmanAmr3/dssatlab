@@ -2,12 +2,117 @@
 
 from datetime import date
 from pathlib import Path
+import shutil
 
+from . import core
+from .controls import _controls_start_date
 from .errors import DSSATCheckError
+from .experiment import _check_date
 from .filex_template import _CROPS, _check_filex_template, _load_filex_template
-from .filex_write import _columns, _planting_row, _PLANTING_HEADER
+from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
-from .weather import _dssat_date
+from .management import _check_management, _report_lines
+from .management_file import _load_management
+from .runner import _create_dated_folder
+from .soil import _parse_soil, write_soil_file
+from .weather import _dssat_date, _parse_weather, write_weather_file
+
+
+def _template_data_dir(executable):
+    """Locate Genotype beside the executable, without connect()'s config write."""
+    found = (core._discover(core._os_name()) if executable is None
+             else core.find_dssat_path(Path(executable)))
+    if found is None:
+        raise DSSATCheckError(["FileX template: cannot find the DSSAT data directory. "
+                               "Supply executable pointing to DSSAT beside its Genotype folder."])
+    return found.parent
+
+
+def _check_template_simulation(sim):
+    """Check template inputs and experiment edits entirely in memory."""
+    weather, weather_problems = _parse_weather(sim.weather)
+    soil, soil_problems = (_parse_soil(sim.soil) if sim.soil is not None else
+                          ([], ["Soil data is required with a FileX template. Supply soil=..."]))
+    data, template_problems = _load_filex_template(sim.filex_template)
+    data_dir = None
+    try:
+        data_dir = _template_data_dir(sim.executable)
+    except DSSATCheckError as error:
+        template_problems.extend(error.problems)
+    # Shape/value checks still run when executable discovery fails.
+    if data is not None:
+        template_problems.extend(_check_filex_template(data, data_dir))
+    if (isinstance(sim.treatment, bool) or not isinstance(sim.treatment, (int, str))
+            or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
+            or int(sim.treatment) != 1):
+        template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+    management, load_problems = _load_management(sim.management)
+    start = _controls_start_date(management, sim.treatment)
+    if start is None and isinstance(data, dict) and isinstance(data.get("planting"), dict):
+        planting_date = data["planting"].get("date")
+        if not _check_date(planting_date, "planting date"):
+            start = date.fromisoformat(planting_date)
+    text, cultivar_path = None, None
+    if isinstance(data, dict) and isinstance(data.get("crop"), str) and data["crop"] in _CROPS:
+        if data_dir is not None:
+            cultivar_path = data_dir / "Genotype" / f"{_CROPS[data['crop']][2]}.CUL"
+    if not (weather_problems or soil_problems or template_problems):
+        _, text = _render_filex(data, weather, soil)
+    if cultivar_path is not None:
+        for suffix in (".ECO", ".SPE"):
+            path = cultivar_path.with_suffix(suffix)
+            if not path.is_file():
+                template_problems.append(f"FileX template: missing genotype file {path}. "
+                                         "Supply the crop's .CUL, .ECO and .SPE in Genotype.")
+    days = [row["date"] for row in weather if "date" in row]
+    if start is not None and days and start not in days:
+        template_problems.append(f"Simulation start date {start} is not covered by weather "
+                                 f"data ({min(days)} to {max(days)}). Supply weather for that date.")
+    problems = weather_problems + soil_problems + template_problems
+    report = (_report_lines("Weather data", weather_problems)
+              + _report_lines("Soil data", soil_problems)
+              + _report_lines("FileX template", template_problems))
+    if sim.management is not None:
+        if load_problems:
+            problems.extend(load_problems)
+            report.extend(_report_lines("Management data", load_problems))
+        else:
+            found, lines = _check_management(
+                management, None, sim.treatment, weather, start,
+                max(row["slb"] for row in soil) if not soil_problems else None,
+                text=text, cultivar_path=cultivar_path)
+            problems.extend(found)
+            report.extend(lines)
+            if not problems and any(int(k) == 1 and v for k, v in management["treatments"].items()):
+                try:
+                    _identity_text(text, 1, sim.name, weather[0]["station"], soil[0]["soil_id"])
+                except ValueError as error:
+                    problems.append(f"FileX: {error}")
+                    report.extend(_report_lines("FileX identity", [str(error)]))
+    return problems, report
+
+
+def _write_template_simulation(sim):
+    """Write checked template inputs in a fresh folder and return the FileX path."""
+    data_dir = _template_data_dir(sim.executable)
+    data, _ = _load_filex_template(sim.filex_template)
+    weather, _ = _parse_weather(sim.weather)
+    soil, _ = _parse_soil(sim.soil)
+    management, _ = _load_management(sim.management)
+    parent = (Path(sim.filex_template).resolve().parent
+              if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
+    folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
+    filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
+    start = _controls_start_date(management, sim.treatment) or date.fromisoformat(data["planting"]["date"])
+    write_weather_file(weather, folder / f"{weather[0]['station']}{start.year % 100:02d}01.WTH")
+    write_soil_file(soil, folder / "SOIL.SOL")
+    prefix = _CROPS[data["crop"]][2]
+    for suffix in ("CUL", "ECO", "SPE"):
+        name = f"{prefix}.{suffix}"
+        shutil.copy2(data_dir / "Genotype" / name, folder / name)
+    _write_management(filex, sim.treatment, management, name=sim.name,
+                      station=weather[0]["station"], soil_id=soil[0]["soil_id"])
+    return filex
 
 
 def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
@@ -30,15 +135,21 @@ def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
         problems = _check_filex_template(data, data_dir)
     if problems:
         raise DSSATCheckError(problems)
+    filename, text = _render_filex(data, weather_rows, soil_rows)
+    path = Path(directory) / filename
+    path.write_bytes(text.encode("ascii"))
+    return path
+
+
+def _render_filex(data, weather_rows, soil_rows):
+    """Return the filename and skeleton text from checked inputs without writing."""
     crop, _, _ = _CROPS[data["crop"]]
     day = date.fromisoformat(data["planting"]["date"])
     # Four station characters + YY + 01, then .<crop>X: exactly 8.3 characters.
     # One FileX per station/year/crop in a caller-owned simulation directory.
     stem = f"{weather_rows[0]['station']}{day.year % 100:02d}01"
-    path = Path(directory) / f"{stem}.{crop}X"
     text = _skeleton_text(data, weather_rows[0], soil_rows[-1], stem)
-    path.write_bytes(text.encode("ascii"))
-    return path
+    return f"{stem}.{crop}X", text
 
 
 def _skeleton_text(data, weather, soil, stem):

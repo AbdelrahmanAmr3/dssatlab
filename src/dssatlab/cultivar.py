@@ -54,7 +54,7 @@ def _unknown_cultivar(code, codes, path, crop, where):
             f" ({len(codes)} codes in the file; open it to see all).")
 
 
-def _check_cultivar(data, where, filex, text, treatment):
+def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None):
     """Check fields, local cultivar availability and the edit before any write."""
     where = f"{where}, cultivar"
     if not isinstance(data, dict):
@@ -71,9 +71,17 @@ def _check_cultivar(data, where, filex, text, treatment):
                             f"Supply a quoted string with {hint}.")
     if problems:
         return problems
-    if isinstance(filex, (str, Path)):
+    if cultivar_path is not None or isinstance(filex, (str, Path)):
         try:
-            path, codes = _cultivar_codes(filex, data["crop"])
+            if cultivar_path is not None:
+                path = Path(cultivar_path)
+                if data["crop"] != path.name[:2]:
+                    problems.append(f"{where}: crop {data['crop']!r} differs from the "
+                                    f"FileX template crop {path.name[:2]!r}. Keep the template "
+                                    "crop and choose a cultivar from its fixed model.")
+                codes = _read_cultivar_codes(path)
+            else:
+                path, codes = _cultivar_codes(filex, data["crop"])
             if data["code"] not in codes:
                 problems.append(_unknown_cultivar(data["code"], codes, path, data["crop"], where))
         except (OSError, ValueError) as error:

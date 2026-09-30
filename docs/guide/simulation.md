@@ -1,10 +1,47 @@
 # Run a Simulation from your weather data
 
 A `Simulation` combines one treatment of an existing FileX with your daily weather
-data. To supply your own soil data as well, see [Run with soil data](soil.md).
+data, or creates a FileX from a template and your weather and soil data.
+To supply your own soil data, see [Run with soil data](soil.md).
 Prepare the FileX and its supporting files, then
 [find or install a DSSAT executable](install.md). The examples use
 `UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
+
+## Start from a FileX template
+
+For maize or wheat, supply a FileX template instead of an existing FileX:
+
+```python
+import dssatlab as dl
+
+dl.write_filex_template("filex.yaml")  # Edit the crop, cultivar and planting values.
+sim = dl.Simulation(
+    filex_template="filex.yaml", weather="weather.csv", soil="soil.csv",
+    executable=r"C:\DSSAT48\DSCSM048.EXE",
+)
+problems = sim.check()
+```
+
+`filex_template` accepts a YAML path (optional PyYAML required) or a dict with the
+same fields (no extra dependency). Supply exactly one of `filex` and
+`filex_template`; both or neither raise `DSSATCheckError` from `check()` and
+`run()`. The existing positional order remains `filex, treatment, weather,
+executable`, with defaults `None, 1, None, None`. Templates require `soil` and
+use treatment 1. Station and soil IDs come from your data. The simulation starts
+on the template's planting date, which must be covered by weather, unless
+experiment controls override the start date.
+
+Template checks find the data directory beside the explicit or discovered DSSAT
+executable and read its `Genotype` folder without saving configuration or writing
+files. `management` and `name` work as with an existing FileX: checks inspect the
+skeleton in memory, then experiment overrides apply to the generated FileX.
+Cultivar overrides must keep the template's crop and use its fixed model's table.
+
+`sim.run()` creates a fresh simulation folder beside the YAML file, or in the
+current directory for a dict. It writes the FileX, weather and `SOIL.SOL`, and
+copies the crop's `.CUL`, `.ECO` and `.SPE` files from `Genotype` (`MZCER048` for
+maize, `WHCER048` for wheat). Your original files are unchanged.
+`run_treatments()` continues to accept an existing FileX path only.
 
 ## Prepare the weather template
 
