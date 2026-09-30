@@ -279,5 +279,8 @@ def _write_management(filex, treatment, management):
             if "initial_conditions" in entry:
                 from .initial_conditions import _initial_conditions_text
                 text = _initial_conditions_text(text, int(treatment), entry["initial_conditions"])
+            if "controls" in entry:
+                from .controls import _controls_text
+                text = _controls_text(text, int(treatment), entry["controls"])
             path.write_bytes(text.encode("latin-1"))
             return

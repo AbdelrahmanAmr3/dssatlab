@@ -180,6 +180,10 @@ def test_all_treatments_and_other_problems_are_reported(cultivar_inputs):
 def test_experiment_template_cultivar_loads_checks_and_runs(cultivar_inputs, fake_dssat, tmp_path, capsys):
     pytest.importorskip("yaml")
     filex, weather = cultivar_inputs
+    # The template also sets controls, so the FileX needs a full SIMULATION CONTROLS section.
+    full = (Path(__file__).parent / "fixtures" / "controls" / "UFGA8201.MZX").read_bytes()
+    filex.write_bytes(filex.read_bytes().split(b"*SIMULATION CONTROLS")[0]
+                      + b"*SIMULATION CONTROLS" + full.split(b"*SIMULATION CONTROLS")[1])
     path = tmp_path / "experiment.yaml"
     write_experiment_template(path, filex=filex)
     sim = Simulation(filex, 3, weather, management=path)

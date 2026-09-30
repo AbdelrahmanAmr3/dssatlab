@@ -73,12 +73,14 @@ _EXPERIMENT_SECTIONS_TEXT = """
           nh4: 0.5               # Soil ammonium, mg/kg (>= 0, no upper limit)
           no3: 2.0               # Soil nitrate, mg/kg (>= 0, no upper limit)
 
-    # Controls currently have shape checks only; they are not applied to FileX yet.
-    controls:                    # All fields optional; supply only the fields to change
+    # Controls are checked and applied to a new level in a copy of the FileX.
+    # Omitted fields keep their base values; omit controls to keep the FileX level.
+    # start_date replaces SDATE in weather and management date checks; START stays unchanged.
+    controls:                    # All fields optional; an empty dict keeps the FileX level
       start_date: "1982-02-25"    # Simulation start date (quoted "YYYY-MM-DD")
       water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)
       nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
-      output_interval: 1          # Output interval, integer days
+      output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column
 """
 
 
@@ -103,8 +105,7 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
     """Write commented YAML for management, cultivar, initial conditions and controls.
 
-    Cultivar is checked against the local .CUL and applied to the FileX copy.
-    Initial conditions and controls have shape checks only, not applied yet.
+    Cultivar, initial conditions and controls are checked and applied to the FileX copy.
     Dates are quoted ISO calendar strings; units and codes are DSSAT's.
     With filex, use its treatment numbers in file order, keeping example values.
     Without filex, write one example treatment numbered 1. No PyYAML is needed.

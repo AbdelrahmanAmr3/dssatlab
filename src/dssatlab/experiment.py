@@ -1,4 +1,4 @@
-"""Shared experiment field checks and shape-only checks for the v0.6 sections."""
+"""Shared experiment field checks, including control values and section shapes."""
 
 from datetime import date
 import math
@@ -46,8 +46,8 @@ def _check_fields(data, required, optional, where, template="Management"):
 def _check_experiment_section(data, section, where):
     """Check keys, required fields and scalar/container types, without FileX edits.
 
-    Cultivar and initial conditions have their own checks; control values
-    belong to the later controls ticket. Dates follow the existing strict ISO contract.
+    Cultivar and initial conditions have their own checks; this checks the
+    controls section. Dates follow the existing strict ISO contract.
     """
     where = f"{where}, {section}"
     if not isinstance(data, dict):
@@ -62,9 +62,15 @@ def _check_experiment_section(data, section, where):
         if field in ("date", "start_date"):
             problems.extend(_check_date(value, location))
         elif field == "output_interval":
-            if isinstance(value, bool) or not isinstance(value, int):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 problems.append(f"{location}: found {_show_value(value)}. "
-                                "Supply an integer number of days, not a boolean.")
+                                "Supply a positive integer number of days, not a boolean.")
+            else:
+                problems.extend(_check_number(value, location))
+        elif section == "controls" and field in ("water", "nitrogen"):
+            if not isinstance(value, str) or value not in ("Y", "N"):
+                problems.append(f"{location}: found {_show_value(value)}. "
+                                'Supply the quoted string "Y" or "N".')
         elif not isinstance(value, str):
             problems.append(f"{location}: found {_show_value(value)}. "
                             "Supply a quoted string following the Experiment template.")

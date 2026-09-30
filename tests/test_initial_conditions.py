@@ -206,6 +206,8 @@ def test_all_treatments_and_fields_reported_at_once(sim, capsys):
 def test_template_initial_conditions_load_check_and_apply(sim, tmp_path, fake_dssat, capsys):
     pytest.importorskip("yaml")
     template = tmp_path / "experiment.yaml"
+    cul = Path(__file__).parent / "fixtures" / "cultivar" / "MZCER048.CUL"
+    (sim.filex.parent / cul.name).write_bytes(cul.read_bytes())
     write_experiment_template(template, filex=sim.filex)
     # Keep the full strict-loader path; the supplied weather covers all template events.
     sim.weather = [dict(sim.weather[0], date=(date(1982, 2, 25) + timedelta(days=i)).isoformat())
