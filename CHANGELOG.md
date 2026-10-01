@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.11.0] - UNDATED
+## [0.11.0] - 2026-10-01
 
 ### Added
 - FileX template key `treatments`: a list of 1 to 99 treatment names, the alternative to `treatment_name` (exactly one of the two is required). Treatments are numbered 1..N in list order, each pointing at the base levels. `EXP.DETAILS` and `SNAME` take the first treatment name.
