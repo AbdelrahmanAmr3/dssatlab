@@ -5,14 +5,15 @@ from pathlib import Path
 import re
 import shutil
 
-from .errors import DSSATCheckError, DSSATRunError
+from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
 from .filex import _irrigation_dates, _read_filex, _weather_filename
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
 from .management import _check_management, _report_lines
 from .management_file import _load_management
-from .runner import RunResult, _create_dated_folder, run
+from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
+from .sequence import _check_sequence, _rotation_components, _run_sequence
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
@@ -87,7 +88,7 @@ class Simulation:
             and prints a report.
         name (str | None): Scenario name written to the copied treatment, even
             without experiment overrides. None and "base" keep the FileX name.
-            Names must fit its column; run_treatments supplies each scenario name.
+            Sequences keep their component names. Other names must fit the column.
     """
 
     def __init__(self, filex=None, treatment=1, weather=None, executable=None, *, soil=None,
@@ -144,8 +145,11 @@ class Simulation:
         edit_identity = _overrides_section(experiment_data, self.treatment)
         override_start = _controls_start_date(experiment_data, self.treatment)
         values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
+        components = _rotation_components(self.filex, self.treatment)
+        sequence_problems, sequence_report = _check_sequence(self.filex, self.treatment, components)
+        filex_problems.extend(sequence_problems)
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
-        if len(name) > 12:
+        if len(name) > 12 and len(components) < 2:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
                                   "accepts at most 12. Rename the FileX to at most 12 "
                                   "characters, including the extension (DSSAT's 8.3 style).")
@@ -213,6 +217,7 @@ class Simulation:
         if self.soil is not None:
             report.extend(_report_lines("Soil data", soil_problems))
         report.extend(_report_lines("FileX", filex_problems))
+        report.extend(sequence_report)
         if self.management is not None:
             if load_problems:
                 problems.extend(load_problems)
@@ -224,10 +229,11 @@ class Simulation:
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)
-        if (edit_identity or self.name not in (None, "base")) and not problems:
+        name = None if len(components) > 1 else self.name
+        if (edit_identity or name not in (None, "base")) and not problems:
             try:
                 _identity_text(Path(self.filex).read_bytes().decode("latin-1"),
-                               int(self.treatment), self.name,
+                               int(self.treatment), name,
                                rows[0]["station"] if edit_identity else None,
                                template_id if edit_identity else None)
             except ValueError as error:
@@ -251,7 +257,7 @@ class Simulation:
         and repoints only the selected treatment; the original FileX is never changed.
         With experiment overrides, writes the weather station and supplied soil
         ID into that field. Independently writes name into the copied treatment,
-        except for None and "base", which retain the FileX treatment name.
+        except for sequences, None and "base", which retain the FileX names.
         When soil data is given, writes its soil profile to SOIL.SOL and copies
         no sibling .SOL files; otherwise
         copies all sibling .SOL files. Invokes the DSSAT executable for the
@@ -272,6 +278,7 @@ class Simulation:
         if problems:
             raise DSSATCheckError(problems)
 
+        components = _rotation_components(self.filex, self.treatment)
         if self.filex_template is not None:
             prepared = _write_template_simulation(self, experiment_data=experiment_data)
         else:
@@ -287,7 +294,7 @@ class Simulation:
             sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
             shutil.copy2(filex, sim_folder / filex.name)
             _write_management(sim_folder / filex.name, self.treatment, experiment_data,
-                              name=self.name, station=station,
+                              name=None if len(components) > 1 else self.name, station=station,
                               soil_id=soil_rows[0]["soil_id"] if soil_rows and station is not None else None)
             for sibling in filex.parent.iterdir():
                 if self.soil is not None and sibling.suffix.upper() == ".SOL":
@@ -299,20 +306,8 @@ class Simulation:
                 write_soil_file(soil_rows, sim_folder / "SOIL.SOL")
             prepared = sim_folder / filex.name
 
-        result = run(prepared, treatment=int(self.treatment), executable=self.executable)
-        warning = result.run_dir / "WARNING.OUT"
-        if warning.exists():
-            for line in warning.read_text(encoding="utf-8", errors="replace").splitlines():
-                missing = re.search(r"Weather record not found for YR DOY:\s+(\d{4})\s+(\d{1,3})", line)
-                if missing:
-                    year, day = map(int, missing.groups())
-                    calendar_date = date(year, 1, 1) + timedelta(days=day - 1)
-                    raise DSSATRunError(
-                        f"DSSAT reported no weather for year {year}, day of year {day} "
-                        f"({calendar_date}). DSSAT exits 0 in this case and gives -99 "
-                        "for anything it could not reach.\n"
-                        f"Run directory (kept): {result.run_dir}\n"
-                        "Extend the weather data through that date and the days the "
-                        "crop needs, then run again."
-                    )
+        result = (_run_sequence(prepared, self.treatment, components, self.executable)
+                  if len(components) > 1 else
+                  run(prepared, treatment=int(self.treatment), executable=self.executable))
+        _check_missing_weather(result)
         return result

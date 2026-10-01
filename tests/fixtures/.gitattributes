@@ -1,0 +1,2 @@
+# Preserve the accepted DSSAT batch file byte for byte, including CRLF.
+DSSBatch.v48 -text
