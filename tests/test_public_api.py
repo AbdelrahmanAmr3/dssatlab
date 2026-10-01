@@ -58,3 +58,10 @@ def test_weather_public_api_is_exported():
 def test_dssat_evaluation_public_api_is_exported():
     assert callable(dssatlab.read_dssat_evaluation)
     assert "read_dssat_evaluation" in dssatlab.__all__
+
+
+def test_crop_listing_public_api_is_exported():
+    for name in ("list_crops", "list_cultivars"):
+        assert name in dssatlab.__all__
+        assert callable(getattr(dssatlab, name))
+

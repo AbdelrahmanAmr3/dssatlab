@@ -4,27 +4,16 @@ from datetime import date
 from pathlib import Path
 import shutil
 
-from . import core
 from .controls import _controls_start_date
 from .errors import DSSATCheckError
 from .experiment import _check_date
-from .filex_template import _CROPS, _check_filex_template, _load_filex_template
+from .filex_template import _CROPS, _check_filex_template, _load_filex_template, _template_data_dir
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
 from .runner import _create_dated_folder
 from .soil import _parse_soil, write_soil_file
 from .weather import _dssat_date, _parse_weather, write_weather_file
-
-
-def _template_data_dir(executable):
-    """Locate Genotype beside the executable, without connect()'s config write."""
-    found = (core._discover(core._os_name()) if executable is None
-             else core.find_dssat_path(Path(executable)))
-    if found is None:
-        raise DSSATCheckError(["FileX template: cannot find the DSSAT data directory. "
-                               "Supply executable pointing to DSSAT beside its Genotype folder."])
-    return found.parent
 
 
 def _check_template_simulation(sim, experiment_data, load_problems):
@@ -57,15 +46,21 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     if not (weather_problems or soil_problems or template_problems):
         _, text = _render_filex(data, weather, soil)
     if cultivar_path is not None:
-        for suffix in (".ECO", ".SPE"):
-            path = cultivar_path.with_suffix(suffix)
+        for suffix in _CROPS[data["crop"]][3]:
+            path = cultivar_path.with_suffix(f".{suffix}")
             if not path.is_file():
                 template_problems.append(f"FileX template: missing genotype file {path}. "
-                                         "Supply the crop's .CUL, .ECO and .SPE in Genotype.")
+                                         "Supply this file in the data directory's Genotype folder.")
     days = [row["date"] for row in weather if "date" in row]
     if start is not None and days and start not in days:
         template_problems.append(f"Simulation start date {start} is not covered by weather "
                                  f"data ({min(days)} to {max(days)}). Supply weather for that date.")
+    if isinstance(data, dict) and "harvest_date" in data:
+        harvest = data["harvest_date"]
+        if not _check_date(harvest, "harvest_date") and days and date.fromisoformat(harvest) not in days:
+            template_problems.append(f"FileX template, harvest_date: {harvest} is not covered by "
+                                     f"weather data ({min(days)} to {max(days)}). "
+                                     "Supply weather for that date.")
     problems = weather_problems + soil_problems + template_problems
     report = (_report_lines("Weather data", weather_problems)
               + _report_lines("Soil data", soil_problems)
@@ -103,8 +98,8 @@ def _write_template_simulation(sim, experiment_data):
     start = _controls_start_date(experiment_data, sim.treatment) or date.fromisoformat(data["planting"]["date"])
     write_weather_file(weather, folder / f"{weather[0]['station']}{start.year % 100:02d}01.WTH")
     write_soil_file(soil, folder / "SOIL.SOL")
-    prefix = _CROPS[data["crop"]][2]
-    for suffix in ("CUL", "ECO", "SPE"):
+    _, _, prefix, extensions, _ = _CROPS[data["crop"]]
+    for suffix in extensions:
         name = f"{prefix}.{suffix}"
         shutil.copy2(data_dir / "Genotype" / name, folder / name)
     _write_management(filex, sim.treatment, experiment_data, name=sim.name,
@@ -140,7 +135,7 @@ def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
 
 def _render_filex(data, weather_rows, soil_rows):
     """Return the filename and skeleton text from checked inputs without writing."""
-    crop, _, _ = _CROPS[data["crop"]]
+    crop = _CROPS[data["crop"]][0]
     day = date.fromisoformat(data["planting"]["date"])
     # Four station characters + YY + 01, then .<crop>X: exactly 8.3 characters.
     # One FileX per station/year/crop in a caller-owned simulation directory.
@@ -151,10 +146,15 @@ def _render_filex(data, weather_rows, soil_rows):
 
 def _skeleton_text(data, weather, soil, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
-    crop, model, _ = _CROPS[data["crop"]]
+    crop, model, _, _, symbi = _CROPS[data["crop"]]
     name, station = data["treatment_name"], weather["station"]
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
+    harvest = []
+    if "harvest_date" in data:
+        harvest_day = _dssat_date(date.fromisoformat(data["harvest_date"]))
+        harvest = ["*HARVEST DETAILS", "@H HDATE  HSTG  HCOM HSIZE   HPC  HBPC HNAME",
+                   f" 1 {harvest_day} GS000   -99   -99   -99   -99 -99", ""]
     # SMODEL occupies eight characters starting at column 72, past its header.
     # ID_SOIL likewise occupies ten characters, starting at column 70.
     lines = [
@@ -163,7 +163,7 @@ def _skeleton_text(data, weather, soil, stem):
         f" {station}", "",
         "*TREATMENTS                        -------------FACTOR LEVELS------------",
         "@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM",
-        f" 1 1 0 0 {name:<25}  1  1  0  0  1  0  0  0  0  0  0  0  1", "",
+        f" 1 1 0 0 {name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1", "",
         "*CULTIVARS", "@C CR INGENO CNAME",
         f" 1 {crop} {data['cultivar']['code']} -99", "",
         "*FIELDS",
@@ -175,15 +175,15 @@ def _skeleton_text(data, weather, soil, stem):
         f"{weather['elevation']:10.1f}{'-99':>18}   -99   -99   -99   -99   -99", "",
         "*INITIAL CONDITIONS", *_INITIAL_HEADERS, "",
         "*PLANTING DETAILS", _PLANTING_HEADER, planting, "",
-        "*SIMULATION CONTROLS",
+        *harvest, "*SIMULATION CONTROLS",
         "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
         f" 1 GE              1     1     S {day}  2150 {name:<25} {model}",
         "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
-        " 1 OP              Y     Y     N     N     N     N     N     N     M",
+        f" 1 OP              Y     Y     {symbi}     N     N     N     N     N     M",
         "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
         " 1 ME              M     M     E     R     S     C     R     1     G     R     2",
         "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
-        " 1 MA              R     R     R     N     M",
+        f" 1 MA              R     R     R     N     {'R' if harvest else 'M'}",
         "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
         " 1 OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
         "", "@  AUTOMATIC MANAGEMENT",

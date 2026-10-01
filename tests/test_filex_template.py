@@ -10,6 +10,21 @@ import dssatlab
 from dssatlab import DSSATCheckError, DSSATError
 
 
+# Expected template crops: name, cultivar, CR, SMODEL, genotype prefix, extensions, SYMBI.
+CROPS = [
+    ("maize", "IB0035", "MZ", "MZCER048", "MZCER048", ("CUL", "ECO", "SPE"), "N"),
+    ("wheat", "IB0488", "WH", "CSCER048", "WHCER048", ("CUL", "ECO", "SPE"), "N"),
+    ("rice", "IB0012", "RI", "RICER048", "RICER048", ("CUL", "SPE"), "N"),
+    ("soybean", "IB0011", "SB", "CRGRO048", "SBGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    ("potato", "IB0001", "PT", "PTSUB048", "PTSUB048", ("CUL", "ECO", "SPE"), "N"),
+    ("sorghum", "IB0040", "SG", "SGCER048", "SGCER048", ("CUL", "ECO", "SPE"), "N"),
+    ("pearl millet", "IB0033", "ML", "MLCER048", "MLCER048", ("CUL", "ECO", "SPE"), "N"),
+    ("barley", "IB0101", "BA", "CSCER048", "BACER048", ("CUL", "ECO", "SPE"), "N"),
+    ("peanut", "GH0001", "PN", "CRGRO048", "PNGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    ("dry bean", "IB0001", "BN", "CRGRO048", "BNGRO048", ("CUL", "ECO", "SPE"), "Y"),
+]
+
+
 @pytest.fixture
 def data():
     return dict(crop="maize", treatment_name="My treatment", cultivar={"code": "IB0035"},
@@ -21,7 +36,7 @@ def data():
 def data_dir(tmp_path):
     folder = tmp_path / "data" / "Genotype"
     folder.mkdir(parents=True)
-    for prefix, code in (("MZCER048", "IB0035"), ("WHCER048", "IB0488")):
+    for _, code, _, _, prefix, _, _ in CROPS:
         (folder / f"{prefix}.CUL").write_text(
             f"*CULTIVARS\n!XX9999 is only a comment\n@VAR#  VAR-NAME\n{code} Example\n")
     # A second model must not affect the fixed model's cultivar lookup.
@@ -53,6 +68,7 @@ def test_written_template_loads_and_passes_checks(tmp_path, data_dir):
     assert _check_filex_template(data, data_dir) == []
     assert set(data) == {"crop", "treatment_name", "planting", "cultivar"}
     assert "write_filex_template" in dssatlab.__all__
+    assert all(row[0] in path.read_text() for row in CROPS)
 
 
 def test_existing_template_is_preserved(tmp_path):
@@ -75,16 +91,17 @@ def test_dict_needs_no_yaml(data, data_dir, monkeypatch):
     assert any("PyYAML" in p for p in problems)
 
 
-@pytest.mark.parametrize("crop", ["soybean", "MZ", [], None])
+@pytest.mark.parametrize("crop", ["cotton", "Rice", "pearl_millet", "dry-bean", "MZ", [], None])
 def test_unsupported_crop_lists_supported_crops(data, data_dir, crop):
     from dssatlab.filex_template import _check_filex_template
     data["crop"] = crop
     problems = _check_filex_template(data, data_dir)
-    assert any("crop" in p and "maize" in p and "wheat" in p for p in problems)
+    assert any("is not a template crop" in p and all(row[0] in p for row in CROPS)
+               for p in problems)
 
 
 @pytest.mark.parametrize("crop,filename,near", [
-    ("maize", "MZCER048.CUL", "IB0035"), ("wheat", "WHCER048.CUL", "IB0488")])
+    (crop, f"{prefix}.CUL", code) for crop, code, _, _, prefix, _, _ in CROPS])
 def test_unknown_cultivar_has_closest_codes(data, data_dir, crop, filename, near):
     from dssatlab.filex_template import _check_filex_template
     data.update(crop=crop, cultivar={"code": "XX9999"})
@@ -222,3 +239,15 @@ def test_duplicate_yaml_key_rejected(tmp_path):
     path = tmp_path / "filex.yaml"
     path.write_text("crop: maize\ncrop: wheat\n")
     assert any("duplicate key" in p for p in _load_filex_template(path)[1])
+
+
+@pytest.mark.parametrize("crop,code,digest", [
+    ("maize", "IB0035", "e8f4919dc7a358db393ffeadfcee6a49b39e062ab0ca30998d874266a60c83e4"),
+    ("wheat", "IB0488", "53e8d83b06fe0e7c62c8b63a2b882ec2b4f91751e073ac389d8c58356b0689c2"),
+])
+def test_original_skeleton_bytes_unchanged(data, rows, crop, code, digest):
+    import hashlib
+    from dssatlab.filex_skeleton import _render_filex
+    data.update(crop=crop, cultivar={"code": code})
+    # Digests captured from the pre-v0.10 renderer with these same inputs.
+    assert hashlib.sha256(_render_filex(data, *rows)[1].encode("ascii")).hexdigest() == digest

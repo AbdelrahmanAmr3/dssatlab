@@ -120,6 +120,11 @@ treatment, one crop. Built from the experiment data plus the crop, station and s
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 
+**Template crop**:
+A crop the FileX template can write, with one fixed DSSAT model and its genotype files. A crop is
+a template crop only after a real DSSAT run proved it. Other crops still run from an existing FileX.
+_Avoid_: supported crop (ambiguous with every crop DSSAT has)
+
 **Observed data**:
 The user's own measured values (for example yield, anthesis day, or LAI on a date), given per
 scenario and treatment, as a CSV, DataFrame or list of rows. dssatlab compares them with the

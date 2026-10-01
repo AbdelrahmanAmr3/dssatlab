@@ -4,6 +4,7 @@ import csv
 from copy import deepcopy
 from datetime import date, datetime
 from pathlib import Path
+import platform
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -84,6 +85,7 @@ def fake_dssat(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(command, state.returncode,
                                            stdout="DSSAT finished\n", stderr="")
 
+    platform.uname()  # Windows Python 3.10 runs `ver` once; cache it before faking run
     monkeypatch.setattr(subprocess, "run", fake_run)
     return state
 
