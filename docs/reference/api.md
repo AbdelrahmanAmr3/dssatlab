@@ -36,6 +36,8 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.combine_summaries
 
+::: dssatlab.summarize_seasons
+
 ::: dssatlab.write_scenario_template
 
 ## Reading outputs and plotting

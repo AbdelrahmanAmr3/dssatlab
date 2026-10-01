@@ -30,6 +30,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 - [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
+- [x] Run multi-year seasonal analyses (`controls: years`), check weather coverage across seasons, and compute season statistics across treatments and scenarios (`summarize_seasons()`)
 
 ```python
 import dssatlab as dl
@@ -125,6 +126,9 @@ result = results["base", 1]
 # Combine all summaries into a single table:
 combined = dl.combine_summaries(results)
 df = dl.to_dataframe(combined)
+
+# For seasonal runs (controls years), compute statistics across seasons:
+stats = dl.summarize_seasons(combined, variables=["HWAM"])
 ```
 
 How multi-treatment and scenario runs work:
@@ -133,6 +137,7 @@ How multi-treatment and scenario runs work:
 - Exactly one of `filex` or `filex_template` is required; templates require `soil` data.
 - Each `(scenario, treatment)` simulation runs in its own dated folder beside the FileX or template YAML (`dssat_sim_<date>`).
 - Scenarios are defined in a YAML file or plain dictionary. Allowed overrides: `weather`, `soil`, `management`. Overrides replace the whole input without partial merging. The baseline un-overridden run is always included as `"base"`.
+- For seasonal analyses, set `years` in experiment data `controls` (DSSAT's `NYERS`). `result.summary()` returns one row per season, and `summarize_seasons()` computes the mean, standard deviation, quartiles, and range across seasons.
 - Every weather input must match the station code of `WSTA` for all selected treatments.
 - All scenario and treatment inputs are verified before any run; a single `DSSATCheckError` lists all problems across all scenarios and treatments.
 - A failed run halts execution immediately and reports all completed run directories kept on disk.

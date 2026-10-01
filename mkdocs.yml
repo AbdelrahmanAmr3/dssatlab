@@ -32,6 +32,7 @@ nav:
       - Run with management data: guide/management.md
       - Run with experiment data: guide/experiment.md
       - Run treatments and scenarios: guide/scenarios.md
+      - Seasonal analysis: guide/seasonal.md
       - Reading results: guide/reading-results.md
       - Evaluate against observed data: guide/evaluate.md
       - Troubleshooting: guide/troubleshooting.md
