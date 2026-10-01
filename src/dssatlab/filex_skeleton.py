@@ -8,20 +8,68 @@ from .controls import _controls_start_date
 from .errors import DSSATCheckError
 from .experiment import _check_date
 from .filex_template import (_CROPS, _check_filex_template, _load_filex_template,
-                             _template_data_dir, _template_treatment_fields, _template_treatment_names)
+                             _template_data_dir,
+                             _template_treatment_fields, _template_treatment_names)
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
 from .runner import _create_dated_folder
-from .soil import _parse_soil, write_soil_file
+from .soil import _parse_soil, _write_soil_profiles
 from .weather import _dssat_date, _parse_weather, write_weather_file
+
+
+def _parse_field_data(source, count, kind):
+    """Check field keys and parse each source, preserving plain-source reports."""
+    label = f"{kind.capitalize()} data"
+    parser = _parse_weather if kind == "weather" else _parse_soil
+    if source is None and kind == "soil":
+        problems = ["Soil data is required with a FileX template. Supply soil=..."]
+        return {}, problems, _report_lines(label, problems)
+    sources = source if isinstance(source, dict) else {1: source}
+    normalized, invalid = {}, []
+    for key, value in sources.items():
+        if (type(key) is int or isinstance(key, str) and key.isascii() and key.isdigit()):
+            number = int(key)
+            if number not in normalized:
+                normalized[number] = value
+                continue
+        invalid.append(repr(key))
+    if invalid or set(normalized) != set(range(1, count + 1)):
+        keys = ", ".join([str(k) for k in sorted(normalized)] + invalid)
+        example = ", ".join(f"{k}: ..." for k in range(1, count + 1))
+        problems = [f"FileX template has fields 1 to {count}, but {kind} data has fields {keys}. "
+                    f"Supply {kind} data for every field: {kind}={{{example}}}."]
+        return {}, problems, _report_lines(label, problems)
+    rows, problems, report = {}, [], []
+    for number, value in sorted(normalized.items()):
+        rows[number], found = parser(value)
+        field_label = f"{label}, field {number}" if isinstance(source, dict) else label
+        if isinstance(source, dict):
+            found = [p.replace(label, field_label, 1) if p.startswith(label)
+                     else f"{field_label}: {p}" for p in found]
+        problems.extend(found)
+        report.extend(_report_lines(field_label, found))
+    return rows, problems, report
+
+
+def _shared_field_problems(rows, kind):
+    """Reject different checked rows claiming the same station or soil ID."""
+    column, label, own = (("station", "station", "station code") if kind == "weather"
+                          else ("soil_id", "soil ID", "soil ID"))
+    seen, problems = {}, []
+    for field, data in rows.items():
+        identity = data[0][column]
+        if identity in seen and data != rows[seen[identity]]:
+            problems.append(f"Fields {seen[identity]} and {field} both use {label} {identity!r} "
+                            f"but their {kind} data differs. Give each field's {kind} its own "
+                            f"{own}, or the same data.")
+        else:
+            seen.setdefault(identity, field)
+    return problems
 
 
 def _check_template_simulation(sim, experiment_data, load_problems):
     """Check template inputs and the loaded experiment data dict in memory."""
-    weather, weather_problems = _parse_weather(sim.weather)
-    soil, soil_problems = (_parse_soil(sim.soil) if sim.soil is not None else
-                          ([], ["Soil data is required with a FileX template. Supply soil=..."]))
     data, template_problems = _load_filex_template(sim.filex_template)
     data_dir = None
     try:
@@ -31,6 +79,21 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     # Shape/value checks still run when executable discovery fails.
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
+    fields = _template_treatment_fields(data) if isinstance(data, dict) else [1]
+    # Malformed field lists are reported by the template checks, never indexed.
+    if (not isinstance(fields, list) or not fields
+            or any(type(k) is not int or not 1 <= k <= 99 for k in fields)):
+        fields = [1]
+    weather_fields, weather_problems, weather_report = _parse_field_data(sim.weather, max(fields), "weather")
+    soil_fields, soil_problems, soil_report = _parse_field_data(sim.soil, max(fields), "soil")
+    for rows, found, kind in ((weather_fields, weather_problems, "weather"),
+                              (soil_fields, soil_problems, "soil")):
+        if not found:
+            template_problems.extend(_shared_field_problems(rows, kind))
+    selected_field = fields[int(sim.treatment) - 1] if (
+        str(sim.treatment).isascii() and str(sim.treatment).isdigit()
+        and 1 <= int(sim.treatment) <= len(fields)) else 1
+    weather, soil = weather_fields.get(selected_field, []), soil_fields.get(selected_field, [])
     count = len(_template_treatment_names(data))
     if (isinstance(sim.treatment, bool) or not isinstance(sim.treatment, (int, str))
             or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
@@ -50,7 +113,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         if data_dir is not None:
             cultivar_path = data_dir / "Genotype" / f"{_CROPS[data['crop']][2]}.CUL"
     if not (weather_problems or soil_problems or template_problems):
-        _, text = _render_filex(data, weather, soil)
+        _, text = _render_filex(data, weather_fields, soil_fields)
     if cultivar_path is not None:
         for suffix in _CROPS[data["crop"]][3]:
             path = cultivar_path.with_suffix(f".{suffix}")
@@ -68,8 +131,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                                      f"weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for that date.")
     problems = weather_problems + soil_problems + template_problems
-    report = (_report_lines("Weather data", weather_problems)
-              + _report_lines("Soil data", soil_problems)
+    report = (weather_report + soil_report
               + _report_lines("FileX template", template_problems))
     if sim.management is not None:
         if load_problems:
@@ -78,7 +140,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         else:
             found, lines = _check_management(
                 experiment_data, None, sim.treatment, weather, start,
-                max(row["slb"] for row in soil) if not soil_problems else None,
+                max(row["slb"] for row in soil) if soil and not soil_problems else None,
                 text=text, cultivar_path=cultivar_path)
             problems.extend(found)
             report.extend(lines)
@@ -100,15 +162,22 @@ def _write_template_simulation(sim, experiment_data):
     """Write checked template inputs and experiment data dict; return the FileX path."""
     data_dir = _template_data_dir(sim.executable)
     data, _ = _load_filex_template(sim.filex_template)
-    weather, _ = _parse_weather(sim.weather)
-    soil, _ = _parse_soil(sim.soil)
+    count = max(_template_treatment_fields(data))
+    weather, _, _ = _parse_field_data(sim.weather, count, "weather")
+    soil, _, _ = _parse_field_data(sim.soil, count, "soil")
     parent = (Path(sim.filex_template).resolve().parent
               if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
     folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
     filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
     start = _controls_start_date(experiment_data, sim.treatment) or date.fromisoformat(data["planting"]["date"])
-    write_weather_file(weather, folder / f"{weather[0]['station']}{start.year % 100:02d}01.WTH")
-    write_soil_file(soil, folder / "SOIL.SOL")
+    stations, profiles = {}, {}
+    for rows in weather.values():
+        stations.setdefault(rows[0]["station"], rows)
+    for station, rows in stations.items():
+        write_weather_file(rows, folder / f"{station}{start.year % 100:02d}01.WTH")
+    for rows in soil.values():
+        profiles.setdefault(rows[0]["soil_id"], rows)
+    _write_soil_profiles(list(profiles.values()), folder / "SOIL.SOL")
     _, _, prefix, extensions, _ = _CROPS[data["crop"]]
     for suffix in extensions:
         name = f"{prefix}.{suffix}"
