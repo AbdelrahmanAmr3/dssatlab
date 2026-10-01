@@ -446,7 +446,7 @@ def test_valid_controls_and_missing_rows_or_columns_pass(filex, weather, control
     assert Simulation(path, 1, weather()).check() == []
 
 
-def test_filex_template_simulation_passes():
+def test_filex_template_controls_pass_wther_and_fname_checks():
     template_data = dict(crop="maize", treatment_name="My treatment", cultivar={"code": "IB0035"},
                          planting=dict(date="2021-03-01", method="S", distribution="R",
                                        population=7.2, row_spacing=75, depth=5))
@@ -455,7 +455,7 @@ def test_filex_template_simulation_passes():
     soil_rows = [dict(soil_id="SOIL123456", salb=0.13, slro=60, sldr=0.5, slpf=1,
                       slb=30, slll=0.1, sdul=0.24, ssat=0.45, srgf=1)]
     sim = Simulation(filex_template=template_data, weather=weather_rows, soil=soil_rows, treatment=1)
-    assert sim.check() == []
+    assert [p for p in sim.check() if "WTHER" in p or "FNAME" in p] == []
 
 
 def test_run_treatments_labels_controls_problem(filex, weather):

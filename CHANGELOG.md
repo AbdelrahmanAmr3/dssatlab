@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.13.0] - UNDATED
+## [0.13.0] - 2026-10-01
 
 ### Added
 - Sequence analysis: a `Simulation` whose treatment number has multiple `*TREATMENTS` rows in the FileX runs as a multi-year crop sequence in DSSAT's sequence mode (`Q`) through a batch file (`DSSBatch.v48`) written to the simulation folder, with the user's weather and soil data (ADR 0013).
