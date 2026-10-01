@@ -51,14 +51,29 @@ def _check_rotation_template(data, data_dir):
             found.extend(p.replace(where, location, 1)
                          for p in _check_template_crop(component, data_dir))
         problems.extend(found)
-        if not found:
+        # Unrelated value problems must not hide rotation date problems.
+        if not isinstance(component, dict):
+            continue
+        crop = component.get("crop")
+        if crop == "fallow":
+            dates = [component.get("end_date")]
+        elif isinstance(crop, str) and crop in _CROPS:
+            planting = component.get("planting")
+            if not isinstance(planting, dict):
+                continue
+            dates = [planting.get("date")]
+            if "harvest_date" in component:
+                dates.append(component["harvest_date"])
+        else:
+            continue
+        if all(not _check_date(value, location) for value in dates):
             valid_components[number] = component
     problems.extend(_check_rotation_dates(components, valid_components, where))
     return problems
 
 
 def _check_rotation_dates(components, valid_components, where):
-    """Check dates of components whose shape passed: leading crop, end, order, closure."""
+    """Check components with valid dates: leading crop, end, order, closure."""
     problems = []
     if 1 in valid_components and valid_components[1].get("crop") == "fallow":
         problems.append(f"{where}, rotation[1]: the first component must be a crop; "
