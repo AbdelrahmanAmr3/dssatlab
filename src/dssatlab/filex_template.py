@@ -1,4 +1,4 @@
-"""One field, named treatments and one crop: the fixed FileX template and checks."""
+"""Numbered fields, named treatments and one crop: the FileX template and checks."""
 
 from pathlib import Path
 import re
@@ -27,7 +27,7 @@ _CROPS = {
     "dry bean": ("BN", "CRGRO048", "BNGRO048", ("CUL", "ECO", "SPE"), "Y"),
 }
 
-_TEMPLATE = """# DSSATLab FileX template: one field, named treatments, one crop.
+_TEMPLATE = """# DSSATLab FileX template: numbered fields, named treatments, one crop.
 # Station, latitude, longitude and elevation come from checked weather data.
 # The soil profile ID comes from checked soil data. Do not add them here.
 # The simulation starts on the planting date. Use experiment data to add
@@ -39,6 +39,7 @@ _TEMPLATE = """# DSSATLab FileX template: one field, named treatments, one crop.
 crop: "maize"
 treatment_name: "My treatment" # 1-25 printable ASCII characters; not just spaces
 # treatments: ["Control", "Variant"] # Instead of treatment_name; 1-99 names, same rule
+# treatment_fields: [1, 2] # With treatments: one field per treatment, 1..K without gaps; default all 1
 cultivar:
   code: "IB0035"              # Six ASCII characters, no spaces; case-sensitive
   # Must exist in the crop's .CUL in data directory/Genotype: maize MZCER048,
@@ -89,6 +90,11 @@ def _template_treatment_names(data):
     return [data.get("treatment_name") if isinstance(data, dict) else None]
 
 
+def _template_treatment_fields(data):
+    """Return checked treatment field numbers, defaulting every treatment to field 1."""
+    return data.get("treatment_fields", [1] * len(_template_treatment_names(data)))
+
+
 def _check_filex_template(data, data_dir) -> list[str]:
     """Return every template problem; data_dir is the DSSAT data directory.
 
@@ -101,7 +107,7 @@ def _check_filex_template(data, data_dir) -> list[str]:
         return [f"{where}: expected a dict. Supply crop, cultivar, planting "
                 "and either treatment_name or treatments."]
     problems = _check_fields(data, ("crop", "cultivar", "planting"),
-                             ("treatment_name", "treatments", "harvest_date"), where, "FileX")
+                             ("treatment_name", "treatments", "treatment_fields", "harvest_date"), where, "FileX")
     crop = data.get("crop")
     supported = isinstance(crop, str) and crop in _CROPS
     if "crop" in data and not supported:
@@ -123,6 +129,27 @@ def _check_filex_template(data, data_dir) -> list[str]:
         if not isinstance(name, str) or not re.fullmatch(r"[ -~]{1,25}", name) or not name.strip():
             problems.append(f"{where}, {field}: found {_show_value(name)}. "
                             "Supply 1-25 printable ASCII characters, not just spaces.")
+    if "treatment_fields" in data:
+        fields = data["treatment_fields"]
+        if "treatments" not in data or "treatment_name" in data:
+            problems.append(f"{where}, treatment_fields: needs treatments. "
+                            "Supply treatments with one name per treatment.")
+        elif isinstance(data["treatments"], list):
+            count = len(data["treatments"])
+            if not isinstance(fields, list) or len(fields) != count:
+                found = len(fields) if isinstance(fields, list) else _show_value(fields)
+                problems.append(f"{where}, treatment_fields: supply one field number per "
+                                f"treatment (found {found} for {count} treatments).")
+            if isinstance(fields, list):
+                bad = [i for i, value in enumerate(fields, 1)
+                       if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 99]
+                problems.extend(f"{where}, treatment_fields[{i}]: found {_show_value(fields[i - 1])}. "
+                                "Supply a whole number 1 to 99." for i in bad)
+                if fields and not bad:
+                    missing = sorted(set(range(1, max(fields) + 1)) - set(fields))
+                    if missing:
+                        problems.append(f"{where}, treatment_fields: number the fields 1 to {max(fields)} "
+                                        f"without gaps (missing {', '.join(map(str, missing))}).")
     if "cultivar" in data:
         problems.extend(_check_template_cultivar(data["cultivar"], crop if supported else None,
                                                  data_dir))
