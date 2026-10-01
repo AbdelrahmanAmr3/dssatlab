@@ -81,6 +81,7 @@ _EXPERIMENT_SECTIONS_TEXT = """
       water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)
       nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
       output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column
+      # years: 9                 # Number of seasons (DSSAT NYERS), positive integer
 """
 
 

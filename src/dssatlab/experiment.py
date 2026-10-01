@@ -53,12 +53,16 @@ def _check_controls(data, where):
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply fields from the Experiment "
                 "template or omit the section to keep the FileX level."]
-    problems = _check_fields(data, (), ("start_date", "water", "nitrogen", "output_interval"),
+    problems = _check_fields(data, (), ("start_date", "water", "nitrogen", "output_interval", "years"),
                              where, "Experiment")
     for field, value in data.items():
         location = f"{where}, field {field!r}"
         if field == "start_date":
             problems.extend(_check_date(value, location))
+        elif field == "years":
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                problems.append(f"{location}: found {_show_value(value)}. "
+                                "Supply a positive integer number of seasons, not a boolean.")
         elif field == "output_interval":
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 problems.append(f"{location}: found {_show_value(value)}. "

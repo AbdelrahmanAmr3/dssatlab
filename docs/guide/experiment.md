@@ -39,6 +39,7 @@ treatments:
       water: "Y"                 # water simulation, "Y" or "N"
       nitrogen: "Y"              # nitrogen simulation, "Y" or "N"
       output_interval: 7         # days between output rows
+      years: 1                   # number of seasons (NYERS); see Seasonal analysis
 ```
 
 Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO strings.
@@ -47,7 +48,7 @@ Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO s
 |---|---|
 | `cultivar` | A code that is not in the one `.CUL` file for that crop beside the FileX; the message lists the codes that do exist. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. |
 | `initial_conditions` | Layer depths that do not ascend, water outside 0 to 1, negative ammonium, nitrate or residue, and, when you pass `soil=`, a layer deeper than the soil profile. |
-| `controls` | `water` or `nitrogen` other than `"Y"`/`"N"`, an `output_interval` that is not a positive integer, a bad `start_date`. |
+| `controls` | `water` or `nitrogen` other than `"Y"`/`"N"`, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
 
 A misspelled field or a misnamed section is reported by name with the allowed list, and every
 problem of every treatment is reported at once. Crop-specific rules are still DSSAT's to check
@@ -100,5 +101,5 @@ Each section was overridden on a copy of DSSAT's own sample FileX (maize `UFGA82
 ## Not included
 
 Building a FileX from nothing, writing `.CUL`, `.ECO` or `.SPE` parameters, simulation controls
-beyond the four above, and other initial-condition detail such as per-layer roots. See the
+beyond the five above, and other initial-condition detail such as per-layer roots. See the
 [roadmap](../reference/roadmap.md) and [ADR 0005](../adr/0005-experiment-data-edits-an-existing-filex.md).

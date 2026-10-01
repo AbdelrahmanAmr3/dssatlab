@@ -1,7 +1,7 @@
 """Controls checks and copied FileX behaviour through Simulation."""
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -19,8 +19,16 @@ def sim(sim_inputs):
     filex, weather = sim_inputs
     filex.write_bytes(FIXTURE.read_bytes())
     return Simulation(filex, "03", weather, management={"treatments": {3: {"controls": {
-        "start_date": "1982-02-26", "water": "N", "nitrogen": "N", "output_interval": 5,
+        "start_date": "1982-02-26", "water": "N", "nitrogen": "N", "output_interval": 5, "years": 9,
     }}}})
+
+
+@pytest.fixture
+def seasonal_weather(sim):
+    # Writer tests requesting several seasons need continuous weather for them.
+    start = date.fromisoformat(sim.weather[0]["date"])
+    sim.weather = [dict(sim.weather[0], date=(start + timedelta(days=i)).isoformat())
+                   for i in range(9 * 366)]
 
 
 def copied(sim, fake_dssat):
@@ -28,7 +36,7 @@ def copied(sim, fake_dssat):
     return (Path(fake_dssat.calls[-1][1]) / sim.filex.name).read_bytes()
 
 
-def test_all_controls_applied_and_every_other_byte_preserved(sim, fake_dssat, capsys):
+def test_all_controls_applied_and_every_other_byte_preserved(sim, seasonal_weather, fake_dssat, capsys):
     original, inputs = sim.filex.read_bytes(), deepcopy(sim.management)
     assert sim.check() == []
     assert "controls: OK" in capsys.readouterr().out
@@ -44,6 +52,7 @@ def test_all_controls_applied_and_every_other_byte_preserved(sim, fake_dssat, ca
     assert len(rows) == len(base) == 10
     expected = [b" 2" + row[2:] for row in base]
     expected[0] = expected[0].replace(b"82056", b"82057")
+    expected[0] = expected[0][:19] + b"9" + expected[0][20:]
     expected[1] = expected[1][:19] + b"N" + expected[1][20:25] + b"N" + expected[1][26:]
     expected[4] = expected[4][:37] + b"5" + expected[4][38:]
     assert rows == expected
@@ -64,11 +73,13 @@ def test_omitted_empty_or_other_treatment_controls_keep_exact_copy(sim, fake_dss
 
 @pytest.mark.parametrize("field,value,old,new", [
     ("start_date", "1982-03-01", b"82056", b"82060"),
+    ("years", 9, b"GE              4", b"GE              9"),
     ("water", "N", b"OP              Y", b"OP              N"),
     ("nitrogen", "N", b"OP              Y     Y", b"OP              Y     N"),
     ("output_interval", 3, b"OU              N     Y     Y     1", b"OU              N     Y     Y     3"),
 ])
-def test_each_field_keeps_all_omitted_fields(sim, fake_dssat, field, value, old, new):
+def test_each_field_keeps_all_omitted_fields(sim, seasonal_weather, fake_dssat, field, value, old, new):
+    sim.filex.write_bytes(sim.filex.read_bytes().replace(b"GE              1", b"GE              4"))
     sim.management["treatments"][3]["controls"] = {field: value}
     base = sim.filex.read_bytes().split(b"*SIMULATION CONTROLS")[1].splitlines()
     expected = [b" 2" + line[2:].replace(old, new) for line in base if line.startswith(b" 1 ")]
@@ -84,13 +95,23 @@ def test_each_field_keeps_all_omitted_fields(sim, fake_dssat, field, value, old,
     ("output_interval", 0), ("output_interval", -1), ("output_interval", True),
     ("output_interval", 1.0), ("output_interval", "1"), ("output_interval", float("inf")),
     ("output_interval", 1000000), ("misspelled", 1),
+    ("years", 0), ("years", -1), ("years", True), ("years", "3"), ("years", 2.5),
+    ("years", 10 ** 10),
     pytest.param("output_interval", 10 ** 5000, id="huge-interval"),
 ])
 def test_bad_values_reported_before_any_write(sim, fake_dssat, field, value):
     sim.management["treatments"][3]["controls"] = {field: value}
     original, listing = sim.filex.read_bytes(), sorted(sim.filex.parent.iterdir())
     problems = sim.check()
-    assert any("controls" in p and (field in p or "FROPT" in p) for p in problems)
+    assert any("controls" in p and (field in p or "FROPT" in p or "NYERS" in p) for p in problems)
+    if field == "years":
+        if value == 10 ** 10:
+            assert any("column NYERS" in p and "does not fit" in p for p in problems)
+            assert not any("season" in p for p in problems)
+        else:
+            assert any(p.endswith(f"controls, field 'years': found {value!r}. "
+                                  "Supply a positive integer number of seasons, not a boolean.")
+                       for p in problems)
     with pytest.raises(DSSATCheckError) as error:
         sim.run()
     assert error.value.problems == problems
@@ -178,7 +199,7 @@ def test_start_override_names_weather_file_for_new_year(sim, fake_dssat):
 
 
 @pytest.mark.parametrize("grouped_rows", [False, True])
-def test_selected_level_cloned_using_highest_number_across_blocks(sim, fake_dssat, grouped_rows):
+def test_selected_level_cloned_using_highest_number_across_blocks(sim, seasonal_weather, fake_dssat, grouped_rows):
     prefix, controls = sim.filex.read_bytes().split(b"*SIMULATION CONTROLS")
     treatment = next(line for line in prefix.splitlines(keepends=True) if line.startswith(b" 3 1"))
     prefix = prefix.replace(treatment, treatment[:70] + b"  7" + treatment[73:])
@@ -204,7 +225,7 @@ def test_selected_level_cloned_using_highest_number_across_blocks(sim, fake_dssa
 
 
 @pytest.mark.parametrize("old_start", [b"S XXXXX", b"P 82056"])
-def test_valid_override_replaces_sdate_but_preserves_start_switch(sim, fake_dssat, old_start):
+def test_valid_override_replaces_sdate_but_preserves_start_switch(sim, seasonal_weather, fake_dssat, old_start):
     sim.filex.write_bytes(sim.filex.read_bytes().replace(b"S 82056", old_start))
     assert sim.check() == []
     assert old_start[:1] + b" 82057" in copied(sim, fake_dssat)

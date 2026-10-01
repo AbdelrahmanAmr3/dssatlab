@@ -20,6 +20,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.10 | Ten template crops: maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut and dry bean; potato planting fields and harvest date; `list_crops()` and `list_cultivars()`. |
 | 0.11 | Multi-treatment experiments from scratch: FileX template `treatments` list, experiment data per treatment number, whole experiment written to simulation folder, and `run_treatments(filex_template=...)`. |
 | 0.11.1 | Several fields from scratch: FileX template `treatment_fields` list, per-field `weather=` and `soil=` dicts, shared station and soil ID rules, and one `SOIL.SOL` with all profiles. |
+| 0.12 | Seasonal analysis: experiment data controls `years` (NYERS), weather coverage check across seasons, per-season Summary rows, and `summarize_seasons()`. |
 
 ## Deliberately not built yet
 

@@ -2,6 +2,26 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.12.0] - 2026-10-01
+
+### Added
+- Experiment data controls key `years`: an optional positive integer specifying the number of seasons to simulate, written as DSSAT's `NYERS` into the copied controls level for the selected treatment. Works for both copied FileX and FileX template experiments, in a `Simulation` and in `run_treatments()`.
+- Season start rule: season k (1-based) starts on day-of-year D of year Y + k - 1 from the simulation start date (from controls `start_date`, FileX `SDATE` when `START` is `S`, or the template planting date), correctly accounting for leap years (e.g. March 1 gives Feb 29 on day 60 in leap years).
+- Pre-run weather coverage check: verifies that weather data covers the start date of the last season for `years` or an existing FileX whose `NYERS` is above 1 before any simulation files are written or DSSAT is run.
+- `summarize_seasons(rows, variables=("HWAM",))` computes cross-season statistics (seasons, missing, mean, sample standard deviation, min, p25, median, p75, max) per scenario, treatment, and variable from Summary rows (`result.summary()` or `combine_summaries()`). Output rows pass directly to `to_dataframe()`.
+- Guide page "Seasonal analysis" (`docs/guide/seasonal.md`) and tutorial Case 8 demonstrating a multi-year seasonal analysis with 9 years of Gainesville weather.
+- Proven on real DSSAT 4.8.5 (yields equal to a hand-edited NYERS run) with a two-treatment maize template experiment across 9 seasons and single-treatment copied FileX runs.
+
+### Changed
+- `write_experiment_template()` comments include `years` in the `controls` section.
+- Checks report weather shortages for the last season's start labelled as `Controls years <N>` or `FileX NYERS <N>`.
+
+### Notes
+- Seasonal analysis sets NYERS in the controls level; no batch file, no new run mode (ADR 0012).
+- Weather ending inside the last crop season continues to be caught after the run by scanning `WARNING.OUT` for missing weather records.
+- `evaluate()` continues to reject multiple Summary rows for a treatment; observed data across seasons remains out of scope.
+- Upgrading from 0.11.1 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.11.1] - 2026-10-01
 
 ### Added
@@ -9,7 +29,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Per-field weather and soil dictionaries: template `Simulation` and `run_treatments(filex_template=...)` accept `weather=` and `soil=` as dicts keyed by field number (`{1: "gainesville.csv", 2: "ames.csv"}`; integer or digit-string keys), accepting CSV paths, lists of dicts, or pandas DataFrames. A plain source still means one field.
 - The written FileX defines each field in both `FIELDS` tables with its own station, coordinates, elevation, soil ID, and depth; the simulation folder holds one weather file per station and one `SOIL.SOL` containing every distinct profile in field order.
 - Guide sections and tutorial Case 7 show writing a two-field maize FileX template, supplying per-field weather and soil data, and comparing sites with `run_treatments()` and `combine_summaries()`.
-- Proven on real DSSAT 4.8.5 with a multi-field maize experiment (`UFGA` and `AMES` weather stations, two soil profiles) run through `run_treatments()` and as a whole experiment via `run()`.
+- Proven on real DSSAT 4.8.5 (yields equal to a hand-edited NYERS run) with a multi-field maize experiment (`UFGA` and `AMES` weather stations, two soil profiles) run through `run_treatments()` and as a whole experiment via `run()`.
 
 ### Changed
 - Fields sharing a station code or soil ID must have identical parsed data; sharing an ID with differing data is rejected with both field numbers before writing anything.
@@ -31,7 +51,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - The simulation folder's generated FileX holds the entire experiment with every treatment's experiment data applied, allowing the whole experiment to be opened or run in DSSAT; a scenario name applies to the selected treatment row only.
 - `run_treatments(filex_template=...)` runs all treatments 1..N (when `treatments=None`) or a selected subset of a FileX template across named scenarios, writing each simulation in its own folder beside the template YAML.
 - Guide sections and tutorial Case 6 show writing a three-treatment maize FileX template (rainfed, irrigated, irrigated with 120 kg N), varying treatments with experiment data, and comparing yields with `run_treatments()` and `combine_summaries()`.
-- Proven on real DSSAT 4.8.5 with a three-treatment maize experiment (control, two N applications, irrigation plus cultivar IB0060) run through `run_treatments()` and as a whole experiment via `run()`.
+- Proven on real DSSAT 4.8.5 (yields equal to a hand-edited NYERS run) with a three-treatment maize experiment (control, two N applications, irrigation plus cultivar IB0060) run through `run_treatments()` and as a whole experiment via `run()`.
 
 ### Changed
 - `run_treatments(filex=None, weather=None, treatments=None, soil=None, management=None, executable=None, scenarios=None, filex_template=None)` accepts exactly one of `filex` and `filex_template`; passing both or neither raises `DSSATCheckError`.
@@ -54,7 +74,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Optional planting fields `planting_material_weight` (`PLWT`, kg/ha) and `sprout_length` (`SPRL`, cm) with numeric range and fixed-width column checks.
 - Potato requires `planting_material_weight`, `sprout_length`, and `harvest_date`; each missing field is reported as a distinct problem.
 - Guide section and tutorial Case 5 demonstrate inspecting installed crops and cultivars, writing a soybean FileX template, and running the simulation.
-- Proven on real DSSAT 4.8.5 with all ten template crops, clean runs, non-zero yields, and matching cultivars.
+- Proven on real DSSAT 4.8.5 (yields equal to a hand-edited NYERS run) with all ten template crops, clean runs, non-zero yields, and matching cultivars.
 
 ### Changed
 - `write_filex_template()` comments list all ten template crops, potato requirements, and `harvest_date`.
@@ -74,7 +94,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - `plot_observed(results, observed, variable)` overlays observed points on Plant growth curves, with one colour per scenario and treatment and optional matplotlib. Points outside the simulated season remain visible.
 - `read_dssat_evaluation()` also reads the `$` title line and `TRNO` column CROPSIM (wheat) writes.
 - Guide section and tutorial Case 4 use the shipped `UFGA8201.MZA` and `UFGA8201.MZT`, compare the end-of-season measurements, plot LAID and show HWAM beside the DSSAT evaluation.
-- Proven on real DSSAT 4.8.5 with maize `UFGA8201` and wheat `KSAS8101`: all six treatments of each, FileA end-of-season values and FileT time series read straight from the shipped files.
+- Proven on real DSSAT 4.8.5 (yields equal to a hand-edited NYERS run) with maize `UFGA8201` and wheat `KSAS8101`: all six treatments of each, FileA end-of-season values and FileT time series read straight from the shipped files.
 
 ### Notes
 - DSSAT fills `Evaluate.OUT`'s measured columns only in some runs. Verified on DSSAT 4.8.5: CERES-Maize through `run()` with the FileA beside the FileX fills them; a `Simulation` (one treatment, DSSAT run mode C) and CROPSIM wheat leave them `-99`. Where they are `-99`, compare with `evaluate(results, read_dssat_observed(path))`. The simulation folder therefore does not copy FileA/FileT (ADR 0008).

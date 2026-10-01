@@ -1,6 +1,6 @@
 """Copy a FileX simulation controls level and replace only named controls."""
 
-from datetime import date
+from datetime import date, timedelta
 import re
 
 from .experiment import _check_date
@@ -9,10 +9,10 @@ from .weather import _dssat_date
 from .filex_write import _append_rows, _cell, _columns, _repoint, _section_bounds
 
 
-def _controls_start_date(source, treatment):
-    """Return a valid selected override even when other experiment fields fail."""
+def _selected_controls(source, treatment):
+    """Return selected controls even when other experiment fields fail."""
     if not isinstance(source, dict) or not isinstance(source.get("treatments"), dict):
-        return None
+        return {}
     for key, entry in source["treatments"].items():
         if (isinstance(key, bool) or not isinstance(key, (int, str)) or
                 isinstance(key, str) and not re.fullmatch(r"[0-9]+", key)):
@@ -24,11 +24,47 @@ def _controls_start_date(source, treatment):
         if not selected or not isinstance(entry, dict):
             continue
         controls = entry.get("controls")
-        if isinstance(controls, dict) and "start_date" in controls:
-            value = controls["start_date"]
-            if not _check_date(value, "start_date"):
-                return date.fromisoformat(value)
+        if isinstance(controls, dict):
+            return controls
+    return {}
+
+
+def _controls_start_date(source, treatment):
+    """Return a valid selected override even when other experiment fields fail."""
+    value = _selected_controls(source, treatment).get("start_date")
+    if not _check_date(value, "start_date"):
+        return date.fromisoformat(value)
     return None
+
+
+def _season_coverage(source, treatment, start, days, nyers=None):
+    """Check the last season's start using DSSAT's fixed day-of-year rule."""
+    if start is None or not days:
+        return []
+    controls = _selected_controls(source, treatment)
+    if "years" in controls:
+        years, label = controls["years"], "Controls years"
+        if type(years) is not int or not 1 <= years <= 99999:
+            return []  # The controls checks and the NYERS column-fit check report these.
+    else:
+        try:
+            years = int(nyers)
+        except (TypeError, ValueError):
+            years = 1
+        label = "FileX NYERS"
+    if years <= 1:
+        return []
+    year, day = start.year + years - 1, start.timetuple().tm_yday
+    end = max(days)
+    if (year, day) <= (end.year, end.timetuple().tm_yday):
+        return []
+    season_start = f"day {day} of {year}"
+    if year <= date.max.year and day <= date(year, 12, 31).timetuple().tm_yday:
+        last = date(year, 1, 1) + timedelta(days=day - 1)
+        season_start = f"{last} ({season_start})"
+    return [f"{label} {years}: season {years} starts on {season_start}, "
+            f"after the weather data ends ({end}). "
+            "Supply weather for every season, or fewer years."]
 
 
 def _controls_text(text, treatment, controls):
@@ -52,7 +88,8 @@ def _controls_text(text, treatment, controls):
     if "start_date" in controls:
         day = date.fromisoformat(controls["start_date"])
         changes["GENERAL", "SDATE"] = _dssat_date(day)
-    for field, block, column in (("water", "OPTIONS", "WATER"),
+    for field, block, column in (("years", "GENERAL", "NYERS"),
+                                 ("water", "OPTIONS", "WATER"),
                                  ("nitrogen", "OPTIONS", "NITRO"),
                                  ("output_interval", "OUTPUTS", "FROPT")):
         if field in controls:

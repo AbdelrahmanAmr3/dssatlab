@@ -1,6 +1,7 @@
 """Check and run FileX treatments under named whole-input overrides."""
 
 from pathlib import Path
+import statistics
 
 from .errors import DSSATCheckError, DSSATError, DSSATRunError
 from .filex import read_treatment_numbers
@@ -145,6 +146,62 @@ def combine_summaries(results: dict[tuple[str, int], RunResult]) -> list[dict]:
     return [dict(row, scenario=scenario, treatment=treatment)
             for (scenario, treatment), result in results.items()
             for row in read_summary(result.run_dir)]
+
+
+def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
+    """Return season statistics per scenario, treatment and variable from Summary rows.
+
+    Takes result.summary() rows (scenario "base", treatment = TRNO) or combine_summaries()
+    rows. Missing values (None) are counted and left out of the statistics.
+    """
+    problems = []
+    if (not isinstance(variables, (list, tuple)) or not variables
+            or not all(isinstance(name, str) for name in variables)):
+        problems.append(f"Variables: found {variables!r}. "
+                        "Supply variables as a list of Summary column names, such as ['HWAM'].")
+        variables = ()
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        raise DSSATCheckError(["Summary rows: expected a list of dicts. Supply the rows from "
+                               "result.summary() or combine_summaries().", *problems])
+    if not rows:
+        if problems:
+            raise DSSATCheckError(problems)
+        return []
+    groups = {}
+    for number, row in enumerate(rows, 1):
+        treatment = row["treatment"] if row.get("treatment") is not None else row.get("TRNO")
+        if treatment is None:
+            problems.append(f"Summary row {number}: found neither 'treatment' nor 'TRNO'. "
+                            "Supply rows from result.summary() or combine_summaries().")
+        groups.setdefault((row.get("scenario") or "base", treatment), []).append(row)
+    for name in variables:
+        if not any(name in row for row in rows):
+            problems.append(f"Variable {name!r} is not a Summary column. "
+                            "Use a column name from the Summary rows, such as HWAM.")
+    for (scenario, treatment), group in groups.items():
+        for name in variables:
+            bad = [value for value in (row.get(name) for row in group) if value is not None
+                   and (isinstance(value, bool) or not isinstance(value, (int, float)))]
+            if bad:  # One problem per group, not one per season.
+                problems.append(f"Variable {name!r} has a non-numeric value {bad[0]!r} (scenario "
+                                f"{scenario!r}, treatment {treatment}). Choose a numeric Summary column.")
+    if problems:
+        raise DSSATCheckError(problems)
+
+    summary = []
+    for (scenario, treatment), group in groups.items():
+        for name in variables:
+            values = [row[name] for row in group if row.get(name) is not None]
+            stats = dict.fromkeys(("mean", "sd", "min", "p25", "median", "p75", "max"))
+            if values:
+                quartiles = (statistics.quantiles(values, n=4, method="inclusive")
+                             if len(values) > 1 else values * 3)
+                stats.update(mean=statistics.mean(values), min=min(values), max=max(values),
+                             sd=statistics.stdev(values) if len(values) > 1 else None,
+                             p25=quartiles[0], median=quartiles[1], p75=quartiles[2])
+            summary.append({"scenario": scenario, "treatment": treatment, "variable": name,
+                            "seasons": len(group), "missing": len(group) - len(values), **stats})
+    return summary
 
 
 _SCENARIO_TEMPLATE = """# DSSATLab Scenario Template
