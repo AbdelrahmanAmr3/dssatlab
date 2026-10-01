@@ -160,6 +160,89 @@ def _weather_filename(station: str, start_date: str) -> str:
     raise ValueError("WSTA must have four or eight characters.")
 
 
+def _check_filex_controls(source, treatment) -> list[str]:
+    """Report WTHER other than M and FNAME other than N in used controls levels."""
+    if isinstance(treatment, bool) or not isinstance(treatment, (int, str)):
+        return []
+    if isinstance(treatment, str) and not re.fullmatch(r"[0-9]+", treatment):
+        return []
+    try:
+        treatment_num = int(treatment)
+    except (TypeError, ValueError, OverflowError):
+        return []
+    if not isinstance(source, (str, Path)):
+        return []
+    try:
+        path = Path(source)
+        text = path.read_text(encoding="latin-1")
+    except (OSError, ValueError):
+        return []
+
+    in_section = False
+    columns = None
+    sm_levels = []
+    for line in text.splitlines():
+        if line.startswith("*"):
+            if in_section:
+                break
+            name = line[1:].strip()
+            in_section = name == "TREATMENTS" or name.startswith("TREATMENTS ")
+            continue
+        if not in_section:
+            continue
+        if line.startswith("@"):
+            columns = []
+            previous_end = 0
+            for token in re.finditer(r"\S+", line):
+                name = token.group().lstrip("@").rstrip(".")
+                end = token.end()
+                columns.append((name, previous_end, end))
+                previous_end = end
+            if not {"N", "SM"} <= {name for name, _, _ in columns}:
+                columns = None
+        elif columns is not None:
+            if not line.strip():
+                columns = None
+                continue
+            row = {name: line[start:end].strip() for name, start, end in columns}
+            try:
+                if int(row["N"]) == treatment_num:
+                    sm = int(row["SM"])
+                    if sm not in sm_levels:
+                        sm_levels.append(sm)
+            except (ValueError, KeyError):
+                continue
+
+    problems = []
+    stem = path.stem
+    for level in sm_levels:
+        try:
+            methods = _section_row(text, "SIMULATION CONTROLS", "N", level, ("WTHER",))
+            wther = methods.get("WTHER", "").strip()
+            if wther and wther != "-99" and wther != "M":
+                problems.append(
+                    f"FileX WTHER '{wther}' in controls level {level} (treatment {treatment_num}): "
+                    "DSSAT would generate weather and ignore the weather data supplied. "
+                    "Set WTHER to M."
+                )
+        except ValueError:
+            pass
+
+        try:
+            outputs = _section_row(text, "SIMULATION CONTROLS", "N", level, ("FNAME",))
+            fname = outputs.get("FNAME", "").strip()
+            if fname and fname != "-99" and fname != "N":
+                problems.append(
+                    f"FileX FNAME '{fname}' in controls level {level} (treatment {treatment_num}): "
+                    f"DSSAT would name its output files after the experiment ({stem}.OSU) "
+                    "instead of Summary.OUT, which dssatlab reads. Set FNAME to N."
+                )
+        except ValueError:
+            pass
+
+    return problems
+
+
 def read_treatment_numbers(source) -> list[int]:
     """Return the treatment numbers (column N) of the FileX TREATMENTS section, in file order."""
     try:
