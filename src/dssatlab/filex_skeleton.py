@@ -8,7 +8,7 @@ from .controls import _controls_start_date
 from .errors import DSSATCheckError
 from .experiment import _check_date
 from .filex_template import (_CROPS, _check_filex_template, _load_filex_template,
-                             _template_data_dir, _template_treatment_names)
+                             _template_data_dir, _template_treatment_fields, _template_treatment_names)
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
@@ -121,12 +121,14 @@ def _write_template_simulation(sim, experiment_data):
     return filex
 
 
-def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
+def write_filex(source, weather_rows: list[dict] | dict[int, list[dict]],
+                soil_rows: list[dict] | dict[int, list[dict]],
                 directory: str | Path, *, data_dir: str | Path) -> Path:
-    """Check a FileX template and write one field and its treatments; return its path.
+    """Check a FileX template and write its fields and treatments; return its path.
 
     source is a template dict or YAML path. weather_rows and soil_rows must be
-    nonempty checked rows from _parse_weather/_parse_soil, with no problems.
+    nonempty checked rows from _parse_weather/_parse_soil, with no problems:
+    a list for field 1, or a dict keyed by every field number in the template.
     data_dir is the DSSAT data directory containing Genotype. The destination
     directory must exist. Existing FileX contents are overwritten, like the
     weather and soil file writers. All template checks and rendering happen
@@ -153,16 +155,31 @@ def _render_filex(data, weather_rows, soil_rows):
     day = date.fromisoformat(data["planting"]["date"])
     # Four station characters + YY + 01, then .<crop>X: exactly 8.3 characters.
     # One FileX per station/year/crop in a caller-owned simulation directory.
-    stem = f"{weather_rows[0]['station']}{day.year % 100:02d}01"
-    text = _skeleton_text(data, weather_rows[0], soil_rows[-1], stem)
+    weather = weather_rows[1] if isinstance(weather_rows, dict) else weather_rows
+    stem = f"{weather[0]['station']}{day.year % 100:02d}01"
+    text = _skeleton_text(data, weather_rows, soil_rows, stem)
     return f"{stem}.{crop}X", text
 
 
-def _skeleton_text(data, weather, soil, stem):
+def _skeleton_text(data, weather_rows, soil_rows, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
     crop, model, _, _, symbi = _CROPS[data["crop"]]
     names = _template_treatment_names(data)
-    name, station = names[0], weather["station"]
+    fields = _template_treatment_fields(data)
+    weather_rows = weather_rows if isinstance(weather_rows, dict) else {1: weather_rows}
+    soil_rows = soil_rows if isinstance(soil_rows, dict) else {1: soil_rows}
+    name, station = names[0], weather_rows[1][0]["station"]
+    field_lines, coordinate_lines = [], []
+    for number in range(1, max(fields) + 1):
+        weather = weather_rows[number][0]
+        soil = max(soil_rows[number], key=lambda row: row["slb"])
+        field_station = weather["station"]
+        field_lines.append(
+            f"{number:2d} {field_station}{number:04d} {field_station:<8}   -99     0 DR000     0     0 00000 -99 "
+            f"{soil['slb']:6.0f}  {soil['soil_id']:<10} -99")
+        coordinate_lines.append(
+            f"{number:2d}{weather['longitude']:16.5f}{weather['latitude']:16.5f}"
+            f"{weather['elevation']:10.1f}{'-99':>18}   -99   -99   -99   -99   -99")
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
     harvest = []
@@ -178,17 +195,15 @@ def _skeleton_text(data, weather, soil, stem):
         f" {station}", "",
         "*TREATMENTS                        -------------FACTOR LEVELS------------",
         "@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM",
-        *(f"{number:2d} 1 0 0 {treatment_name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1"
+        *(f"{number:2d} 1 0 0 {treatment_name:<25}  1 {fields[number - 1]:2d}  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1"
           for number, treatment_name in enumerate(names, 1)), "",
         "*CULTIVARS", "@C CR INGENO CNAME",
         f" 1 {crop} {data['cultivar']['code']} -99", "",
         "*FIELDS",
         "@L ID_FIELD WSTA....  FLSA  FLOB  FLDT  FLDD  FLDS  FLST SLTX  SLDP  ID_SOIL    FLNAME",
-        f" 1 {station}0001 {station:<8}   -99     0 DR000     0     0 00000 -99 "
-        f"{soil['slb']:6.0f}  {soil['soil_id']:<10} -99",
+        *field_lines,
         "@L ...........XCRD ...........YCRD .....ELEV .............AREA .SLEN .FLWR .SLAS FLHST FHDUR",
-        f" 1{weather['longitude']:16.5f}{weather['latitude']:16.5f}"
-        f"{weather['elevation']:10.1f}{'-99':>18}   -99   -99   -99   -99   -99", "",
+        *coordinate_lines, "",
         "*INITIAL CONDITIONS", *_INITIAL_HEADERS, "",
         "*PLANTING DETAILS", _PLANTING_HEADER, planting, "",
         *harvest, "*SIMULATION CONTROLS",
