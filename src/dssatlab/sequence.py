@@ -10,13 +10,14 @@ from .filex_write import _columns
 from .runner import _run_command
 
 
-def _rotation_components(source, treatment):
+def _rotation_components(source, treatment, *, text=None):
     """Read matching TREATMENTS rows in file order; unreadable inputs give []."""
     if isinstance(treatment, bool) or not isinstance(treatment, (int, str)):
         return []
     try:
         treatment = int(treatment)
-        text = Path(source).read_text(encoding="latin-1")
+        if text is None:
+            text = Path(source).read_text(encoding="latin-1")
     except (OSError, ValueError, TypeError):
         return []
     components, columns, in_section = [], {}, False
@@ -33,7 +34,7 @@ def _rotation_components(source, treatment):
                     continue
             except ValueError:
                 continue
-            component = {key: row.get(key, "?") for key in ("R", "FL", "SM", "CU")}
+            component = {key: row.get(key, "?") for key in ("R", "FL", "SM", "CU", "MP", "MH")}
             try:
                 cultivar = _section_row(text, "CULTIVARS", "C", int(component["CU"]), ("CR",))
                 component["CR"] = cultivar["CR"] or "?"
@@ -127,12 +128,12 @@ def _sequence_experiment_data(source, treatment, components):
         if not isinstance(entry, dict):
             continue  # Ordinary experiment checks report malformed entries.
         controls = entry.get("controls", {})
-        if entry.keys() - {"controls"} or (
+        if entry.keys() - {"controls", "rotation"} or (
                 isinstance(controls, dict) and controls.keys() - {"years", "start_date"}):
             if not problems:
                 problems.append(f"Treatment {int(treatment)} is a sequence of {len(components)} "
                                 "rotation components; experiment data for a sequence takes only "
-                                "controls years and start_date. Edit the components in the FileX "
+                                "controls years, start_date and rotation. Edit the components in the FileX "
                                 "for other changes.")
             checked[key] = {}
     return problems, dict(source, treatments=checked)

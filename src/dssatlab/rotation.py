@@ -233,7 +233,8 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
             found, lines = load_problems, _report_lines("Management data", load_problems)
         else:
             found, lines = _check_management(checked_data, None, sim.treatment,
-                                             weather.get(1, []), start, text=text)
+                                             weather.get(1, []), start, text=text,
+                                             rotation_template=data["rotation"], data_dir=data_dir)
         problems.extend(found)
         report.extend(lines)
     return problems, report
