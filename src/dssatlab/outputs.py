@@ -263,16 +263,19 @@ def _evaluate_value(name: str, value: str):
 def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
     """Return DSSAT's simulated-versus-measured evaluation table from Evaluate.OUT.
 
-    Header line starts with @. Values are int, float, or str (EXCODE, CR), with
-    -99 missing values as None. Date columns remain days after planting. Multiple
-    *EVALUATION blocks read each row under its own header.
+    Header line starts with @; columns keep DSSAT's names, which differ by crop
+    model (TN or TRNO). Values are int, float, or str (EXCODE, CR), with -99
+    missing values as None. Date columns remain days after planting. Multiple
+    *EVALUATION blocks read each row under its own header. DSSAT fills the
+    measured columns only for run() (all treatments) with the FileA beside the
+    FileX; a Simulation runs one treatment and DSSAT leaves them -99 there.
 
     Raises DSSATOutputError if Evaluate.OUT is missing, empty, or malformed.
     """
     path = Path(run_dir) / "Evaluate.OUT"
-    checked = (f"Checked {path} in the run directory. DSSAT writes measured columns only when "
-               "the FileA is in the run directory or FileX folder.")
-    next_step = "Place the matching FileA beside the FileX and rerun DSSAT to produce Evaluate.OUT."
+    checked = f"Checked {path} in the run directory."
+    next_step = ("Run the FileX with run() and its FileA beside it, so DSSAT writes "
+                 "Evaluate.OUT with measured columns.")
     try:
         lines = path.read_text(encoding="latin-1").splitlines()
     except OSError as exc:
@@ -285,7 +288,7 @@ def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
     header_seen = False
     for line_number, line in enumerate(lines, 1):
         stripped = line.strip()
-        if not stripped or stripped.startswith(("!", "*")):
+        if not stripped or stripped.startswith(("!", "*", "$")):
             continue
         if stripped.startswith("@"):
             header_seen = True

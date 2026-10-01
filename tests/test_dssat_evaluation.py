@@ -1,59 +1,15 @@
-"""Tests for DSSAT evaluation (Evaluate.OUT) and FileA/FileT copying (#105)."""
+"""Tests for reading DSSAT evaluation (Evaluate.OUT) (#105)."""
 
-import csv
-from datetime import datetime
 from pathlib import Path
 import shutil
-import subprocess
-from types import SimpleNamespace
-from unittest.mock import Mock
 
 import pytest
 
-from dssatlab import DSSATOutputError, Simulation, read_dssat_evaluation, runner
+from dssatlab import DSSATOutputError, read_dssat_evaluation
 from dssatlab.runner import RunResult
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "output_files" / "evaluate" / "maize"
-
-SAMPLE_FILEX = """*TREATMENTS                        -------------FACTOR LEVELS------------
-@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
- 1 1 0 0 RAINFED LOW NITROGEN       1  1  0  1  1  1  1  0  0  0  0  0  1
-
-*FIELDS
-@L ID_FIELD WSTA....  FLSA  FLOB  FLDT  FLDD  FLDS  FLST SLTX  SLDP  ID_SOIL    FLNAME
- 1 UFGA0002 UFGA       -99     0 DR000     0     0 00000 -99    180  IBMZ910014 Field section
-
-*SIMULATION CONTROLS
-@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
- 1 GE              1     1     S 82056  2150 N X IRRIGATION, GAINESVILLE
-"""
-
-
-@pytest.fixture
-def fake_dssat(tmp_path, monkeypatch):
-    executable = tmp_path / "DSSAT install" / "DSCSM048.EXE"
-    executable.parent.mkdir()
-    executable.write_text("fake DSSAT")
-    executable.chmod(0o755)
-    connect = Mock(return_value=executable)
-    monkeypatch.setattr(runner, "connect", connect)
-    monkeypatch.setattr(runner, "datetime", SimpleNamespace(
-        now=lambda: datetime(2026, 9, 30, 12, 34, 56)))
-    state = SimpleNamespace(executable=executable, connect=connect, calls=[],
-                            outputs={"Summary.OUT": b"summary", "Evaluate.OUT": b"evaluation"},
-                            returncode=0)
-
-    def fake_run(command, *, cwd, **kwargs):
-        state.calls.append((command, cwd, kwargs))
-        for name, content in state.outputs.items():
-            (Path(cwd) / name).write_bytes(content)
-        return subprocess.CompletedProcess(command, state.returncode,
-                                           stdout="DSSAT finished\n", stderr="")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    return state
-
 
 @pytest.mark.parametrize("as_string", [False, True])
 def test_read_dssat_evaluation_maize_fixture(as_string):
@@ -123,9 +79,7 @@ def test_missing_evaluate_file_raises_dssat_output_error(tmp_path):
         read_dssat_evaluation(run_dir)
     message = str(exc_info.value)
     assert str(run_dir / "Evaluate.OUT") in message
-    assert "FileA" in message
-    assert "run directory or FileX folder" in message
-    assert "Place the matching FileA beside the FileX and rerun DSSAT to produce Evaluate.OUT." in message
+    assert "Run the FileX with run() and its FileA beside it" in message
 
 
 def test_broken_evaluate_file_errors(tmp_path):
@@ -190,80 +144,12 @@ def test_run_result_dssat_evaluation(tmp_path):
     assert rows[0]["HWAMM"] == 2929.0
 
 
-@pytest.mark.parametrize("filea_name,filet_name", [
-    ("UFGA8201.MZA", "UFGA8201.MZT"),  # Uppercase
-    ("ufga8201.mza", "ufga8201.mzt"),  # Lowercase
-    ("UFGA8201.mza", "UFGA8201.mzt"),  # Mixed case extension
-])
-def test_simulation_run_copies_filea_and_filet_when_present(
-        tmp_path, fake_dssat, filea_name, filet_name):
-    folder = tmp_path / "exp"
-    folder.mkdir()
-    filex = folder / "UFGA8201.MZX"
-    filex.write_text(SAMPLE_FILEX, encoding="latin-1")
-
-    # Create sibling model files
-    (folder / "MZCER048.CUL").write_text("cul")
-    (folder / "MZCER048.ECO").write_text("eco")
-    (folder / "MZCER048.SPE").write_text("spe")
-    (folder / "SOIL.SOL").write_text("sol")
-    (folder / "unrelated.txt").write_text("unrelated")
-    (folder / "OTHER.MZA").write_text("other mza")
-
-    # Create FileA and FileT with specified casing
-    (folder / filea_name).write_text("filea content")
-    (folder / filet_name).write_text("filet content")
-
-    weather = folder / "weather.csv"
-    rows = [dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
-                 date=day, srad=20, tmax=25, tmin=10, rain=0)
-            for day in ["1982-02-24", "1982-02-25", "1982-02-26"]]
-    with weather.open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-
-    sim = Simulation(filex, 1, weather)
-    result = sim.run()
-
-    sim_folder = result.run_dir.parent
-    # Verify FileA and FileT were copied to sim_folder
-    assert (sim_folder / filea_name).is_file()
-    assert (sim_folder / filea_name).read_text() == "filea content"
-    assert (sim_folder / filet_name).is_file()
-    assert (sim_folder / filet_name).read_text() == "filet content"
-
-    # Verify model files were copied
-    assert (sim_folder / "MZCER048.CUL").is_file()
-    assert (sim_folder / "SOIL.SOL").is_file()
-
-    # Verify unrelated files were NOT copied
-    assert not (sim_folder / "unrelated.txt").exists()
-    assert not (sim_folder / "OTHER.MZA").exists()
-
-
-def test_simulation_run_when_filea_filet_absent(tmp_path, fake_dssat):
-    folder = tmp_path / "exp"
-    folder.mkdir()
-    filex = folder / "UFGA8201.MZX"
-    filex.write_text(SAMPLE_FILEX, encoding="latin-1")
-    (folder / "MZCER048.CUL").write_text("cul")
-
-    weather = folder / "weather.csv"
-    rows = [dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
-                 date=day, srad=20, tmax=25, tmin=10, rain=0)
-            for day in ["1982-02-24", "1982-02-25", "1982-02-26"]]
-    with weather.open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-
-    sim = Simulation(filex, 1, weather)
-    result = sim.run()
-
-    sim_folder = result.run_dir.parent
-    copied_names = {p.name for p in sim_folder.iterdir()}
-    assert "UFGA8201.MZA" not in copied_names
-    assert "UFGA8201.MZT" not in copied_names
-    assert "UFGA8201.MZX" in copied_names
-    assert "MZCER048.CUL" in copied_names
+def test_cropsim_title_line_and_trno_column(tmp_path):
+    # CROPSIM (wheat CSCER048) starts Evaluate.OUT with a $ title and names the treatment TRNO.
+    (tmp_path / "Evaluate.OUT").write_text(
+        "$PLANT EVALUATION\n  \n*EVALUATION : KSAS8101WH  N RESPONSE,KANSAS STATE    CSCER048\n\n"
+        "@RUN EXCODE      TRNO RN CR EDAPS EDAPM HWAMS HWAMM HWUMS HWUMM\n"
+        "   1 KSAS8101WH     2  0 WH     5   -99  3485   -99 0.019 -99.0\n")
+    assert read_dssat_evaluation(tmp_path) == [dict(
+        RUN=1, EXCODE="KSAS8101WH", TRNO=2, RN=0, CR="WH", EDAPS=5, EDAPM=None,
+        HWAMS=3485, HWAMM=None, HWUMS=0.019, HWUMM=None)]

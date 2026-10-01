@@ -134,8 +134,9 @@ observed data; it never writes them. `-99` in them means "not measured".
 _Avoid_: observed file (ambiguous with the observed data CSV)
 
 **DSSAT evaluation**:
-DSSAT's own simulated-versus-measured table, `Evaluate.OUT`, filled only when the FileA is in the
-simulation folder. Read as rows; not the same as dssatlab's Evaluation.
+DSSAT's own simulated-versus-measured table, `Evaluate.OUT`. DSSAT fills its measured columns only
+in some runs (verified: CERES-Maize through run() with the FileA beside the FileX); a Simulation runs
+one treatment and DSSAT leaves them -99. Read as rows; not the same as dssatlab's Evaluation.
 _Avoid_: evaluation (alone)
 
 **Evaluation**:
