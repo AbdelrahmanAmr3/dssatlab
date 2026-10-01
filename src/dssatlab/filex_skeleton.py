@@ -109,7 +109,7 @@ def _write_template_simulation(sim, experiment_data):
 
 def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
                 directory: str | Path, *, data_dir: str | Path) -> Path:
-    """Check a FileX template and write one field and treatment; return its path.
+    """Check a FileX template and write one field and its treatments; return its path.
 
     source is a template dict or YAML path. weather_rows and soil_rows must be
     nonempty checked rows from _parse_weather/_parse_soil, with no problems.
@@ -118,7 +118,7 @@ def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
     weather and soil file writers. All template checks and rendering happen
     before opening the file; failures raise DSSATCheckError with all problems.
 
-    Treatment 1 references required levels 1; unused operations have level 0
+    Each treatment references required levels 1; unused operations have level 0
     (none). Initial-condition headers allow the v0.6 writer to add a level.
     Start equals planting date, with DSSAT default initial conditions (IC=0).
     """
@@ -147,7 +147,8 @@ def _render_filex(data, weather_rows, soil_rows):
 def _skeleton_text(data, weather, soil, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
     crop, model, _, _, symbi = _CROPS[data["crop"]]
-    name, station = data["treatment_name"], weather["station"]
+    names = [data["treatment_name"]] if "treatment_name" in data else data["treatments"]
+    name, station = names[0], weather["station"]
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
     harvest = []
@@ -163,7 +164,8 @@ def _skeleton_text(data, weather, soil, stem):
         f" {station}", "",
         "*TREATMENTS                        -------------FACTOR LEVELS------------",
         "@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM",
-        f" 1 1 0 0 {name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1", "",
+        *(f"{number:2d} 1 0 0 {treatment_name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1"
+          for number, treatment_name in enumerate(names, 1)), "",
         "*CULTIVARS", "@C CR INGENO CNAME",
         f" 1 {crop} {data['cultivar']['code']} -99", "",
         "*FIELDS",
