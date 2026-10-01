@@ -20,6 +20,8 @@ REPORT = ("FileX: treatment 1 is a sequence of 6 rotation components "
 def sequence(tmp_path):
     text = (FIXTURES / "UFGA7804.SQX").read_text(encoding="latin-1")
     text = text.replace(" 1 GE             10     5", " 1 GE              1     1")
+    text = re.sub(r"(?m)^( *\d+ ME {14})W", r"\1M", text)
+    text = re.sub(r"(?m)^( *\d+ OU {14})Y", r"\1N", text)
     filex = tmp_path / "UFGA7804.SQX"
     filex.write_text(text, encoding="latin-1")
     weather = [dict(station="UFGA", latitude=45, longitude=-100, elevation=200,

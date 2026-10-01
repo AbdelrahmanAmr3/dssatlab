@@ -7,7 +7,7 @@ import shutil
 
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
-from .filex import _irrigation_dates, _read_filex, _weather_filename
+from .filex import _check_filex_controls, _irrigation_dates, _read_filex, _weather_filename
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
 from .management import _check_management, _report_lines
@@ -148,6 +148,8 @@ class Simulation:
         components = _rotation_components(self.filex, self.treatment)
         sequence_problems, sequence_report = _check_sequence(self.filex, self.treatment, components)
         filex_problems.extend(sequence_problems)
+        filex_problems.extend(_check_filex_controls(self.filex, self.treatment,
+                                                    [row["SM"] for row in components]))
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
         if len(name) > 12 and len(components) < 2:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
