@@ -57,7 +57,7 @@ def test_field_sources_run_selected_treatment(fields, installed, tmp_path, keys,
 
 @pytest.mark.parametrize("kind", ["weather", "soil"])
 @pytest.mark.parametrize("keys,shown", [([1], "1"), ([3, 1, 2], "1, 2, 3"),
-    ([2], "2"), ([], ""), ([True, 2], "2, True"), ([1.0, 2], "2, 1.0"),
+    ([2], "2"), ([], "none"), ([True, 2], "2, True"), ([1.0, 2], "2, 1.0"),
     (["bad", 1], "1, 'bad'"), ([1, "1", 2], "1, 2, '1'"), (None, "1")])
 def test_field_keys_must_match(fields, installed, kind, keys, shown):
     source = fields[kind][1]
@@ -164,3 +164,10 @@ def test_single_field_dict_and_plain_sources_write_identical_files(data, rows, i
     keyed = Simulation(filex_template=data, weather={"1": rows[0]}, soil={1: rows[1]}).run().run_dir.parent
     assert {p.name: p.read_bytes() for p in plain.iterdir() if p.is_file()} == {
         p.name: p.read_bytes() for p in keyed.iterdir() if p.is_file()}
+
+
+@pytest.mark.parametrize("treatment_fields", [[1, 3, 3], [1, 2], "1"])
+def test_invalid_treatment_fields_give_no_field_key_problem(fields, installed, treatment_fields):
+    fields["filex_template"]["treatment_fields"] = treatment_fields
+    problems = Simulation(**fields).check()
+    assert problems and all("treatment_fields" in p for p in problems)

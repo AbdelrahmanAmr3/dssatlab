@@ -19,7 +19,7 @@ from .weather import _dssat_date, _parse_weather, write_weather_file
 
 
 def _parse_field_data(source, count, kind):
-    """Check field keys and parse each source, preserving plain-source reports."""
+    """Check field keys against fields 1..count (any keys if count is None) and parse each source."""
     label = f"{kind.capitalize()} data"
     parser = _parse_weather if kind == "weather" else _parse_soil
     if source is None and kind == "soil":
@@ -34,8 +34,9 @@ def _parse_field_data(source, count, kind):
                 normalized[number] = value
                 continue
         invalid.append(repr(key))
-    if invalid or set(normalized) != set(range(1, count + 1)):
-        keys = ", ".join([str(k) for k in sorted(normalized)] + invalid)
+    if invalid or count is not None and set(normalized) != set(range(1, count + 1)):
+        count = count or max(normalized, default=1)
+        keys = ", ".join([str(k) for k in sorted(normalized)] + invalid) or "none"
         example = ", ".join(f"{k}: ..." for k in range(1, count + 1))
         problems = [f"FileX template has fields 1 to {count}, but {kind} data has fields {keys}. "
                     f"Supply {kind} data for every field: {kind}={{{example}}}."]
@@ -80,12 +81,14 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
     fields = _template_treatment_fields(data) if isinstance(data, dict) else [1]
-    # Malformed field lists are reported by the template checks, never indexed.
+    # Malformed field lists are reported by the template checks, never indexed,
+    # and the field keys are then not compared with them (count None).
+    count = max(fields) if not any("treatment_fields" in p for p in template_problems) else None
     if (not isinstance(fields, list) or not fields
             or any(type(k) is not int or not 1 <= k <= 99 for k in fields)):
         fields = [1]
-    weather_fields, weather_problems, weather_report = _parse_field_data(sim.weather, max(fields), "weather")
-    soil_fields, soil_problems, soil_report = _parse_field_data(sim.soil, max(fields), "soil")
+    weather_fields, weather_problems, weather_report = _parse_field_data(sim.weather, count, "weather")
+    soil_fields, soil_problems, soil_report = _parse_field_data(sim.soil, count, "soil")
     for rows, found, kind in ((weather_fields, weather_problems, "weather"),
                               (soil_fields, soil_problems, "soil")):
         if not found:

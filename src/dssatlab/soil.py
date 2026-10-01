@@ -110,11 +110,7 @@ def write_soil_file(rows: list[dict], path: str | Path) -> Path:
     come from the first row, including -99 for unset optional values. The parent
     folder must exist; an existing file is overwritten.
     """
-    path = Path(path)
-    header = f"*SOILS: {rows[0]['soil_id']} (written by dssatlab)\n"
-    with path.open("w", encoding="ascii", newline="\n") as stream:
-        stream.write(header + _profile_text(rows))
-    return path
+    return _write_soil_profiles([rows], path)
 
 
 def _check_columns(columns, where, problems):
