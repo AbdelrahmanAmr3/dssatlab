@@ -31,7 +31,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 - [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
 - [x] Run multi-year seasonal analyses (`controls: years`), check weather coverage across seasons, and compute season statistics across treatments and scenarios (`summarize_seasons()`)
-- [x] Run multi-year crop rotations and sequence analyses in DSSAT's sequence mode (`Q`) from a sequence FileX or a FileX template (`rotation`), with per-component summary statistics and continuous soil water series
+- [x] Run multi-year crop rotations and sequence analyses in DSSAT's sequence mode (`Q`) from a sequence FileX or a FileX template (`rotation`), with experiment data per rotation component (planting, cultivar, fertilizer and irrigation), per-component summary statistics and continuous soil water series
 
 ```python
 import dssatlab as dl
