@@ -26,25 +26,36 @@ def _cultivar_codes(filex, crop):
     return path, _read_cultivar_codes(path)
 
 
-def _read_cultivar_codes(path):
-    """Read VAR# from a selected .CUL, shared with the fixed FileX crop models."""
-    codes, in_table, has_header = [], False, False
+def _read_cultivar_codes(path, *, names: bool = False):
+    """Read VAR# and optional names from a .CUL, shared across template checks and listings."""
+    path = Path(path)
+    cultivars, seen, in_table, has_header = [], set(), False, False
+    col_start, col_end = 6, 22
     for line in path.read_text(encoding="latin-1").splitlines():
         if line.startswith("@"):
-            in_table = line.split()[0] == "@VAR#"
+            parts = line.split()
+            in_table = bool(parts and parts[0] == "@VAR#")
             has_header = has_header or in_table
+            if in_table:
+                tokens = list(re.finditer(r"[^\s@]+", line))
+                if len(tokens) > 1:
+                    col_start, col_end = tokens[1].start(), tokens[1].end()
         elif line.startswith("*"):
             in_table = False
         elif in_table and line.strip() and not line.lstrip().startswith("!"):
             code = line[:6]
-            if re.fullmatch(r"[!-~]{6}", code) and code not in codes:
-                codes.append(code)
+            if re.fullmatch(r"[!-~]{6}", code) and code not in seen:
+                seen.add(code)
+                cultivars.append({
+                    "code": code,
+                    "name": line[col_start:col_end].strip(),
+                })
     if not has_header:
         raise ValueError(f".CUL file {path} has no @VAR# header. Supply a cultivar table.")
-    if not codes:
+    if not cultivars:
         raise ValueError(f".CUL file {path} has no cultivar codes under @VAR#. "
                          "Supply a table containing six-character cultivar codes.")
-    return codes
+    return cultivars if names else [c["code"] for c in cultivars]
 
 
 def _unknown_cultivar(code, codes, path, crop, where):
