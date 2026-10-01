@@ -171,7 +171,8 @@ stats = dl.summarize_seasons(combined, variables=["HWAM"])
 ```
 
 `summarize_seasons()` accepts Summary rows from `combine_summaries()` or directly from `result.summary()`
-(where scenario defaults to `"base"`). It groups rows by `(scenario, treatment)` and calculates summary
+(where scenario defaults to `"base"`). It groups rows by `(scenario, treatment, component)` (where `component` is
+the rotation component `R#`, defaulting to `1` for single-crop seasonal runs) and calculates summary
 statistics for each requested variable.
 
 ### Statistics table columns
@@ -182,6 +183,8 @@ Each dictionary in the returned list contains the following columns:
 |---|---|
 | `scenario` | Scenario name (`"base"` for single runs without scenario labels) |
 | `treatment` | Treatment number (from the row's `treatment` or `TRNO` key) |
+| `component` | Rotation component number (`R#`, `1` for single-crop seasonal runs) |
+| `crop` | Crop code from the first row of the group (`CR`, or `None` if absent) |
 | `variable` | The Summary column name being summarized (e.g., `"HWAM"`) |
 | `seasons` | Total number of seasons simulated (total rows in the group) |
 | `missing` | Count of missing values (`None` / DSSAT `-99`) |

@@ -271,6 +271,15 @@ case. `WSTA` must have four or eight characters, and `SDATE` must contain five
 digits: two for the year and three for the day of year. The FileX filename must
 also fit the 12-character limit.
 
+For every simulation controls level used by the selected treatment (or each rotation
+component in a sequence), `check()` also validates the simulation methods and outputs:
+
+- `METHODS` `WTHER` must be `M` (measured weather). If set to `W` (weather generator),
+  DSSAT would generate artificial weather and silently ignore your supplied weather data.
+- `OUTPUTS` `FNAME` must be `N`. If set to `Y`, DSSAT would name its output files after
+  the experiment (such as `UFGA7804.OSU`) instead of standard names like `Summary.OUT`,
+  which `dssatlab` reads.
+
 When `management` supplies experiment overrides for the selected treatment,
 the copied FileX uses the weather data's station and, if supplied, the soil
 data's profile ID. These IDs need not match the source FileX. An omitted or empty

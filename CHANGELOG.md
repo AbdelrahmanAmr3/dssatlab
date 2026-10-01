@@ -2,6 +2,28 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.13.0] - 2026-10-01
+
+### Added
+- Sequence analysis: a `Simulation` whose treatment number has multiple `*TREATMENTS` rows in the FileX runs as a multi-year crop sequence in DSSAT's sequence mode (`Q`) through a batch file (`DSSBatch.v48`) written to the simulation folder, with the user's weather and soil data (ADR 0013).
+- Pre-run sequence checks: validates a 12-character FileX filename, distinct positive `R` numbers, single field across all components, `NREPS` equal to 1, and continuous weather data covering through the sequence's last day calculated via DSSAT's calendar day-of-year end rule (`(start year + years)` at start day of year, minus one day).
+- Sequence experiment data: supports controls `years` and `start_date` applied to a copy of the first component's controls level; unsupported edits are reported as check problems.
+- Continuous daily series: `SoilWat.OUT` and `Weather.OUT` provide a continuous series across rotation components over the whole sequence.
+- Guide page "Sequence analysis" (`docs/guide/sequence.md`) and tutorial Case 9 demonstrating a 9-year crop rotation (bean, fallow, soybean) with `UFGA7804.SQX`.
+- Architecture Decision Record 0013 recording sequence execution in mode Q via a batch file.
+
+### Changed
+- Copied FileX controls checks: verifies for every copied FileX (sequence or single-crop) that used controls levels have `METHODS` `WTHER` set to `M` (not `W`) and `OUTPUTS` `FNAME` set to `N` (not `Y`), preventing silent weather generation or missing `Summary.OUT`.
+- `summarize_seasons()` groups by scenario, treatment, and rotation component (`R#`, defaulting to 1), adding `component` and `crop` keys to each returned dictionary.
+- The weather station written into a copied FileX field (experiment data) is left-justified, as in DSSAT's own files; DSSAT's sequence mode rejects a right-justified station.
+- `run_treatments(treatments=None)` selects each FileX treatment number once in file order, allowing multi-sequence FileX experiments to run each sequence once.
+
+### Notes
+- Run modes now include C (`Simulation`), Q (`Simulation` of a sequence), and A (`dl.run()`). `dl.run()` remains unchanged.
+- Experiment data per rotation component and FileX template generation from scratch for sequences are deferred to v0.13.1.
+- `evaluate()` continues to reject multiple Summary rows per treatment; sequence evaluation remains out of scope.
+- Upgrading from 0.12.0: a copied FileX with `WTHER` other than `M` or `FNAME` other than `N` in a controls level the run uses is now a check problem; set them to `M` and `N`. Nothing else changes. Zero runtime dependencies are preserved.
+
 ## [0.12.0] - 2026-10-01
 
 ### Added

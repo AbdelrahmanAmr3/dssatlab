@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -139,6 +140,12 @@ def run(
             "(for example my_weather.csv), or use Simulation, which runs in its own folder."
         )
 
+    arguments = ["A", filex.name] if treatment is None else ["C", filex.name, str(treatment)]
+    return _run_command(filex.parent, arguments, executable)
+
+
+def _run_command(folder: Path, arguments: list[str], executable=None) -> RunResult:
+    """Resolve DSSAT, execute its arguments, and collect outputs in a run directory."""
     if executable is None:
         executable = connect(interactive=False)
     else:
@@ -147,16 +154,14 @@ def run(
         if executable is None:
             raise core._invalid_path(path)
 
-    run_dir = _create_dated_folder(filex.parent, "dssat_run_", "run directory")
+    run_dir = _create_dated_folder(folder, "dssat_run_", "run directory")
 
     before = {path.name: path.stat().st_mtime_ns
-              for path in filex.parent.iterdir() if path.is_file()}
-    command = [str(executable), "A", filex.name]
-    if treatment is not None:
-        command = [str(executable), "C", filex.name, str(treatment)]
+              for path in folder.iterdir() if path.is_file()}
+    command = [str(executable), *arguments]
     try:
         completed = subprocess.run(
-            command, cwd=filex.parent, stdin=subprocess.DEVNULL,
+            command, cwd=folder, stdin=subprocess.DEVNULL,
             capture_output=True, text=True,
         )
     except OSError as error:
@@ -167,13 +172,13 @@ def run(
             "then try again."
         ) from error
     after = {path.name: path.stat().st_mtime_ns
-             for path in filex.parent.iterdir() if path.is_file()}
+             for path in folder.iterdir() if path.is_file()}
 
     outputs = []
     for name in sorted(after):
         if name not in before or after[name] != before[name]:
             destination = run_dir / name
-            shutil.move(filex.parent / name, destination)
+            shutil.move(folder / name, destination)
             outputs.append(destination)
 
     stdout_tail = "\n".join(completed.stdout.splitlines()[-20:])
@@ -196,3 +201,22 @@ def run(
             "correct the reported problem and try again."
         )
     return RunResult(completed.returncode, run_dir, outputs, stdout_tail)
+
+
+def _check_missing_weather(result):
+    """Raise when DSSAT silently ran out of measured weather."""
+    warning = result.run_dir / "WARNING.OUT"
+    if warning.exists():
+        for line in warning.read_text(encoding="utf-8", errors="replace").splitlines():
+            missing = re.search(r"Weather record not found for YR DOY:\s+(\d{4})\s+(\d{1,3})", line)
+            if missing:
+                year, day = map(int, missing.groups())
+                calendar_date = date(year, 1, 1) + timedelta(days=day - 1)
+                raise DSSATRunError(
+                    f"DSSAT reported no weather for year {year}, day of year {day} "
+                    f"({calendar_date}). DSSAT exits 0 in this case and gives -99 "
+                    "for anything it could not reach.\n"
+                    f"Run directory (kept): {result.run_dir}\n"
+                    "Extend the weather data through that date and the days the "
+                    "crop needs, then run again."
+                )

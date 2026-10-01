@@ -305,3 +305,224 @@ def test_checks_write_nothing_and_reread_inputs(filex, weather, tmp_path):
     before = {p: p.read_bytes() for p in tmp_path.rglob("*")}
     assert any("SDATE" in p for p in simulation.check())
     assert {p: p.read_bytes() for p in tmp_path.rglob("*")} == before
+
+
+@pytest.mark.parametrize("wther,fname,expected_problems", [
+    ("W", "N", [
+        "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M."
+    ]),
+    ("M", "Y", [
+        "FileX FNAME 'Y' in controls level 1 (treatment 1): DSSAT would name its output "
+        "files after the experiment (UFGA8201.OSU) instead of Summary.OUT, which dssatlab "
+        "reads. Set FNAME to N."
+    ]),
+    ("W", "Y", [
+        "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M.",
+        "FileX FNAME 'Y' in controls level 1 (treatment 1): DSSAT would name its output "
+        "files after the experiment (UFGA8201.OSU) instead of Summary.OUT, which dssatlab "
+        "reads. Set FNAME to N.",
+    ]),
+    ("S", "N", [
+        "FileX WTHER 'S' in controls level 1 (treatment 1): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M."
+    ]),
+    ("G", "N", [
+        "FileX WTHER 'G' in controls level 1 (treatment 1): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M."
+    ]),
+])
+def test_wther_and_fname_reported_for_one_row_treatment(filex, weather, wther, fname, expected_problems):
+    controls = f"""
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              {wther}     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              {fname}     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+"""
+    path = filex(text=SAMPLE + controls)
+    assert Simulation(path, 1, weather()).check() == expected_problems
+
+
+def test_two_row_treatment_level_two_w_reported_once(filex, weather):
+    treatments = """*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 COMPONENT 1                1  1  0  1  1  1  1  0  0  0  0  0  1
+ 1 2 0 0 COMPONENT 2                1  1  0  1  1  1  1  0  0  0  0  0  2
+"""
+    fields = "*FIELDS" + SAMPLE.split("*FIELDS")[1].split("*SIMULATION CONTROLS")[0]
+    controls = """*SIMULATION CONTROLS
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 1 GE              1     1     S 82056  2150 COMPONENT 1
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              M     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 2 GE              1     1     S 82056  2150 COMPONENT 2
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 2 ME              W     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 2 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+"""
+    path = filex(text=treatments + fields + controls)
+    problems = Simulation(path, 1, weather()).check()
+    assert [p for p in problems if "WTHER" in p or "FNAME" in p] == [
+        "FileX WTHER 'W' in controls level 2 (treatment 1): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M."
+    ]
+
+
+def test_two_rows_both_using_level_one_with_w_reported_once(filex, weather):
+    treatments = """*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 COMPONENT 1                1  1  0  1  1  1  1  0  0  0  0  0  1
+ 1 2 0 0 COMPONENT 2                1  1  0  1  1  1  1  0  0  0  0  0  1
+"""
+    fields = "*FIELDS" + SAMPLE.split("*FIELDS")[1].split("*SIMULATION CONTROLS")[0]
+    controls = """*SIMULATION CONTROLS
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 1 GE              1     1     S 82056  2150 COMPONENT 1
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              W     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+"""
+    path = filex(text=treatments + fields + controls)
+    problems = Simulation(path, 1, weather()).check()
+    assert [p for p in problems if "WTHER" in p or "FNAME" in p] == [
+        "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M."
+    ]
+
+
+@pytest.mark.parametrize("controls", [
+    # M/N passes
+    """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              M     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+""",
+    # Missing METHODS block entirely
+    """
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+""",
+    # Missing OUTPUTS block entirely
+    """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              M     M     E     R     S     L     R     1     G     R     2
+""",
+    # Missing both METHODS and OUTPUTS blocks (SAMPLE already has neither)
+    "",
+    # Level row missing in METHODS / OUTPUTS
+    """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 2 ME              W     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 2 OU              Y     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+""",
+    # WTHER column missing from METHODS header
+    """
+@N METHODS     INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              M     E     R     S     L     R     1     G     R     2
+""",
+    # FNAME column missing from OUTPUTS header
+    """
+@N OUTPUTS     OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              N     Y     1     N     N     N     N     N     N     Y     N     N     A
+""",
+    # Blank or -99 WTHER / FNAME
+    """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME                    M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU            -99     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+""",
+])
+def test_valid_controls_and_missing_rows_or_columns_pass(filex, weather, controls):
+    path = filex(text=SAMPLE + controls)
+    assert Simulation(path, 1, weather()).check() == []
+
+
+def test_filex_template_controls_pass_wther_and_fname_checks():
+    template_data = dict(crop="maize", treatment_name="My treatment", cultivar={"code": "IB0035"},
+                         planting=dict(date="2021-03-01", method="S", distribution="R",
+                                       population=7.2, row_spacing=75, depth=5))
+    weather_rows = [dict(station="TEST", latitude=45.125, longitude=-100.25, elevation=234,
+                         date="2021-03-01", srad=20, tmax=25, tmin=10, rain=0)]
+    soil_rows = [dict(soil_id="SOIL123456", salb=0.13, slro=60, sldr=0.5, slpf=1,
+                      slb=30, slll=0.1, sdul=0.24, ssat=0.45, srgf=1)]
+    sim = Simulation(filex_template=template_data, weather=weather_rows, soil=soil_rows, treatment=1)
+    assert [p for p in sim.check() if "WTHER" in p or "FNAME" in p] == []
+
+
+def test_run_treatments_labels_controls_problem(filex, weather):
+    from dssatlab import DSSATCheckError, run_treatments
+    controls = """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              W     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              Y     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+"""
+    path = filex(text=SAMPLE + controls)
+    with pytest.raises(DSSATCheckError) as exc_info:
+        run_treatments(filex=path, weather=weather(), treatments=[1])
+    problems = exc_info.value.problems
+    assert len(problems) == 2
+    assert problems[0] == (
+        "Scenario 'base', treatment 1: FileX WTHER 'W' in controls level 1 (treatment 1): "
+        "DSSAT would generate weather and ignore the weather data supplied. Set WTHER to M."
+    )
+    assert problems[1] == (
+        "Scenario 'base', treatment 1: FileX FNAME 'Y' in controls level 1 (treatment 1): "
+        "DSSAT would name its output files after the experiment (UFGA8201.OSU) instead of "
+        "Summary.OUT, which dssatlab reads. Set FNAME to N."
+    )
+
+
+def test_simulation_run_raises_check_error_on_controls_problem(filex, weather):
+    from dssatlab import DSSATCheckError
+    controls = """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              W     M     E     R     S     L     R     1     G     R     2
+"""
+    path = filex(text=SAMPLE + controls)
+    sim = Simulation(path, 1, weather())
+    with pytest.raises(DSSATCheckError) as exc_info:
+        sim.run()
+    assert any("WTHER 'W'" in p for p in exc_info.value.problems)
+
+
+def test_treatment_selection_only_checks_its_own_controls_levels(filex, weather):
+    controls = """
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 2 GE              1     1     S 82056  2150 SECOND
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              M     M     E     R     S     L     R     1     G     R     2
+ 2 ME              W     M     E     R     S     L     R     1     G     R     2
+"""
+    text = SAMPLE.replace(" 2 1 0 0 RAINFED HIGH NITROGEN      1  1  0  1  1  1  2  0  0  0  0  0  1",
+                          " 2 1 0 0 RAINFED HIGH NITROGEN      1  1  0  1  1  1  2  0  0  0  0  0  2")
+    path = filex(text=text + controls)
+    assert Simulation(path, 1, weather()).check() == []
+    problems = Simulation(path, 2, weather()).check()
+    assert problems == [
+        "FileX WTHER 'W' in controls level 2 (treatment 2): DSSAT would generate weather "
+        "and ignore the weather data supplied. Set WTHER to M."
+    ]
+
+
+def test_verbose_check_reports_in_filex_section(filex, weather, capsys):
+    controls = """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              W     M     E     R     S     L     R     1     G     R     2
+"""
+    path = filex(text=SAMPLE + controls)
+    Simulation(path, 1, weather()).check(verbose=True)
+    captured = capsys.readouterr().out
+    assert "FileX:" in captured
+    assert "FileX WTHER 'W' in controls level 1 (treatment 1)" in captured
+
+

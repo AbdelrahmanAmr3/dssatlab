@@ -51,7 +51,8 @@ _Avoid_: site, location
 
 **Simulation**:
 One treatment of one experiment, described by its inputs, checked, and run to produce
-one set of results (one per season in a seasonal analysis). The unit a future `Simulation` object stands for. A run carries out
+one set of results (one per season in a seasonal analysis, one per rotation component run in a
+sequence). The unit a future `Simulation` object stands for. A run carries out
 one or more simulations (one per treatment it covers).
 _Avoid_: job, experiment (an experiment holds several simulations)
 
@@ -65,6 +66,24 @@ _Avoid_: year (alone), replicate
 Running one experiment's treatments over several seasons (DSSAT's NYERS, set by the controls
 `years`) and comparing the results across seasons: mean, spread and range of a Summary variable.
 _Avoid_: multi-year run, long-term run
+
+**Sequence**:
+A treatment whose number has several TREATMENTS rows in the FileX, one per rotation component.
+DSSAT runs the components one after another, each starting the day after the previous one ended,
+with soil water and nitrogen carried over, until the sequence's years (the first component's
+NYERS or the controls `years`) have passed. dssatlab runs it in DSSAT's sequence mode (Q) through
+a batch file it writes.
+_Avoid_: rotation (alone), crop sequence file, multi-crop treatment
+
+**Rotation component**:
+One row of a sequence, numbered by the FileX's R column: one crop (or fallow) with its own
+cultivar, planting and other levels. A Summary row's `R#` names the component it came from.
+_Avoid_: phase, step, sub-treatment
+
+**Sequence analysis**:
+Running a sequence over several years and comparing results per rotation component and over
+time, the way DSSAT's sequence analysis does.
+_Avoid_: rotation analysis, long-term run
 
 **Scenario**:
 A named set of input overrides applied to a base Simulation's inputs (weather, soil, or
@@ -201,8 +220,8 @@ soil water, plant nitrogen, and weather); every other one is only listed.
 _Avoid_: result file
 
 **Summary**:
-The parsed `Summary.OUT` of a run directory: one row per simulation and season, with DSSAT's own
-column names (`HWAM`, `ADAT`, ...).
+The parsed `Summary.OUT` of a run directory: one row per simulation and season (per rotation
+component run in a sequence), with DSSAT's own column names (`HWAM`, `ADAT`, `R#`, ...).
 
 **Plant growth**:
 The parsed `PlantGro.OUT` of a run directory: one row per simulation day, with DSSAT's own
