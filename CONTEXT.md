@@ -80,6 +80,11 @@ One row of a sequence, numbered by the FileX's R column: one crop (or fallow) wi
 cultivar, planting and other levels. A Summary row's `R#` names the component it came from.
 _Avoid_: phase, step, sub-treatment
 
+**Fallow**:
+A rotation component with no crop: the field stays bare, soil water and nitrogen still change,
+until the fallow's end date. DSSAT's crop code FA; it has no cultivar, planting or model of its own.
+_Avoid_: empty crop, bare crop
+
 **Sequence analysis**:
 Running a sequence over several years and comparing results per rotation component and over
 time, the way DSSAT's sequence analysis does.
@@ -154,7 +159,9 @@ _Avoid_: management (for the whole dict), FileX input
 The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one crop, one or
 more fields, and one treatment or a list of named treatments, each on one field. Every treatment starts from the template's
 cultivar, planting and harvest; experiment data keyed by treatment number varies each one. Built
-from the experiment data plus the crop, station and soil profile.
+from the experiment data plus the crop, station and soil profile. Instead of one crop it can hold a
+rotation: one sequence of 2 to 9 rotation components (crops or fallows), each crop with its own
+cultivar, planting and harvest, written as a sequence FileX.
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 
