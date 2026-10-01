@@ -8,6 +8,7 @@ import subprocess
 import pytest
 
 import dssatlab as lab
+from test_season_coverage import weather as continuous_weather
 from test_simulation_run import fake_dssat, inputs, snapshot, soil_rows
 
 
@@ -47,7 +48,8 @@ def test_all_treatments_selects_repeated_numbers_once_in_file_order(
     for index, (number, component) in enumerate(zip(numbers, (1, 2, 1)), 2):
         lines[index] = f"{number:2} {component}" + lines[index][4:]
     batch_inputs.filex.write_text("\n".join(lines) + "\n")
-    results = lab.run_treatments(batch_inputs.filex, batch_inputs.weather,
+    weather = continuous_weather("1982-02-25", "1983-02-24")
+    results = lab.run_treatments(batch_inputs.filex, weather,
                                  treatments=None, executable=fake_dssat.executable)
     assert list(results) == [("base", numbers[0]), ("base", numbers[2])]
     assert len(fake_dssat.calls) == 2
