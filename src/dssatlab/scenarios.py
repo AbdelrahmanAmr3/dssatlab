@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .errors import DSSATCheckError, DSSATError, DSSATRunError
 from .filex import read_treatment_numbers
-from .filex_template import _load_filex_template
+from .filex_template import _load_filex_template, _template_treatment_names
 from .management_file import _load_yaml
 from .outputs import read_summary
 from .runner import RunResult
@@ -81,12 +81,8 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
         raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
     if treatments is None and filex_template is not None:
         data, _ = _load_filex_template(filex_template)
-        names = data.get("treatments") if isinstance(data, dict) else None
-        # Count only an unambiguous list. Simulation reports malformed or
-        # unreadable templates through its checks, using treatment 1 as fallback.
-        count = (len(names) if isinstance(names, list) and 1 <= len(names) <= 99
-                 and "treatment_name" not in data else 1)
-        treatments = list(range(1, count + 1))
+        # Simulation reports malformed or unreadable templates through its checks.
+        treatments = list(range(1, len(_template_treatment_names(data)) + 1))
     elif treatments is None:
         try:
             treatments = read_treatment_numbers(filex)

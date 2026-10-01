@@ -23,7 +23,7 @@ def test_exactly_one_name_key(data, data_dir, names):
     del data["treatment_name"]
     data.update(names)
     assert _check_filex_template(data, data_dir) == [
-        "Supply exactly one of treatment_name or treatments."]
+        "FileX template: supply exactly one of treatment_name or treatments."]
 
 
 @pytest.mark.parametrize("names", [None, "Control", ("Control",), {}, 1, [], ["T"] * 100])

@@ -109,7 +109,7 @@ def _check_filex_template(data, data_dir) -> list[str]:
                         f"Use one of the template crops: {', '.join(_CROPS)}.")
     names = []
     if ("treatment_name" in data) == ("treatments" in data):
-        problems.append("Supply exactly one of treatment_name or treatments.")
+        problems.append(f"{where}: supply exactly one of treatment_name or treatments.")
     elif "treatment_name" in data:
         names = [("treatment_name", data["treatment_name"])]
     else:

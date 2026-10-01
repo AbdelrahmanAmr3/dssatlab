@@ -99,7 +99,7 @@ treatments:
 - A treatment with no entry (like treatment 1, `"Control"`) remains the unchanged base.
 - Each entry receives its own new level; equal levels are not shared (ADR 0010).
 - When you create a single `Simulation(filex_template="filex.yaml", treatment=k, ...)`, `treatment` can be any integer from 1 to N (`treatment=1` by default). Out-of-range treatment numbers are rejected by `check()` with the valid range.
-- When `sim.run()` executes, the generated FileX in the simulation folder holds the **whole experiment**: every treatment with its experiment data applied, so you can open or run the entire experiment in DSSAT. If a scenario name is supplied, it is written to the selected treatment row only.
+- When `sim.run()` executes, the generated FileX in the simulation folder holds the **whole experiment**: every treatment with its experiment data applied, so you can open or run the entire experiment in DSSAT. If a scenario name is supplied, it is written to the selected treatment row only. Only one weather file is written, for the selected treatment's start year, so give every treatment a start date in that year if you plan to run the whole experiment.
 - To run every treatment at once, pass `filex_template=` to `run_treatments()` (see [Run treatments and scenarios](scenarios.md)).
 
 ### Which crops and cultivars can I use?
