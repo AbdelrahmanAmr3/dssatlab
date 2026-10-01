@@ -283,11 +283,10 @@ class Simulation:
         problems, _ = self._check_inputs(experiment_data, load_problems)
         if problems:
             raise DSSATCheckError(problems)
-
-        components = _rotation_components(self.filex, self.treatment)
         if self.filex_template is not None:
             prepared = _write_template_simulation(self, experiment_data=experiment_data)
         else:
+            components = _rotation_components(self.filex, self.treatment)
             rows, _ = _parse_weather(self.weather)
             override_start = _controls_start_date(experiment_data, self.treatment)
             values, _ = _read_filex(self.filex, self.treatment, start_date=override_start)
@@ -312,6 +311,7 @@ class Simulation:
                 write_soil_file(soil_rows, sim_folder / "SOIL.SOL")
             prepared = sim_folder / filex.name
 
+        components = _rotation_components(prepared, self.treatment)
         result = (_run_sequence(prepared, self.treatment, components, self.executable)
                   if len(components) > 1 else
                   run(prepared, treatment=int(self.treatment), executable=self.executable))
