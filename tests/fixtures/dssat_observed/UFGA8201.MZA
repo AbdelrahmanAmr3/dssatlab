@@ -1,0 +1,5 @@
+*EXP. DATA (A): UFGA8201MZ Z N X IRRIGATION, GAINESVILLE                               
+! Two treatment rows from the DSSAT sample.
+@TRNO   HWAM  HWUM  H#AM  H#UM  LAIX  CWAM  BWAH  ADAT  MDAT  GN%M  CNAM  SNAM  GNAM
+     1 2929. 0.218  917.  229.  2.26 5532. 3530.   132   185  1.80  69.5  37.8  31.7
+     2 3130. 0.209 1494.  220.  2.84 7201. 4071.   132   185  1.80 104.8  47.8  57.0
