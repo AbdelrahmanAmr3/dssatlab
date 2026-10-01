@@ -1,6 +1,7 @@
 """Check Experiment data per rotation component and render its row-targeted edits."""
 
 from datetime import date, timedelta
+from pathlib import Path
 
 from .cultivar import _CROPS, _check_cultivar, _cultivar_text
 from .experiment import _check_date, _unknown_keys
@@ -234,3 +235,35 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
             problems.extend(found)
             report.extend(lines)
     return ordinary, problems, report + notes
+
+
+def _write_rotation_data(filex, treatment, experiment_data):
+    """Apply checked rotation component edits to the FileX copy."""
+    if not isinstance(experiment_data, dict):
+        return
+    treatments = experiment_data.get('treatments')
+    if not isinstance(treatments, dict):
+        return
+    for key, entry in treatments.items():
+        try:
+            if int(key) != int(treatment):
+                continue
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not isinstance(entry, dict) or not isinstance(entry.get('rotation'), dict):
+            return
+        dedup = {}
+        for r_key, r_entry in entry['rotation'].items():
+            try:
+                r_num = int(r_key)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if r_num not in dedup and isinstance(r_entry, dict):
+                dedup[r_num] = r_entry
+        if not any(any(s in r for s in _SECTIONS) for r in dedup.values()):
+            return
+        path = Path(filex)
+        text = path.read_bytes().decode('latin-1')
+        text = _rotation_text(text, int(treatment), dict(sorted(dedup.items())))
+        path.write_bytes(text.encode('latin-1'))
+        return

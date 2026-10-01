@@ -12,6 +12,7 @@ from .filex_skeleton import _check_template_simulation, _write_template_simulati
 from .filex_write import _identity_text, _write_management
 from .management import _check_management, _report_lines
 from .management_file import _load_management
+from .rotation_data import _write_rotation_data
 from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
 from .sequence import (_check_sequence, _rotation_components, _run_sequence,
                        _sequence_coverage, _sequence_experiment_data)
@@ -172,8 +173,7 @@ class Simulation:
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate, days))
         coverage = _sequence_coverage if len(components) > 1 else _season_coverage
-        filex_problems.extend(coverage(
-            experiment_data, self.treatment, start_date, days, values.get("NYERS")))
+        filex_problems.extend(coverage(experiment_data, self.treatment, start_date, days, values.get("NYERS")))
         if override_start is not None and days:
             if override_start not in days:
                 filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "
@@ -238,8 +238,7 @@ class Simulation:
         name = None if len(components) > 1 else self.name
         if (edit_identity or name not in (None, "base")) and not problems:
             try:
-                _identity_text(Path(self.filex).read_bytes().decode("latin-1"),
-                               int(self.treatment), name,
+                _identity_text(Path(self.filex).read_bytes().decode("latin-1"), int(self.treatment), name,
                                rows[0]["station"] if edit_identity else None,
                                template_id if edit_identity else None)
             except ValueError as error:
@@ -298,9 +297,10 @@ class Simulation:
             filex = Path(self.filex).resolve()
             sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
             shutil.copy2(filex, sim_folder / filex.name)
+            soil_id = soil_rows[0]["soil_id"] if soil_rows and station is not None else None
             _write_management(sim_folder / filex.name, self.treatment, experiment_data,
-                              name=None if len(components) > 1 else self.name, station=station,
-                              soil_id=soil_rows[0]["soil_id"] if soil_rows and station is not None else None)
+                              name=None if len(components) > 1 else self.name, station=station, soil_id=soil_id)
+            _write_rotation_data(sim_folder / filex.name, self.treatment, experiment_data)
             for sibling in filex.parent.iterdir():
                 if self.soil is not None and sibling.suffix.upper() == ".SOL":
                     continue
