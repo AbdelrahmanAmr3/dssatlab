@@ -17,30 +17,37 @@ from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
 
+def _parse_sdate(sdate):
+    """Parse a FileX SDATE (YYDDD) string into (yy, doy) integers, or None."""
+    if isinstance(sdate, str) and re.fullmatch(r"[0-9]{5}", sdate):
+        return int(sdate[:2]), int(sdate[2:])
+    return None
+
+
 def _simulation_start_date(values, days):
-    """Convert FileX SDATE to a calendar date using years from weather data."""
-    if values.get("START", "S") != "S" or "SDATE" not in values or not days:
-        return None
-    sdate = values["SDATE"]
-    if not (isinstance(sdate, str) and re.fullmatch(r"[0-9]{5}", sdate)):
-        return None
-    yy = int(sdate[:2])
-    doy = int(sdate[2:])
-    if doy < 1:
-        return None
-    min_year = min(day.year for day in days)
-    max_year = max(day.year for day in days)
-    matching_years = [y for y in range(min_year, max_year + 1) if y % 100 == yy]
+    """Convert FileX SDATE to a calendar date using years from weather data.
+
+    Returns (date, None) on success, or (None, reason) when skipped:
+    'weather unreadable' when days is empty, or 'ambiguous start year' when the
+    two-digit SDATE year does not resolve to exactly one year in weather data.
+    """
+    if values.get("START", "S") != "S" or "SDATE" not in values:
+        return None, None
+    if not days:
+        return None, "weather unreadable"
+    parsed = _parse_sdate(values["SDATE"])
+    if parsed is None or parsed[1] < 1:
+        return None, None
+    yy, doy = parsed
+    matching_years = [y for y in range(min(d.year for d in days), max(d.year for d in days) + 1) if y % 100 == yy]
     if len(matching_years) != 1:
-        return None
+        return None, "ambiguous start year"
     year = matching_years[0]
     try:
         candidate = date(year, 1, 1) + timedelta(days=doy - 1)
-        if candidate.year != year:
-            return None
-        return candidate
+        return (candidate, None) if candidate.year == year else (None, "ambiguous start year")
     except (ValueError, OverflowError):
-        return None
+        return None, "ambiguous start year"
 
 
 def _overrides_section(management, treatment, section=None):
@@ -118,7 +125,7 @@ class Simulation:
             print("Crop-specific fields are checked by DSSAT at run time.")
         return problems
 
-    def _check_inputs(self):
+    def _check_inputs(self, management_data=None):
         """Collect weather, soil, FileX and management problems and report lines.
 
         Performs strict validation: checks weather data column names, value
@@ -132,9 +139,11 @@ class Simulation:
         if (self.filex is None) == (self.filex_template is None):
             raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
         if self.filex_template is not None:
-            return _check_template_simulation(self)
+            return _check_template_simulation(self, management_data=management_data)
         rows, weather_problems = _parse_weather(self.weather)
-        management_dict, load_problems = _load_management(self.management)
+        management_dict, load_problems = (
+            _load_management(self.management) if management_data is None else management_data
+        )
         edit_identity = _overrides_section(management_dict, self.treatment)
         override_start = _controls_start_date(management_dict, self.treatment)
         values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
@@ -159,15 +168,15 @@ class Simulation:
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
         elif values.get("START") == "S" and "SDATE" in values and days:
-            start = values["SDATE"]
-            wanted = (int(start[:2]), int(start[2:]))
-            if not any((day.year % 100, day.timetuple().tm_yday) == wanted for day in days):
+            parsed = _parse_sdate(values["SDATE"])
+            if parsed is not None and not any((day.year % 100, day.timetuple().tm_yday) == parsed for day in days):
+                start = values["SDATE"]
                 filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
         if override_start is not None and days and not _overrides_section(
                 management_dict, self.treatment, "irrigation"):
-            irrigation = [_simulation_start_date({"SDATE": text}, days)
+            irrigation = [_simulation_start_date({"SDATE": text}, days)[0]
                           for text in _irrigation_dates(self.filex, self.treatment)]
             irrigation = [day for day in irrigation if day is not None]
             if irrigation and min(irrigation) < override_start:
@@ -204,9 +213,13 @@ class Simulation:
                 problems.extend(load_problems)
                 report.extend(_report_lines("Management data", load_problems))
             else:
-                start_date = override_start or _simulation_start_date(values, days)
+                start_date, skip_reason = (
+                    (override_start, None) if override_start is not None
+                    else _simulation_start_date(values, days)
+                )
                 management_problems, management_report = _check_management(
-                    management_dict, self.filex, self.treatment, rows, start_date, soil_depth
+                    management_dict, self.filex, self.treatment, rows, start_date, soil_depth,
+                    start_date_note=skip_reason,
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)
@@ -253,15 +266,17 @@ class Simulation:
             DSSATRunError: If execution fails, DSSAT returns non-zero, ERROR.OUT is
                 produced, or WARNING.OUT reports missing weather records.
         """
-        problems, _ = self._check_inputs()
+        if (self.filex is None) == (self.filex_template is None):
+            raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
+        management_dict, load_problems = _load_management(self.management)
+        problems, _ = self._check_inputs(management_data=(management_dict, load_problems))
         if problems:
             raise DSSATCheckError(problems)
 
         if self.filex_template is not None:
-            prepared = _write_template_simulation(self)
+            prepared = _write_template_simulation(self, management_dict=management_dict)
         else:
             rows, _ = _parse_weather(self.weather)
-            management_dict, _ = _load_management(self.management)
             override_start = _controls_start_date(management_dict, self.treatment)
             values, _ = _read_filex(self.filex, self.treatment, start_date=override_start)
             station = rows[0]["station"] if _overrides_section(management_dict, self.treatment) else None

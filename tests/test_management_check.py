@@ -443,6 +443,41 @@ def test_planting_before_simulation_start_date_rejected(simulation, planting, ca
     assert simulation.check() == []
 
 
+def test_planting_start_date_check_skipped_note_for_ambiguous_start_year(simulation, planting, capsys):
+    simulation.weather = [
+        dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
+             date=f"1990-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
+        for day in range(20, 28)
+    ]
+    planting["date"] = "1990-02-25"
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "FileX start year 82 day 056 is not covered by weather data" in problems[0]
+    assert not any("planting" in p.lower() for p in problems)
+    report = capsys.readouterr().out
+    assert "Note: planting-date-versus-start-date check was skipped (ambiguous start year)." in report
+    assert "planting: OK" in report
+
+    # verbose=False prints nothing
+    problems_quiet = simulation.check(verbose=False)
+    assert problems_quiet == problems
+    assert capsys.readouterr().out == ""
+
+
+def test_planting_start_date_check_skipped_note_for_weather_unreadable(simulation, planting, capsys, tmp_path):
+    simulation.weather = tmp_path / "nonexistent.csv"
+    problems = simulation.check()
+    assert len(problems) == 1
+    assert "Cannot read weather data" in problems[0]
+    report = capsys.readouterr().out
+    assert "Note: planting-date-versus-start-date check was skipped (weather unreadable)." in report
+
+    # verbose=False prints nothing
+    problems_quiet = simulation.check(verbose=False)
+    assert problems_quiet == problems
+    assert capsys.readouterr().out == ""
+
+
 @pytest.mark.parametrize("section", ["planting", "irrigation", "fertilizer"])
 @pytest.mark.parametrize("target_date", ["1982-02-19", "1982-03-01"])
 def test_date_outside_weather_range_rejected(simulation, planting, section, target_date, capsys):
