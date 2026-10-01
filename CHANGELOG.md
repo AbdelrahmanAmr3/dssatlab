@@ -2,6 +2,28 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.10.0] - UNDATED
+
+### Added
+- Ten template crops for the FileX template: maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut and dry bean, each with one fixed DSSAT model and genotype support files. Legumes (soybean, peanut, dry bean) write N fixation on (`SYMBI Y`); rice requires only `.CUL` and `.SPE`.
+- `list_crops(executable=None)` returns rows (`crop`, `code`, `model`, `cultivars`) for each template crop whose genotype files exist in the installed DSSAT data directory.
+- `list_cultivars(crop, executable=None)` returns rows (`code`, `name`) for a template crop in `.CUL` file order, listing the first occurrence of each distinct code. Both listings return plain dicts accepted by `to_dataframe()`.
+- Optional top-level `harvest_date` in the FileX template writes a `*HARVEST DETAILS` section (`HDATE`, `GS000`) and sets harvest mode to `R` (harvest on reported date).
+- Optional planting fields `planting_material_weight` (`PLWT`, kg/ha) and `sprout_length` (`SPRL`, cm) with numeric range and fixed-width column checks.
+- Potato requires `planting_material_weight`, `sprout_length`, and `harvest_date`; each missing field is reported as a distinct problem.
+- Guide section and tutorial Case 5 demonstrate inspecting installed crops and cultivars, writing a soybean FileX template, and running the simulation.
+- Proven on real DSSAT 4.8.5 with all ten template crops, clean runs, non-zero yields, and matching cultivars.
+
+### Changed
+- `write_filex_template()` comments list all ten template crops, potato requirements, and `harvest_date`.
+- A crop that is not a template crop is reported with the list of all ten template crops (FileX template and `list_cultivars`).
+- Genotype file checks and staging copy only the required files for each crop (e.g. rice requires only `.CUL` and `.SPE`).
+
+### Notes
+- A crop becomes a template crop only after a real DSSAT run proved it; other crops still run from an existing FileX (ADR 0009).
+- Yields from the template default management are not calibrated.
+- Upgrading from 0.9.0 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.9.0] - 2026-09-30
 
 ### Added

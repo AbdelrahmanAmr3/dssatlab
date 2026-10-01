@@ -9,7 +9,7 @@ Prepare the FileX and its supporting files, then
 
 ## Start from a FileX template
 
-For maize or wheat, supply a FileX template instead of an existing FileX:
+For any of the ten template crops, supply a FileX template instead of an existing FileX:
 
 ```python
 import dssatlab as dl
@@ -31,6 +31,62 @@ use treatment 1. Station and soil IDs come from your data. The simulation starts
 on the template's planting date, which must be covered by weather, unless
 experiment controls override the start date.
 
+### Template crops
+
+The FileX template supports ten crops, each with one fixed DSSAT model:
+
+| Crop name | Crop code | Model | Genotype files |
+| --- | --- | --- | --- |
+| `maize` | `MZ` | `MZCER048` | `MZCER048.CUL`, `MZCER048.ECO`, `MZCER048.SPE` |
+| `wheat` | `WH` | `CSCER048` | `WHCER048.CUL`, `WHCER048.ECO`, `WHCER048.SPE` |
+| `rice` | `RI` | `RICER048` | `RICER048.CUL`, `RICER048.SPE` |
+| `soybean` | `SB` | `CRGRO048` | `SBGRO048.CUL`, `SBGRO048.ECO`, `SBGRO048.SPE` |
+| `potato` | `PT` | `PTSUB048` | `PTSUB048.CUL`, `PTSUB048.ECO`, `PTSUB048.SPE` |
+| `sorghum` | `SG` | `SGCER048` | `SGCER048.CUL`, `SGCER048.ECO`, `SGCER048.SPE` |
+| `pearl millet` | `ML` | `MLCER048` | `MLCER048.CUL`, `MLCER048.ECO`, `MLCER048.SPE` |
+| `barley` | `BA` | `CSCER048` | `BACER048.CUL`, `BACER048.ECO`, `BACER048.SPE` |
+| `peanut` | `PN` | `CRGRO048` | `PNGRO048.CUL`, `PNGRO048.ECO`, `PNGRO048.SPE` |
+| `dry bean` | `BN` | `CRGRO048` | `BNGRO048.CUL`, `BNGRO048.ECO`, `BNGRO048.SPE` |
+
+Rice requires only `.CUL` and `.SPE` because DSSAT ships no rice `.ECO`. Legumes (`soybean`, `peanut`, `dry bean`) are automatically written with nitrogen fixation enabled (`SYMBI Y`).
+
+### Planting fields and harvest date
+
+The template `planting` section accepts the standard fields (`date`, `method`, `distribution`, `population`, `row_spacing`, `depth`) and two optional fields:
+
+- `planting_material_weight`: seed piece / planting material weight (`PLWT`) in kg/ha.
+- `sprout_length`: sprout length (`SPRL`) in cm.
+
+In addition, an optional top-level `harvest_date` may be specified as a quoted ISO date (`"YYYY-MM-DD"`). When given, dssatlab writes a `*HARVEST DETAILS` section (`HDATE`, stage code `GS000`) and sets harvest management to `R` (harvest on reported date). When omitted, the crop harvests at maturity (`M`). `harvest_date` must be after the planting date and within the weather data.
+
+**Potato requirements**: Potato requires all three fields: `planting_material_weight`, `sprout_length`, and `harvest_date`. Each missing field is reported as a separate problem. For other crops, these fields are optional.
+
+### Which crops and cultivars can I use?
+
+To inspect which template crops your installed DSSAT has genotype files for:
+
+```python
+import dssatlab as dl
+
+crops = dl.list_crops()
+for crop in crops:
+    print(crop["crop"], crop["code"], crop["model"], crop["cultivars"])
+```
+
+`list_crops()` returns rows of plain dictionaries with keys `"crop"`, `"code"`, `"model"`, and `"cultivars"` (the count of distinct cultivar codes in the `.CUL` file), listing only template crops whose required genotype files are found in the DSSAT `Genotype` folder.
+
+To list the cultivar codes and names available for a template crop:
+
+```python
+cultivars = dl.list_cultivars("soybean")
+for cv in cultivars[:5]:
+    print(cv["code"], cv["name"])
+```
+
+`list_cultivars(crop)` returns rows of dictionaries with keys `"code"` and `"name"` in `.CUL` file order, listing the first occurrence of each distinct code.
+
+Both listings accept an optional `executable=` argument, never touch the network or write to saved configuration, and return plain dictionaries compatible with `dl.to_dataframe()`.
+
 Template checks find the data directory beside the explicit or discovered DSSAT
 executable and read its `Genotype` folder without saving configuration or writing
 files. `management` and `name` work as with an existing FileX: checks inspect the
@@ -39,8 +95,7 @@ Cultivar overrides must keep the template's crop and use its fixed model's table
 
 `sim.run()` creates a fresh simulation folder beside the YAML file, or in the
 current directory for a dict. It writes the FileX, weather and `SOIL.SOL`, and
-copies the crop's `.CUL`, `.ECO` and `.SPE` files from `Genotype` (`MZCER048` for
-maize, `WHCER048` for wheat). Your original files are unchanged.
+copies the crop's required genotype files from `Genotype`. Your original files are unchanged.
 `run_treatments()` continues to accept an existing FileX path only.
 
 ## Prepare the weather template

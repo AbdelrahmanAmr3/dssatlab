@@ -29,6 +29,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
+- [x] Write a FileX from a template for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
 
 ```python
 import dssatlab as dl
@@ -71,7 +72,7 @@ problems = sim.check()   # every problem at once, nothing is written; [] means f
 result = sim.run()       # checks first, then writes files and runs DSSAT
 ```
 
-No FileX yet? For maize or wheat, write one from a **FileX template** instead. Station, coordinates and elevation come from your weather data, and the soil ID from your soil data:
+No FileX yet? For ten template crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), write one from a **FileX template** instead. Station, coordinates and elevation come from your weather data, and the soil ID from your soil data:
 
 ```python
 dl.write_filex_template("filex.yaml")   # crop, treatment name, cultivar, planting
@@ -94,7 +95,7 @@ What happens:
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a FileX with more than one field, treatment or crop (maize and wheat are supported), and parallel or resumed runs.
+Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a FileX with more than one field or treatment, or crops outside the ten template crops, and parallel or resumed runs.
 
 ## Multi-treatment and scenario runs
 
@@ -201,3 +202,22 @@ print(result.dssat_evaluation())  # or dl.read_dssat_evaluation(result.run_dir)
 Short dates need the matching FileX beside the FileA/FileT. DSSAT fills the
 measured columns of `Evaluate.OUT` only in some runs (maize through `run()` with the
 FileA beside the FileX); a `Simulation` leaves them `None`. No FileA/FileT is written. See [Use DSSAT's own measured data](docs/guide/evaluate.md#use-dssats-own-measured-data).
+
+## Which crops and cultivars can I use?
+
+Inspect which template crops and cultivars are installed before writing a FileX:
+
+```python
+crops = dl.list_crops()                 # template crops found in Genotype
+cultivars = dl.list_cultivars("soybean") # cultivar codes and names from SBGRO048.CUL
+df = dl.to_dataframe(cultivars)
+```
+
+- `list_crops(executable=None)` lists the ten template crops (maize, wheat, rice,
+  soybean, potato, sorghum, pearl millet, barley, peanut, dry bean) whose genotype
+  files exist in your DSSAT data directory.
+- `list_cultivars(crop, executable=None)` lists that crop's cultivar codes and names
+  in `.CUL` file order.
+- Both return rows of plain dicts accepted by `to_dataframe()`, without modifying
+  saved config or touching the network.
+
