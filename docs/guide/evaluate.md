@@ -81,7 +81,7 @@ maize = Path("C:/DSSAT48/Maize")  # use your own DSSAT Maize folder
 result = dl.run(maize / "UFGA8201.MZX")  # all six treatments
 observed_a = dl.read_dssat_observed(maize / "UFGA8201.MZA")
 observed_t = dl.read_dssat_observed(maize / "UFGA8201.MZT")
-evaluation = dl.evaluate(result, observed_a + observed_t)
+evaluation = dl.evaluate(result, observed_a)  # end-of-season values
 print(evaluation.pairs)
 print(evaluation.statistics)
 ax = dl.plot_observed(result, observed_t, "LAID")
@@ -110,8 +110,10 @@ if it falls before the start date. Seven-digit `yyyyddd` dates need no FileX.
 `plot_observed()` returns a matplotlib Axes, using the optional `plot` extra.
 It draws one Plant growth line per observed scenario and treatment, with measured
 points in the same colour. Points outside the simulated season are still drawn;
-`evaluate()` requires matching simulated dates. For Summary variables, use
-`plot_evaluation()` instead.
+`evaluate()` requires a simulated row on every observed date, so shipped FileT
+files usually hold dates outside the season (before planting or after maturity)
+that it reports as problems; plot them, or keep only the dates inside the season
+before evaluating. For Summary variables, use `plot_evaluation()` instead.
 
 ### Compare with the DSSAT evaluation
 
@@ -134,9 +136,12 @@ column names, numbers and text, with `-99` as `None`. Date columns in
 `Evaluate.OUT` stay as days after planting, not calendar dates. A missing, empty
 or malformed `Evaluate.OUT` raises `DSSATOutputError`.
 
-DSSAT needs the matching FileA beside the FileX when it runs to fill measured
-columns. `Simulation.run()` now copies the matching FileA/FileT into the
-simulation folder when present; a FileX template without them works as before.
-For an older run without the FileA, put it beside the FileX and rerun. DSSATLab
+DSSAT fills the measured columns only in some runs. On DSSAT 4.8.5, CERES-Maize
+run with `run()` (all treatments) and the FileA beside the FileX fills them. A
+`Simulation` runs one treatment (DSSAT run mode C), where DSSAT does not find the
+FileA, and CROPSIM wheat (`CSCER048`) does not fill them even with `run()`; their
+measured columns come back as `None`. There, `evaluate(results, read_dssat_observed(path))`
+is the comparison to use. Column names follow the crop model: CERES-Maize writes
+`TN`, CROPSIM writes `TRNO`. DSSATLab
 writes no FileA/FileT; [ADR 0008](../adr/0008-read-filea-filet-and-evaluate-out.md)
 supersedes the reading restriction in ADR 0007.

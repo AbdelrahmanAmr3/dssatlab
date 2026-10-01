@@ -186,8 +186,8 @@ Already have DSSAT's own measurements? Read the FileA/FileT beside your FileX:
 result = dl.run("UFGA8201.MZX")  # keep UFGA8201.MZA and .MZT beside it
 observed_a = dl.read_dssat_observed("UFGA8201.MZA")
 observed_t = dl.read_dssat_observed("UFGA8201.MZT")
-ev = dl.evaluate(result, observed_a + observed_t)
-dl.plot_observed(result, observed_t, "LAID");
+ev = dl.evaluate(result, observed_a)  # end-of-season values
+dl.plot_observed(result, observed_t, "LAID")  # every FileT date, in or out of season
 print(result.dssat_evaluation())  # or dl.read_dssat_evaluation(result.run_dir)
 ```
 
@@ -198,6 +198,6 @@ print(result.dssat_evaluation())  # or dl.read_dssat_evaluation(result.run_dir)
 - `read_dssat_evaluation(run_dir)` and `RunResult.dssat_evaluation()` read DSSAT's
   `Evaluate.OUT` with its own column names and missing values as `None`.
 
-Short dates need the matching FileX beside the FileA/FileT. `Simulation.run()`
-copies those files when present so DSSAT can fill measured columns. No FileA/FileT
-is written. See [Use DSSAT's own measured data](docs/guide/evaluate.md#use-dssats-own-measured-data).
+Short dates need the matching FileX beside the FileA/FileT. DSSAT fills the
+measured columns of `Evaluate.OUT` only in some runs (maize through `run()` with the
+FileA beside the FileX); a `Simulation` leaves them `None`. No FileA/FileT is written. See [Use DSSAT's own measured data](docs/guide/evaluate.md#use-dssats-own-measured-data).

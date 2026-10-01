@@ -16,7 +16,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.6 | Experiment data: `cultivar`, `initial_conditions` and `controls` sections beside planting, irrigation and fertilizer, applied to a copy of an existing FileX, and `write_experiment_template()`. Proven on real DSSAT with maize and wheat. |
 | 0.7 | FileX template: write a FileX for one field, one treatment and one crop (maize, wheat) from your own weather and soil, `write_filex_template()`; scenario name in `TNAM`; experiment data sets the station and soil ID of the copied FileX. Proven on real DSSAT. |
 | 0.8 | Observed data: a commented CSV template (`write_observed_template()`), comparison with Summary and Plant growth (`evaluate()`), an `Evaluation` with paired errors, RMSE, mean bias and Willmott's d-index, and a 1:1 scatter (`plot_evaluation()`). DSSAT's own column names and units; all observed data and matching problems in one `DSSATCheckError`. |
-| 0.9 | Read FileA/FileT as observed data (`read_dssat_observed()`), overlay measurements on Plant growth (`plot_observed()`), copy matching FileA/FileT into simulation folders, and read the DSSAT evaluation (`read_dssat_evaluation()`, `result.dssat_evaluation()`). No FileA/FileT is written (ADR 0008). |
+| 0.9 | Read FileA/FileT as observed data (`read_dssat_observed()`), overlay measurements on Plant growth (`plot_observed()`), and read the DSSAT evaluation (`read_dssat_evaluation()`, `result.dssat_evaluation()`). No FileA/FileT is written (ADR 0008). |
 
 ## Deliberately not built yet
 

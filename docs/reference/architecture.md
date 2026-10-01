@@ -105,7 +105,7 @@ All identified issues are collected and returned as a list of strings. When `man
 
 ### 3. File generation and staging
 
-When checks pass, `Simulation.run()` creates a dated simulation folder (`dssat_sim_YYYY-MM-DD_HHMMSS`) beside the FileX to isolate the execution environment. The FileX and sibling model files with extensions `.CUL`, `.ECO`, or `.SPE` are copied into this folder. The FileA and FileT named after the FileX are also copied when present, so DSSAT can fill measured columns in `Evaluate.OUT`; no FileA/FileT is written.
+When checks pass, `Simulation.run()` creates a dated simulation folder (`dssat_sim_YYYY-MM-DD_HHMMSS`) beside the FileX to isolate the execution environment. The FileX and sibling model files with extensions `.CUL`, `.ECO`, or `.SPE` are copied into this folder. FileA/FileT are not copied: in run mode C DSSAT would not read them (ADR 0008).
 
 When management data is provided, `filex_write._write_management()` edits the copied FileX inside the simulation folder: it appends new levels to the planting details, irrigation, or fertilizer sections and updates the treatment pointer (`MP`, `MI`, `MF`). The original FileX remains untouched.
 
