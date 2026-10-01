@@ -64,7 +64,7 @@ def _newline(lines):
 
 
 def _insert_section(lines, section, body):
-    """Insert any missing management section before SIMULATION CONTROLS.
+    """Insert missing management before harvest or SIMULATION CONTROLS.
 
     Return new lines, leaving every existing line unchanged. Body contains
     header/row strings without line endings; future writers can pass multiple
@@ -74,6 +74,9 @@ def _insert_section(lines, section, body):
     if bounds is None:
         raise ValueError("missing SIMULATION CONTROLS section. Supply that section "
                          "so management can be inserted before it.")
+    harvest = _section_bounds(lines, "HARVEST DETAILS")
+    if harvest is not None and harvest[0] < bounds[0]:
+        bounds = harvest
     newline = _newline(lines)
     block = [line + newline for line in ["*" + section, *body, ""]]
     return lines[:bounds[0]] + block + lines[bounds[0]:]

@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 from .cultivar import _read_cultivar_codes, _unknown_cultivar
-from .experiment import _check_fields, _check_number
+from .experiment import _check_date, _check_fields, _check_number
 from .filex_write import _cell, _columns, _PLANTING_HEADER
 from .management import _check_planting, _REQUIRED
 from .management_file import _load_yaml, _write_template
@@ -17,6 +17,7 @@ _CROPS = {
     "wheat": ("WH", "CSCER048", "WHCER048", ("CUL", "ECO", "SPE"), "N"),
     "rice": ("RI", "RICER048", "RICER048", ("CUL", "SPE"), "N"),
     "soybean": ("SB", "CRGRO048", "SBGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    "potato": ("PT", "PTSUB048", "PTSUB048", ("CUL", "ECO", "SPE"), "N"),
     "sorghum": ("SG", "SGCER048", "SGCER048", ("CUL", "ECO", "SPE"), "N"),
     "pearl millet": ("ML", "MLCER048", "MLCER048", ("CUL", "ECO", "SPE"), "N"),
     "barley": ("BA", "CSCER048", "BACER048", ("CUL", "ECO", "SPE"), "N"),
@@ -29,9 +30,9 @@ _TEMPLATE = """# DSSATLab FileX template: one field, one treatment, one crop.
 # The soil profile ID comes from checked soil data. Do not add them here.
 # The simulation starts on the planting date. Use experiment data to add
 # irrigation, fertilizer, initial conditions or control overrides later.
-# All fields below are required. Dates and cultivar codes must be quoted.
+# Uncommented fields are required. Dates and cultivar codes must be quoted.
 
-# Template crops: maize, wheat, rice, soybean, sorghum, pearl millet,
+# Template crops: maize, wheat, rice, soybean, potato, sorghum, pearl millet,
 # barley, peanut, dry bean; model is fixed per crop.
 crop: "maize"
 treatment_name: "My treatment" # 1-25 printable ASCII characters; not just spaces
@@ -46,6 +47,10 @@ planting:
   population: 7.2             # Plants/m2, above zero; also used at emergence
   row_spacing: 75             # cm, above zero
   depth: 5                    # cm, nonnegative
+  # planting_material_weight: 1500 # Optional PLWT, kg/ha; potato needs it
+  # sprout_length: 2               # Optional SPRL, cm; potato needs it
+# harvest_date: "2021-08-01"  # Optional; potato needs it. After planting,
+# within weather data; omit to harvest at maturity.
 # Values must fit DSSAT's fixed-width columns without rounding or truncation.
 """
 
@@ -76,7 +81,7 @@ def _check_filex_template(data, data_dir) -> list[str]:
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply crop, treatment_name, cultivar and planting."]
     problems = _check_fields(data, ("crop", "treatment_name", "cultivar", "planting"),
-                             (), where, "FileX")
+                             ("harvest_date",), where, "FileX")
     crop = data.get("crop")
     supported = isinstance(crop, str) and crop in _CROPS
     if "crop" in data and not supported:
@@ -90,20 +95,34 @@ def _check_filex_template(data, data_dir) -> list[str]:
     if "cultivar" in data:
         problems.extend(_check_template_cultivar(data["cultivar"], crop if supported else None,
                                                  data_dir))
+    planting = data.get("planting")
+    if crop == "potato":
+        for field in ("planting_material_weight", "sprout_length", "harvest_date"):
+            source = data if field == "harvest_date" else planting
+            if not isinstance(source, dict) or field not in source:
+                problems.append(f"{where}: missing {field!r}; potato needs it.")
+    if "harvest_date" in data:
+        found = _check_date(data["harvest_date"], f"{where}, harvest_date")
+        problems.extend(found)
+        if (not found and isinstance(planting, dict)
+                and not _check_date(planting.get("date"), "planting date")
+                and data["harvest_date"] <= planting["date"]):
+            problems.append(f"{where}, harvest_date: must be after the planting date.")
     if "planting" in data:
         planting = data["planting"]
         found = _check_planting(planting, f"{where}, planting")
         if isinstance(planting, dict):
-            # This template intentionally accepts only the six skeleton fields.
+            allowed = _REQUIRED + ("planting_material_weight", "sprout_length")
             found.extend(f"{where}, planting: unknown key {_show_value(key)}. "
-                         f"Use only {', '.join(_REQUIRED)} from the FileX template."
-                         for key in planting if key not in _REQUIRED
+                         f"Use only {', '.join(allowed)} from the FileX template."
+                         for key in planting if key not in allowed
                          and not any(f"unknown key {_show_value(key)}" in p for p in found))
             # Dates/codes have bounded lengths after the value checks. Check
             # each numeric cell separately so all overflows are reported.
             columns = _columns(_PLANTING_HEADER)
             for field, column in (("population", "PPOP"), ("row_spacing", "PLRS"),
-                                  ("depth", "PLDP")):
+                                  ("depth", "PLDP"), ("planting_material_weight", "PLWT"),
+                                  ("sprout_length", "SPRL")):
                 if field not in planting or _check_number(planting[field], field):
                     continue
                 left, right = columns[column]

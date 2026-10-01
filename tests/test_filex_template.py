@@ -16,6 +16,7 @@ CROPS = [
     ("wheat", "IB0488", "WH", "CSCER048", "WHCER048", ("CUL", "ECO", "SPE"), "N"),
     ("rice", "IB0012", "RI", "RICER048", "RICER048", ("CUL", "SPE"), "N"),
     ("soybean", "IB0011", "SB", "CRGRO048", "SBGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    ("potato", "IB0001", "PT", "PTSUB048", "PTSUB048", ("CUL", "ECO", "SPE"), "N"),
     ("sorghum", "IB0040", "SG", "SGCER048", "SGCER048", ("CUL", "ECO", "SPE"), "N"),
     ("pearl millet", "IB0033", "ML", "MLCER048", "MLCER048", ("CUL", "ECO", "SPE"), "N"),
     ("barley", "IB0101", "BA", "CSCER048", "BACER048", ("CUL", "ECO", "SPE"), "N"),
@@ -90,7 +91,7 @@ def test_dict_needs_no_yaml(data, data_dir, monkeypatch):
     assert any("PyYAML" in p for p in problems)
 
 
-@pytest.mark.parametrize("crop", ["cotton", "potato", "Rice", "pearl_millet", "dry-bean", "MZ", [], None])
+@pytest.mark.parametrize("crop", ["cotton", "Rice", "pearl_millet", "dry-bean", "MZ", [], None])
 def test_unsupported_crop_lists_supported_crops(data, data_dir, crop):
     from dssatlab.filex_template import _check_filex_template
     data["crop"] = crop

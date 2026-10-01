@@ -66,6 +66,12 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     if start is not None and days and start not in days:
         template_problems.append(f"Simulation start date {start} is not covered by weather "
                                  f"data ({min(days)} to {max(days)}). Supply weather for that date.")
+    if isinstance(data, dict) and "harvest_date" in data:
+        harvest = data["harvest_date"]
+        if not _check_date(harvest, "harvest_date") and days and date.fromisoformat(harvest) not in days:
+            template_problems.append(f"FileX template, harvest_date: {harvest} is not covered by "
+                                     f"weather data ({min(days)} to {max(days)}). "
+                                     "Supply weather for that date.")
     problems = weather_problems + soil_problems + template_problems
     report = (_report_lines("Weather data", weather_problems)
               + _report_lines("Soil data", soil_problems)
@@ -155,6 +161,11 @@ def _skeleton_text(data, weather, soil, stem):
     name, station = data["treatment_name"], weather["station"]
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
+    harvest = []
+    if "harvest_date" in data:
+        harvest_day = _dssat_date(date.fromisoformat(data["harvest_date"]))
+        harvest = ["*HARVEST DETAILS", "@H HDATE  HSTG  HCOM HSIZE   HPC  HBPC HNAME",
+                   f" 1 {harvest_day} GS000   -99   -99   -99   -99 -99", ""]
     # SMODEL occupies eight characters starting at column 72, past its header.
     # ID_SOIL likewise occupies ten characters, starting at column 70.
     lines = [
@@ -163,7 +174,7 @@ def _skeleton_text(data, weather, soil, stem):
         f" {station}", "",
         "*TREATMENTS                        -------------FACTOR LEVELS------------",
         "@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM",
-        f" 1 1 0 0 {name:<25}  1  1  0  0  1  0  0  0  0  0  0  0  1", "",
+        f" 1 1 0 0 {name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1", "",
         "*CULTIVARS", "@C CR INGENO CNAME",
         f" 1 {crop} {data['cultivar']['code']} -99", "",
         "*FIELDS",
@@ -175,7 +186,7 @@ def _skeleton_text(data, weather, soil, stem):
         f"{weather['elevation']:10.1f}{'-99':>18}   -99   -99   -99   -99   -99", "",
         "*INITIAL CONDITIONS", *_INITIAL_HEADERS, "",
         "*PLANTING DETAILS", _PLANTING_HEADER, planting, "",
-        "*SIMULATION CONTROLS",
+        *harvest, "*SIMULATION CONTROLS",
         "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
         f" 1 GE              1     1     S {day}  2150 {name:<25} {model}",
         "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
@@ -183,7 +194,7 @@ def _skeleton_text(data, weather, soil, stem):
         "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
         " 1 ME              M     M     E     R     S     C     R     1     G     R     2",
         "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
-        " 1 MA              R     R     R     N     M",
+        f" 1 MA              R     R     R     N     {'R' if harvest else 'M'}",
         "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
         " 1 OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
         "", "@  AUTOMATIC MANAGEMENT",

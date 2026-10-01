@@ -80,6 +80,10 @@ def test_template_reports_independent_problems_without_writes(
 def test_template_run_generates_inputs_and_uses_bare_filename(
         data, rows, installed, tmp_path, crop, code, cr, model, prefix, extensions, symbi, source_form, explicit):
     data.update(crop=crop, cultivar={"code": code})
+    if crop == "potato":
+        data["planting"].update(planting_material_weight=1500, sprout_length=2)
+        data["harvest_date"] = "2021-03-02"
+        rows[0].append(dict(rows[0][0], date=date(2021, 3, 2)))
     source = data
     parent = tmp_path
     if source_form == "yaml":
@@ -123,6 +127,10 @@ def test_template_run_generates_inputs_and_uses_bare_filename(
     (crop, code, f"{cr}X") for crop, code, cr, _, _, _, _ in CROPS])
 def test_experiment_overrides_apply_to_template(data, rows, installed, crop, code, extension):
     data.update(crop=crop, cultivar={"code": code})
+    if crop == "potato":
+        data["planting"].update(planting_material_weight=1500, sprout_length=2)
+        data["harvest_date"] = "2021-03-02"
+        rows[0].append(dict(rows[0][0], date=date(2021, 3, 2)))
     entry = dict(planting=dict(data["planting"], population=8),
                  cultivar={"crop": extension[:2], "code": "ZZ0001"},
                  initial_conditions=dict(date="2021-03-01", layers=[
