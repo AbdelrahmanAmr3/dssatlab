@@ -5,8 +5,12 @@ import re
 
 from .experiment import _check_date, _check_fields
 from .cultivar import _CROPS
-from .filex_template import _check_template_crop
-from .filex_write import _columns, _planting_row, _PLANTING_HEADER
+from .controls import _controls_start_date, _selected_controls
+from .filex_skeleton import _field_lines, _control_lines, _parse_field_data
+from .filex_template import _check_template_crop, _template_genotype_files
+from .management import _check_management, _report_lines
+from .sequence import _sequence_coverage, _sequence_experiment_data
+from .filex_write import _columns, _planting_row, _PLANTING_HEADER, _repoint
 from .weather import _dssat_date, _show_value
 
 
@@ -91,11 +95,14 @@ def _check_rotation_dates(components, valid_components, where):
             if last_end:
                 end_date = date.fromisoformat(last_end)
                 first_doy, last_doy = start_date.timetuple().tm_yday, end_date.timetuple().tm_yday
-                if last_doy >= first_doy:
-                    if first_doy > 1:
-                        example = date(end_date.year, 1, 1) + timedelta(days=first_doy - 2)
-                    else:
-                        example = date(end_date.year - 1, 12, 31)
+                if first_doy == 1:
+                    problems.append(
+                        f"{where}, rotation: the first planting is on day 1 of the year "
+                        f"({start_date}), so the last component cannot end before it in the year; "
+                        "DSSAT would start the next cycle a year late. Plant the first crop after January 1."
+                    )
+                elif last_doy >= first_doy:
+                    example = date(end_date.year, 1, 1) + timedelta(days=first_doy - 2)
                     problems.append(
                         f"{where}, rotation: the last component ends on {last_end} "
                         f"(day {last_doy} of the year), not before the first planting's day of the year "
@@ -123,8 +130,6 @@ def _rotation_cycle_years(components):
 
 def _render_rotation(data, weather_rows, soil_rows):
     """Return a sequence filename and text from checked template/weather/soil."""
-    from .filex_skeleton import _field_lines, _control_lines
-
     components, name = data["rotation"], data["treatment_name"]
     weather = weather_rows[1] if isinstance(weather_rows, dict) else weather_rows
     soil = soil_rows[1] if isinstance(soil_rows, dict) else soil_rows
@@ -168,53 +173,8 @@ def _render_rotation(data, weather_rows, soil_rows):
     return f"{stem}.SQX", "\n".join(lines)
 
 
-def _control_lines(number, years, day, name, model, symbi, harvest):
-    """One controls level, including DSSAT automatic-management defaults."""
-    return [
-        "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
-        f"{number:2d} GE          {years:5d}     1     S {day}  2150 {name:<25} {model}",
-        "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
-        f"{number:2d} OP              Y     Y     {symbi}     N     N     N     N     N     M",
-        "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
-        f"{number:2d} ME              M     M     E     R     S     C     R     1     G     R     2",
-        "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
-        f"{number:2d} MA              R     R     R     N     {'R' if harvest else 'M'}",
-        "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
-        f"{number:2d} OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
-        "", "@  AUTOMATIC MANAGEMENT",
-        "@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN",
-        f"{number:2d} PL          {day} {day}    40   100    30    40    10",
-        "@N IRRIGATION  IMDEP ITHRL ITHRU IROFF IMETH IRAMT IREFF",
-        f"{number:2d} IR             30    50   100 GS000 IR001    10     1",
-        "@N NITROGEN    NMDEP NMTHR NAMNT NCODE NAOFF",
-        f"{number:2d} NI             30    50    25 FE001 GS000",
-        "@N RESIDUES    RIPCN RTIME RIDEP",
-        f"{number:2d} RE            100     1    20",
-        "@N HARVEST     HFRST HLAST HPCNP HPCNR",
-        f"{number:2d} HA              0   -99   100     0", "",
-    ]
-
-
-def _rotation_genotype_files(data, data_dir):
-    """List each crop's required genotype files once; fallow needs none."""
-    paths = {}
-    for component in data.get("rotation", []):
-        crop = component.get("crop") if isinstance(component, dict) else None
-        if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
-            _, _, prefix, extensions, _ = _CROPS[crop]
-            for suffix in extensions:
-                path = data_dir / "Genotype" / f"{prefix}.{suffix}"
-                paths.setdefault(path, None)
-    return list(paths)
-
-
 def _check_rotation_simulation(sim, data, data_dir, template_problems, experiment_data, load_problems):
     """Check one field and sequence controls without writing a temporary FileX."""
-    from .controls import _controls_start_date
-    from .filex_skeleton import _parse_field_data
-    from .management import _check_management, _report_lines
-    from .sequence import _sequence_coverage, _sequence_experiment_data
-
     weather, wp, wr = _parse_field_data(sim.weather, 1, "weather")
     soil, sp, sr = _parse_field_data(sim.soil, 1, "soil")
     for kind in ("weather", "soil"):
@@ -245,7 +205,7 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
                                      f"data ({min(days)} to {max(days)}). Supply weather for that date.")
         if not (wp or sp):
             _, text = _render_rotation(data, weather, soil)
-    for path in _rotation_genotype_files(data, data_dir) if isinstance(data["rotation"], list) else []:
+    for path in _template_genotype_files(data, data_dir) if isinstance(data["rotation"], list) else []:
         if not path.is_file():
             template_problems.append(f"FileX template: missing genotype file {path}. "
                                      "Supply this file in the data directory's Genotype folder.")
@@ -264,30 +224,10 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
     return problems, report
 
 
-def _write_rotation_simulation(sim, data, data_dir, experiment_data):
-    """Write the checked sequence and its one field, preserving component names."""
-    from pathlib import Path
-    import shutil
-    from .controls import _controls_start_date, _selected_controls
-    from .filex_skeleton import _parse_field_data, write_filex
-    from .filex_write import _repoint
-    from .runner import _create_dated_folder
-    from .soil import _write_soil_profiles
-    from .weather import write_weather_file
-
-    weather, _, _ = _parse_field_data(sim.weather, 1, "weather")
-    soil, _, _ = _parse_field_data(sim.soil, 1, "soil")
-    parent = (Path(sim.filex_template).resolve().parent
-              if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
-    folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
-    filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
-    start = (_controls_start_date(experiment_data, 1)
-             or date.fromisoformat(data["rotation"][0]["planting"]["date"]))
-    write_weather_file(weather[1], folder / f"{weather[1][0]['station']}{start.year % 100:02d}01.WTH")
-    _write_soil_profiles([soil[1]], folder / "SOIL.SOL")
-    for path in _rotation_genotype_files(data, data_dir):
-        shutil.copy2(path, folder / path.name)
-    # This new FileX owns its levels: edit level 1 directly, leaving later components intact.
+def _write_rotation_controls(filex, experiment_data, start):
+    """Edit the checked sequence's first controls level, keeping component levels."""
+    # The normal controls writer adds a new level and repoints SM; sequences
+    # need NYERS/SDATE in level 1, so edit that level in this generated FileX.
     controls = _selected_controls(experiment_data, 1)
     lines = filex.read_text(encoding="ascii").splitlines(keepends=True)
     for key, column, value in (("years", "NYERS", controls.get("years")),
@@ -295,4 +235,3 @@ def _write_rotation_simulation(sim, data, data_dir, experiment_data):
         if key in controls:
             _repoint(lines, 1, column, value, "SIMULATION CONTROLS", "N")
     filex.write_bytes("".join(lines).encode("ascii"))
-    return filex

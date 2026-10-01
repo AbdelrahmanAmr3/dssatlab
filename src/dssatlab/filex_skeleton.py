@@ -9,11 +9,11 @@ from .cultivar import _CROPS, _template_data_dir
 from .errors import DSSATCheckError
 from .experiment import _check_date
 from .filex_template import (_check_filex_template, _load_filex_template,
-                             _template_treatment_fields, _template_treatment_names)
+                             _template_treatment_fields, _template_treatment_names,
+                             _shared_field_problems, _template_genotype_files)
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
-from .rotation import _control_lines
 from .runner import _create_dated_folder
 from .soil import _parse_soil, _write_soil_profiles
 from .weather import _dssat_date, _parse_weather, write_weather_file
@@ -54,22 +54,6 @@ def _parse_field_data(source, count, kind):
     return rows, problems, report
 
 
-def _shared_field_problems(rows, kind):
-    """Reject different checked rows claiming the same station or soil ID."""
-    column, label, own = (("station", "station", "station code") if kind == "weather"
-                          else ("soil_id", "soil ID", "soil ID"))
-    seen, problems = {}, []
-    for field, data in rows.items():
-        identity = data[0][column]
-        if identity in seen and data != rows[seen[identity]]:
-            problems.append(f"Fields {seen[identity]} and {field} both use {label} {identity!r} "
-                            f"but their {kind} data differs. Give each field's {kind} its own "
-                            f"{own}, or the same data.")
-        else:
-            seen.setdefault(identity, field)
-    return problems
-
-
 def _check_template_simulation(sim, experiment_data, load_problems):
     """Check template inputs and the loaded experiment data dict in memory."""
     data, template_problems = _load_filex_template(sim.filex_template)
@@ -82,6 +66,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
     if isinstance(data, dict) and "rotation" in data:
+        # Import only at dispatch: rotation uses the shared skeleton helpers.
         from .rotation import _check_rotation_simulation
         return _check_rotation_simulation(sim, data, data_dir, template_problems,
                                           experiment_data, load_problems)
@@ -171,17 +156,17 @@ def _write_template_simulation(sim, experiment_data):
     """Write checked template inputs and experiment data dict; return the FileX path."""
     data_dir = _template_data_dir(sim.executable)
     data, _ = _load_filex_template(sim.filex_template)
-    if "rotation" in data:
-        from .rotation import _write_rotation_simulation
-        return _write_rotation_simulation(sim, data, data_dir, experiment_data)
-    count = max(_template_treatment_fields(data))
+    rotation = "rotation" in data
+    count = 1 if rotation else max(_template_treatment_fields(data))
     weather, _, _ = _parse_field_data(sim.weather, count, "weather")
     soil, _, _ = _parse_field_data(sim.soil, count, "soil")
     parent = (Path(sim.filex_template).resolve().parent
               if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
     folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
     filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
-    start = _controls_start_date(experiment_data, sim.treatment) or date.fromisoformat(data["planting"]["date"])
+    first = data["rotation"][0] if rotation else data
+    start = (_controls_start_date(experiment_data, sim.treatment)
+             or date.fromisoformat(first["planting"]["date"]))
     stations, profiles = {}, {}
     for rows in weather.values():
         stations.setdefault(rows[0]["station"], rows)
@@ -190,10 +175,13 @@ def _write_template_simulation(sim, experiment_data):
     for rows in soil.values():
         profiles.setdefault(rows[0]["soil_id"], rows)
     _write_soil_profiles(list(profiles.values()), folder / "SOIL.SOL")
-    _, _, prefix, extensions, _ = _CROPS[data["crop"]]
-    for suffix in extensions:
-        name = f"{prefix}.{suffix}"
-        shutil.copy2(data_dir / "Genotype" / name, folder / name)
+    for path in _template_genotype_files(data, data_dir):
+        shutil.copy2(path, folder / path.name)
+    if rotation:
+        # Import only at dispatch: rotation uses the shared skeleton helpers.
+        from .rotation import _write_rotation_controls
+        _write_rotation_controls(filex, experiment_data, start)
+        return filex
     if isinstance(experiment_data, dict) and isinstance(experiment_data.get("treatments"), dict):
         for key in sorted(experiment_data["treatments"], key=int):
             _write_management(filex, int(key), experiment_data)
@@ -233,6 +221,7 @@ def write_filex(source, weather_rows: list[dict] | dict[int, list[dict]],
 def _render_filex(data, weather_rows, soil_rows):
     """Return the filename and skeleton text from checked inputs without writing."""
     if "rotation" in data:
+        # Import only at dispatch: rotation uses the shared skeleton helpers.
         from .rotation import _render_rotation
         return _render_rotation(data, weather_rows, soil_rows)
     crop = _CROPS[data["crop"]][0]
@@ -298,4 +287,31 @@ def _field_lines(weather_rows, soil_rows, count):
         *field_lines,
         "@L ...........XCRD ...........YCRD .....ELEV .............AREA .SLEN .FLWR .SLAS FLHST FHDUR",
         *coordinate_lines, "",
+    ]
+
+
+def _control_lines(number, years, day, name, model, symbi, harvest):
+    """One controls level, including DSSAT automatic-management defaults."""
+    return [
+        "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
+        f"{number:2d} GE          {years:5d}     1     S {day}  2150 {name:<25} {model}",
+        "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
+        f"{number:2d} OP              Y     Y     {symbi}     N     N     N     N     N     M",
+        "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
+        f"{number:2d} ME              M     M     E     R     S     C     R     1     G     R     2",
+        "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
+        f"{number:2d} MA              R     R     R     N     {'R' if harvest else 'M'}",
+        "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
+        f"{number:2d} OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
+        "", "@  AUTOMATIC MANAGEMENT",
+        "@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN",
+        f"{number:2d} PL          {day} {day}    40   100    30    40    10",
+        "@N IRRIGATION  IMDEP ITHRL ITHRU IROFF IMETH IRAMT IREFF",
+        f"{number:2d} IR             30    50   100 GS000 IR001    10     1",
+        "@N NITROGEN    NMDEP NMTHR NAMNT NCODE NAOFF",
+        f"{number:2d} NI             30    50    25 FE001 GS000",
+        "@N RESIDUES    RIPCN RTIME RIDEP",
+        f"{number:2d} RE            100     1    20",
+        "@N HARVEST     HFRST HLAST HPCNP HPCNR",
+        f"{number:2d} HA              0   -99   100     0", "",
     ]

@@ -106,6 +106,7 @@ def _check_filex_template(data, data_dir) -> list[str]:
         return [f"{where}: expected a dict. Supply crop, cultivar, planting "
                 "and either treatment_name or treatments."]
     if "rotation" in data:
+        # Import only at dispatch: rotation uses the shared template checks.
         from .rotation import _check_rotation_template
         return _check_rotation_template(data, data_dir)
     problems = _check_fields(data, ("crop", "cultivar", "planting"),
@@ -224,4 +225,33 @@ def _check_template_cultivar(data, crop, data_dir):
         except (OSError, ValueError, TypeError) as error:
             problems.append(f"{where}: cannot check .CUL: {error}. "
                             f"Supply a DSSAT data directory containing Genotype/{prefix}.CUL.")
+    return problems
+
+
+def _template_genotype_files(data, data_dir):
+    """List each template crop's required genotype files once; fallow needs none."""
+    paths = {}
+    for component in data.get("rotation", [data]):
+        crop = component.get("crop") if isinstance(component, dict) else None
+        if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
+            _, _, prefix, extensions, _ = _CROPS[crop]
+            for suffix in extensions:
+                path = data_dir / "Genotype" / f"{prefix}.{suffix}"
+                paths.setdefault(path, None)
+    return list(paths)
+
+
+def _shared_field_problems(rows, kind):
+    """Reject different checked rows claiming the same station or soil ID."""
+    column, label, own = (("station", "station", "station code") if kind == "weather"
+                          else ("soil_id", "soil ID", "soil ID"))
+    seen, problems = {}, []
+    for field, data in rows.items():
+        identity = data[0][column]
+        if identity in seen and data != rows[seen[identity]]:
+            problems.append(f"Fields {seen[identity]} and {field} both use {label} {identity!r} "
+                            f"but their {kind} data differs. Give each field's {kind} its own "
+                            f"{own}, or the same data.")
+        else:
+            seen.setdefault(identity, field)
     return problems
