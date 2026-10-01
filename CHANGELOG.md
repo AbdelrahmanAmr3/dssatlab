@@ -2,6 +2,21 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.9.0] - UNDATED
+
+### Added
+- `read_dssat_observed(path)` reads DSSAT's FileA/FileT into observed data under scenario `base`, ready for `evaluate()`. Reads supported Summary and Plant growth measurements, omits `-99` cells, and resolves short dates from the sibling FileX treatment's `SDATE`. Problems are reported together with paths and line numbers.
+- `read_dssat_evaluation(run_dir)` and `result.dssat_evaluation()` read DSSAT's own `Evaluate.OUT` as rows, retaining its column names, days-after-planting dates and missing values as `None`.
+- `plot_observed(results, observed, variable)` overlays observed points on Plant growth curves, with one colour per scenario and treatment and optional matplotlib. Points outside the simulated season remain visible.
+- Guide section and tutorial Case 4 use the shipped `UFGA8201.MZA` and `UFGA8201.MZT`, compare their measurements, plot LAID and show HWAM beside the DSSAT evaluation.
+
+### Changed
+- `Simulation.run()` copies the FileA/FileT named after the FileX into the simulation folder when present, so DSSAT fills measured columns in `Evaluate.OUT`. Runs without them work as before.
+
+### Notes
+- Only FileA/FileT reading and `Evaluate.OUT` reading were added to file support; no FileA/FileT is written. ADR 0008 supersedes the reading half of ADR 0007's note.
+- Upgrading from 0.8.0 needs no changes. Runtime dependencies remain zero; plotting still uses optional matplotlib.
+
 ## [0.8.0] - 2026-09-30
 
 ### Added
