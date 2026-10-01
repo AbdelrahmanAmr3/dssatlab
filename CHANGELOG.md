@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.13.1] - UNDATED
+## [0.13.1] - 2026-10-01
 
 ### Added
 - Crop rotations from the FileX template: the FileX template accepts `treatment_name` and `rotation`, a list of 2 to 9 rotation components, instead of single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`, `treatments`, `treatment_fields`) (ADR 0014).
