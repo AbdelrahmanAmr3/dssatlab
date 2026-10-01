@@ -1,6 +1,6 @@
 # 0007: Evaluation is computed in Python, not through DSSAT's FileA and Evaluate.OUT
 
-Status: proposed (2026-09-30)
+Status: accepted (2026-09-30), amended by 0008
 
 ## Context
 
