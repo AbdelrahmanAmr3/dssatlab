@@ -42,15 +42,8 @@ def evaluate(results: RunResult | dict[tuple[str, int], RunResult], observed) ->
     rows and their measurement columns; statistics pool each variable's pairs.
     """
     observed, problems = _load_observed(observed)
-    cache, pairs = {}, []
-    if isinstance(results, RunResult):
-        try:
-            summary = results.summary()
-        except DSSATOutputError as error:
-            problems.append(f"Scenario 'base': {error}")
-            summary = []
-        cache[results.run_dir, False] = summary
-        results = {("base", row["TRNO"]): results for row in summary}
+    results, cache = _results_by_key(results, problems)
+    pairs = []
     for row in observed:
         scenario, treatment, day = row["scenario"], row["treatment"], row["date"]
         where = f"Scenario {scenario!r}, treatment {treatment}, date {_date_code(day) if day else None}"
@@ -93,6 +86,20 @@ def evaluate(results: RunResult | dict[tuple[str, int], RunResult], observed) ->
             for name in ("observed", "simulated"):
                 pair[name] = _date_code(pair[name])
     return Evaluation(pairs, statistics)
+
+
+def _results_by_key(results, problems):
+    """Map a single run's Summary treatments to 'base', retaining its read cache."""
+    cache = {}
+    if isinstance(results, RunResult):
+        try:
+            summary = results.summary()
+        except DSSATOutputError as error:
+            problems.append(f"Scenario 'base': {error}")
+            summary = []
+        cache[results.run_dir, False] = summary
+        results = {("base", row["TRNO"]): results for row in summary}
+    return results, cache
 
 
 def _simulated_row(result, treatment, day, cache, where, problems):
