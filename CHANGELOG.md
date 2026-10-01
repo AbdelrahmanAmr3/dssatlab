@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.12.0] - UNDATED
+## [0.12.0] - 2026-10-01
 
 ### Added
 - Experiment data controls key `years`: an optional positive integer specifying the number of seasons to simulate, written as DSSAT's `NYERS` into the copied controls level for the selected treatment. Works for both copied FileX and FileX template experiments, in a `Simulation` and in `run_treatments()`.
