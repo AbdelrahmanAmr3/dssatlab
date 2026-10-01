@@ -7,7 +7,8 @@ import shutil
 from .controls import _controls_start_date
 from .errors import DSSATCheckError
 from .experiment import _check_date
-from .filex_template import _CROPS, _check_filex_template, _load_filex_template, _template_data_dir
+from .filex_template import (_CROPS, _check_filex_template, _load_filex_template,
+                             _template_data_dir, _template_treatment_names)
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
@@ -30,18 +31,15 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     # Shape/value checks still run when executable discovery fails.
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
-    n = len(data["treatments"]) if (isinstance(data, dict) and "treatments" in data
-                                    and "treatment_name" not in data
-                                    and isinstance(data["treatments"], list)) else 1
+    count = len(_template_treatment_names(data))
     if (isinstance(sim.treatment, bool) or not isinstance(sim.treatment, (int, str))
             or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
-            or not (1 <= int(sim.treatment) <= n)):
-        if n <= 1:
+            or not 1 <= int(sim.treatment) <= count):
+        if count == 1:
             template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
         else:
-            template_problems.append(
-                f"FileX template has treatments 1 to {n}. Supply treatment=<k> with 1 <= k <= {n}."
-            )
+            template_problems.append(f"FileX template has treatments 1 to {count}. "
+                                     f"Supply treatment=<k> with 1 <= k <= {count}.")
     start = _controls_start_date(experiment_data, sim.treatment)
     if start is None and isinstance(data, dict) and isinstance(data.get("planting"), dict):
         planting_date = data["planting"].get("date")
@@ -163,7 +161,7 @@ def _render_filex(data, weather_rows, soil_rows):
 def _skeleton_text(data, weather, soil, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
     crop, model, _, _, symbi = _CROPS[data["crop"]]
-    names = [data["treatment_name"]] if "treatment_name" in data else data["treatments"]
+    names = _template_treatment_names(data)
     name, station = names[0], weather["station"]
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])

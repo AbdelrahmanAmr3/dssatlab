@@ -76,6 +76,19 @@ def _load_filex_template(source):
                       "crop, cultivar, planting and either treatment_name or treatments keys")
 
 
+def _template_treatment_names(data):
+    """Return the template's treatment names, treatment 1 first.
+
+    A treatments list of 1 to 99 entries gives N names; anything else gives one
+    entry, so the checks report a malformed template for treatment 1 only.
+    """
+    if isinstance(data, dict) and "treatments" in data and "treatment_name" not in data:
+        names = data["treatments"]
+        if isinstance(names, list) and 1 <= len(names) <= 99:
+            return names
+    return [data.get("treatment_name") if isinstance(data, dict) else None]
+
+
 def _check_filex_template(data, data_dir) -> list[str]:
     """Return every template problem; data_dir is the DSSAT data directory.
 
