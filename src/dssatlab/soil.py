@@ -58,6 +58,51 @@ def write_soil_template(path: str | Path) -> None:
         raise DSSATError(message) from error
 
 
+_PROFILE_FIELDS = (("salb", 2), ("slu1", 1), ("sldr", 2), ("slro", 1),
+                  ("slnf", 2), ("slpf", 2), ("smhb", None), ("smpx", None), ("smke", None))
+_LAYER_FIELDS = (("slb", None), ("slmh", None), ("slll", 3), ("sdul", 3),
+                ("ssat", 3), ("srgf", 3), ("ssks", 2), ("sbdm", 2),
+                ("sloc", 2), ("slcl", 1), ("slsi", 1), ("slcf", 1),
+                ("slni", 3), ("slhw", 1), ("slhb", 1), ("scec", 1), ("sadc", 1))
+
+
+def _cell(value, decimals):
+    if value is None or value == -99 or value == "-99":
+        return "   -99"
+    if decimals is None:  # Depths and codes are written as given, not rounded.
+        return f"{float(value) + 0.0:>6g}"
+    num = round(float(value), decimals) + 0.0
+    if round(num) == -99:
+        return "   -99"
+    return f"{num:>6.{decimals}f}"
+
+
+def _profile_text(rows: list[dict]) -> str:
+    first = rows[0]
+    depth = int(round(rows[-1]["slb"]))
+    out = [
+        f"*{first['soil_id']:<10}  DSSATLAB    -99  {depth:>6} Written by dssatlab",
+        "@SITE        COUNTRY          LAT     LONG SCS FAMILY",
+        " -99         -99              -99      -99 -99",
+        "@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE",
+        "   -99" + "".join(_cell(first.get(n, -99), d) for n, d in _PROFILE_FIELDS),
+        "@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC",
+    ]
+    for row in rows:
+        out.append("".join(_cell(row.get(n, -99), d) for n, d in _LAYER_FIELDS))
+    return "\n".join(out) + "\n"
+
+
+def _write_soil_profiles(profiles: list[list[dict]], path: str | Path) -> Path:
+    """Write several soil profiles into one SOIL.SOL file."""
+    path = Path(path)
+    header = f"*SOILS: {profiles[0][0]['soil_id']} (written by dssatlab)\n"
+    content = header + "\n".join(_profile_text(p) for p in profiles)
+    with path.open("w", encoding="ascii", newline="\n") as stream:
+        stream.write(content)
+    return path
+
+
 def write_soil_file(rows: list[dict], path: str | Path) -> Path:
     """Write one soil profile from valid parsed soil rows to the chosen path.
 
@@ -66,39 +111,9 @@ def write_soil_file(rows: list[dict], path: str | Path) -> Path:
     folder must exist; an existing file is overwritten.
     """
     path = Path(path)
-    first = rows[0]
-    depth = int(round(rows[-1]["slb"]))
-    profile_fields = (("salb", 2), ("slu1", 1), ("sldr", 2), ("slro", 1),
-                      ("slnf", 2), ("slpf", 2), ("smhb", None), ("smpx", None), ("smke", None))
-    layer_fields = (("slb", None), ("slmh", None), ("slll", 3), ("sdul", 3),
-                    ("ssat", 3), ("srgf", 3), ("ssks", 2), ("sbdm", 2),
-                    ("sloc", 2), ("slcl", 1), ("slsi", 1), ("slcf", 1),
-                    ("slni", 3), ("slhw", 1), ("slhb", 1), ("scec", 1), ("sadc", 1))
-
-    def _cell(value, decimals):
-        if value is None or value == -99 or value == "-99":
-            return "   -99"
-        if decimals is None:  # Depths and codes are written as given, not rounded.
-            return f"{float(value) + 0.0:>6g}"
-        num = round(float(value), decimals) + 0.0
-        if round(num) == -99:
-            return "   -99"
-        return f"{num:>6.{decimals}f}"
-
+    header = f"*SOILS: {rows[0]['soil_id']} (written by dssatlab)\n"
     with path.open("w", encoding="ascii", newline="\n") as stream:
-        stream.write(f"*SOILS: {first['soil_id']} (written by dssatlab)\n")
-        stream.write(f"*{first['soil_id']:<10}  DSSATLAB    -99  {depth:>6} Written by dssatlab\n")
-        stream.write("@SITE        COUNTRY          LAT     LONG SCS FAMILY\n")
-        stream.write(" -99         -99              -99      -99 -99\n")
-        stream.write("@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE\n")
-        stream.write("   -99")
-        for name, decimals in profile_fields:
-            stream.write(_cell(first.get(name, -99), decimals))
-        stream.write("\n@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC\n")
-        for row in rows:
-            for name, decimals in layer_fields:
-                stream.write(_cell(row.get(name, -99), decimals))
-            stream.write("\n")
+        stream.write(header + _profile_text(rows))
     return path
 
 
