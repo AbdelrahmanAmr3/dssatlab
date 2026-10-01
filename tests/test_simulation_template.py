@@ -47,7 +47,7 @@ def test_template_requires_soil(data, rows, installed, tmp_path):
 
 
 @pytest.mark.parametrize("crop,code,word", [
-    ("cotton", "IB0035", "unsupported crop"),
+    ("cotton", "IB0035", "is not a template crop"),
     ("maize", "XX9999", "Closest codes"),
 ])
 def test_template_reports_independent_problems_without_writes(

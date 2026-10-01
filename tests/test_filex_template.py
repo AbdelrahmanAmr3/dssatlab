@@ -96,7 +96,7 @@ def test_unsupported_crop_lists_supported_crops(data, data_dir, crop):
     from dssatlab.filex_template import _check_filex_template
     data["crop"] = crop
     problems = _check_filex_template(data, data_dir)
-    assert any("unsupported crop" in p and all(row[0] in p for row in CROPS)
+    assert any("is not a template crop" in p and all(row[0] in p for row in CROPS)
                for p in problems)
 
 

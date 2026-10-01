@@ -149,7 +149,7 @@ def test_list_cultivars_unsupported_crop(fake_dssat_env):
     with pytest.raises(DSSATCheckError) as exc_info:
         list_cultivars("cotton")
     message = str(exc_info.value)
-    assert "Unsupported crop" in message
+    assert "is not a template crop" in message
     assert "cotton" in message
     for crop in _CROPS:
         assert crop in message
@@ -169,6 +169,15 @@ def test_list_cultivars_missing_cul(fake_dssat_env):
     assert "Missing .CUL file" in message
     assert "MZCER048.CUL" in message
     assert str(genotype_dir / "MZCER048.CUL") in message
+
+
+@pytest.mark.parametrize("listing", [list_crops, lambda: list_cultivars("maize")])
+def test_cul_without_cultivar_table_is_check_error(fake_dssat_env, listing):
+    _, genotype_dir = fake_dssat_env
+    (genotype_dir / "MZCER048.CUL").write_text("*MAIZE CULTIVAR COEFFICIENTS\n")
+
+    with pytest.raises(DSSATCheckError, match="no @VAR# header"):
+        listing()
 
 
 def test_dssat_not_found_with_discovery_monkeypatched(monkeypatch, tmp_path):

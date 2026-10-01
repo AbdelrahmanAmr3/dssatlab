@@ -40,8 +40,10 @@ crop: "maize"
 treatment_name: "My treatment" # 1-25 printable ASCII characters; not just spaces
 cultivar:
   code: "IB0035"              # Six ASCII characters, no spaces; case-sensitive
-  # Must exist in data directory/Genotype/<prefix>.CUL for the crop,
-  # e.g. MZCER048.CUL for maize.
+  # Must exist in the crop's .CUL in data directory/Genotype: maize MZCER048,
+  # wheat WHCER048, rice RICER048, soybean SBGRO048, potato PTSUB048,
+  # sorghum SGCER048, pearl millet MLCER048, barley BACER048, peanut
+  # PNGRO048, dry bean BNGRO048. list_cultivars(crop) lists the codes.
 planting:
   date: "2021-03-01"          # Quoted ISO calendar date, YYYY-MM-DD
   method: "S"                 # One ASCII letter: DSSAT planting code (S=seed)
@@ -87,8 +89,8 @@ def _check_filex_template(data, data_dir) -> list[str]:
     crop = data.get("crop")
     supported = isinstance(crop, str) and crop in _CROPS
     if "crop" in data and not supported:
-        problems.append(f"{where}: unsupported crop {_show_value(crop)}. "
-                        f"Supported crops: {', '.join(_CROPS)}.")
+        problems.append(f"{where}: {_show_value(crop)} is not a template crop. "
+                        f"Use one of the template crops: {', '.join(_CROPS)}.")
     if "treatment_name" in data:
         name = data["treatment_name"]
         if not isinstance(name, str) or not re.fullmatch(r"[ -~]{1,25}", name) or not name.strip():
@@ -99,19 +101,22 @@ def _check_filex_template(data, data_dir) -> list[str]:
                                                  data_dir))
     planting = data.get("planting")
     if crop == "potato":
-        for field in ("planting_material_weight", "sprout_length", "harvest_date"):
-            source = data if field == "harvest_date" else planting
-            if not isinstance(source, dict) or field not in source:
-                problems.append(f"{where}: missing {field!r}; potato needs it.")
+        for field in ("planting_material_weight", "sprout_length"):
+            if not isinstance(planting, dict) or field not in planting:
+                problems.append(f"{where}, planting: missing {field!r}; potato needs it. "
+                                f"Supply planting.{field}.")
+        if "harvest_date" not in data:
+            problems.append(f"{where}: missing 'harvest_date'; potato needs it. "
+                            "Supply a quoted harvest_date after the planting date.")
     if "harvest_date" in data:
         found = _check_date(data["harvest_date"], f"{where}, harvest_date")
         problems.extend(found)
         if (not found and isinstance(planting, dict)
                 and not _check_date(planting.get("date"), "planting date")
                 and data["harvest_date"] <= planting["date"]):
-            problems.append(f"{where}, harvest_date: must be after the planting date.")
+            problems.append(f"{where}, harvest_date: {data['harvest_date']} is not after the "
+                            f"planting date {planting['date']}. Supply a later harvest_date.")
     if "planting" in data:
-        planting = data["planting"]
         found = _check_planting(planting, f"{where}, planting")
         if isinstance(planting, dict):
             allowed = _REQUIRED + ("planting_material_weight", "sprout_length")
@@ -179,7 +184,15 @@ def _listing_data_dir(executable):
                    else "Checked saved configuration, DSSAT_HOME, and PATH/platform defaults "
                         "(including the managed cache on Linux).")
         raise DSSATNotFoundError(f"DSSAT was not found. {checked} "
-                                 "Supply executable= pointing to the DSSAT executable or directory.")
+                                 "Supply executable= pointing to the DSSAT executable or directory.") from None
+
+
+def _listed_cultivars(path, crop):
+    """Cultivar rows of a .CUL; an unreadable table is DSSATCheckError."""
+    try:
+        return _read_cultivar_codes(path, names=True)
+    except ValueError as error:
+        raise DSSATCheckError([f"Cannot list cultivars for {crop!r}: {error}"]) from None
 
 
 def list_crops(executable=None) -> list[dict]:
@@ -204,14 +217,8 @@ def list_crops(executable=None) -> list[dict]:
     for crop, (code, model, prefix, extensions, _) in _CROPS.items():
         if not all((genotype_dir / f"{prefix}.{ext}").is_file() for ext in extensions):
             continue
-        cul_path = genotype_dir / f"{prefix}.CUL"
-        cultivar_codes = _read_cultivar_codes(cul_path)
-        rows.append({
-            "crop": crop,
-            "code": code,
-            "model": model,
-            "cultivars": len(cultivar_codes),
-        })
+        cultivars = _listed_cultivars(genotype_dir / f"{prefix}.CUL", crop)
+        rows.append({"crop": crop, "code": code, "model": model, "cultivars": len(cultivars)})
     return rows
 
 
@@ -229,8 +236,8 @@ def list_cultivars(crop: str, executable=None) -> list[dict]:
         to_dataframe().
 
     Raises:
-        DSSATCheckError: If crop is not a supported template crop, or if the
-            crop's .CUL file is missing.
+        DSSATCheckError: If crop is not a template crop, or if the crop's .CUL
+            file is missing or has no cultivar table.
         DSSATNotFoundError: If DSSAT executable or data directory cannot be found.
 
     Example:
@@ -241,8 +248,8 @@ def list_cultivars(crop: str, executable=None) -> list[dict]:
     """
     if not isinstance(crop, str) or crop not in _CROPS:
         raise DSSATCheckError([
-            f"Unsupported crop {_show_value(crop)}. "
-            f"Supported template crops: {', '.join(_CROPS)}. Choose one of these crops."
+            f"{_show_value(crop)} is not a template crop. "
+            f"Use one of the template crops: {', '.join(_CROPS)}."
         ])
 
     prefix = _CROPS[crop][2]
@@ -253,5 +260,4 @@ def list_cultivars(crop: str, executable=None) -> list[dict]:
             "Supply this file in the data directory's Genotype folder."
         ])
 
-    return _read_cultivar_codes(cul_path, names=True)
-
+    return _listed_cultivars(cul_path, crop)
