@@ -63,6 +63,80 @@ columns are reported once per name, with the closest valid names and the lists
 of Summary and Plant growth columns. An observed `-99` is also a problem; leave
 unmeasured cells blank instead.
 
-No pair is silently dropped. Results without observations are fine. DSSAT's
-`Evaluate.OUT` is not read. Loading and checking observed data are internal to
+No pair is silently dropped. Results without observations are fine. Loading and
+checking observed data are internal to
 `evaluate()`; there are no public `load_observed()` or `check_observed()` functions.
+
+## Use DSSAT's own measured data
+
+Read a shipped experiment's FileA (end-of-season measurements) and FileT
+(measurements by date) directly. Keep both beside their FileX in the DSSAT Maize
+folder, or copy all three into your own folder before running:
+
+```python
+from pathlib import Path
+import dssatlab as dl
+
+maize = Path("C:/DSSAT48/Maize")  # use your own DSSAT Maize folder
+result = dl.run(maize / "UFGA8201.MZX")  # all six treatments
+observed_a = dl.read_dssat_observed(maize / "UFGA8201.MZA")
+observed_t = dl.read_dssat_observed(maize / "UFGA8201.MZT")
+evaluation = dl.evaluate(result, observed_a + observed_t)
+print(evaluation.pairs)
+print(evaluation.statistics)
+ax = dl.plot_observed(result, observed_t, "LAID")
+```
+
+The `*EXP. DATA (A)` or `(T)` header identifies the kind, for any crop extension.
+Rows use scenario `base`, an integer `treatment` from `TRNO`, and `date=None`
+for FileA or an ISO `yyyy-mm-dd` date for FileT. Summary date measurements such
+as `ADAT` and `MDAT` also become ISO strings. Tables merge by treatment and date.
+If you ran only selected treatments, select their observed rows before comparing;
+observations for a treatment without a result are a check problem.
+
+Only supported Summary measurement columns are read from FileA (`HWAM`, `CWAM`,
+`ADAT`, `MDAT`, etc.), and supported Plant growth measurement columns from FileT
+(`LAID`, `CWAD`, etc.). Metadata and unsupported measurements such as `GN%M`,
+`VN%D`, and `SW1D` are not read. `-99` cells and rows with no measurement are
+omitted. Names and units stay as DSSAT gives them. Problems, including conflicting
+measurements, are collected in one `DSSATCheckError` with paths and line numbers.
+
+Short dates are resolved from the treatment's simulation start (`SDATE`), so the
+matching FileX must sit beside the FileA/FileT (for example `UFGA8201.MZX`).
+A bare day of year uses the start year, or the next year when it precedes the
+start day. A five-digit `yyddd` uses the start date's century, advancing a century
+if it falls before the start date. Seven-digit `yyyyddd` dates need no FileX.
+
+`plot_observed()` returns a matplotlib Axes, using the optional `plot` extra.
+It draws one Plant growth line per observed scenario and treatment, with measured
+points in the same colour. Points outside the simulated season are still drawn;
+`evaluate()` requires matching simulated dates. For Summary variables, use
+`plot_evaluation()` instead.
+
+### Compare with the DSSAT evaluation
+
+DSSATLab computes `evaluation` from Summary and Plant growth. The **DSSAT
+evaluation** is DSSAT's own `Evaluate.OUT`; these two calls read the same rows:
+
+```python
+dssat_rows = dl.read_dssat_evaluation(result.run_dir)
+dssat_rows = result.dssat_evaluation()
+
+# Compare grain yield for each treatment, side by side (optional pandas).
+pairs = dl.to_dataframe([p for p in evaluation.pairs if p["variable"] == "HWAM"])
+dssat_yield = dl.to_dataframe(dssat_rows)[["TN", "HWAMS", "HWAMM"]]
+print(pairs.merge(dssat_yield, left_on="treatment", right_on="TN"))
+```
+
+`HWAMS` and `HWAMM` are DSSAT's simulated and measured yield; compare them with
+`simulated` and `observed` in the Evaluation pairs. The reader retains DSSAT's
+column names, numbers and text, with `-99` as `None`. Date columns in
+`Evaluate.OUT` stay as days after planting, not calendar dates. A missing, empty
+or malformed `Evaluate.OUT` raises `DSSATOutputError`.
+
+DSSAT needs the matching FileA beside the FileX when it runs to fill measured
+columns. `Simulation.run()` now copies the matching FileA/FileT into the
+simulation folder when present; a FileX template without them works as before.
+For an older run without the FileA, put it beside the FileX and rerun. DSSATLab
+writes no FileA/FileT; [ADR 0008](../adr/0008-read-filea-filet-and-evaluate-out.md)
+supersedes the reading restriction in ADR 0007.

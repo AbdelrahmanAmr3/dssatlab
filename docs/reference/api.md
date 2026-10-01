@@ -46,6 +46,10 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.read_weather
 
+::: dssatlab.read_dssat_evaluation
+
+::: dssatlab.runner.RunResult.dssat_evaluation
+
 ::: dssatlab.to_dataframe
 
 ::: dssatlab.plot_plant_growth
@@ -54,6 +58,13 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
         warn_missing_types: false
 
 ## Observed data and evaluation
+
+::: dssatlab.read_dssat_observed
+
+::: dssatlab.plot_observed
+    options:
+      docstring_options:
+        warn_missing_types: false
 
 ::: dssatlab.write_observed_template
 

@@ -28,7 +28,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own soil data into a strictly checked simulation and run it
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
-- [x] Read five DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`) and plot plant growth
+- [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 
 ```python
 import dssatlab as dl
@@ -44,7 +44,7 @@ How a run works:
 - DSSAT runs in the FileX's own folder, so weather and soil files beside the FileX are found. Its output files are then moved into a new `dssat_run_<date>` folder beside the FileX, and your FileX folder is left as it was.
 - The FileX filename can be at most 12 characters, including the extension (DSSAT's own limit), for example `UFGA8201.MZX`.
 - A failed run raises `DSSATRunError` with the command, the end of DSSAT's console output and the start of `ERROR.OUT`. The run folder is kept so you can look inside.
-- `run()` returns the files DSSAT wrote. Read outputs with `result.summary()`, `result.plant_growth()`, `result.soil_water()`, `result.plant_nitrogen()`, and `result.weather()`, or plot with `result.plot(variable)`. Building experiments from Python is not built yet.
+- `run()` returns the files DSSAT wrote. Read outputs with `result.summary()`, `result.plant_growth()`, `result.soil_water()`, `result.plant_nitrogen()`, `result.weather()`, and `result.dssat_evaluation()`, or plot with `result.plot(variable)`. Building experiments from Python is not built yet.
 
 Upgrading from 0.1.x on Linux or Colab: a DSSAT built by 0.1.x cannot run simulations, so the first `dl.install()` (or `dl.connect()` with consent) rebuilds it once.
 
@@ -157,7 +157,7 @@ ax = result.plot("LAID")                 # leaf area index over time
 ax = dl.plot_plant_growth([run_dir_rainfed, run_dir_irrigated], "LAID")
 ```
 
-Dates are parsed into `datetime.date` objects, DSSAT's `-99` missing values become `None`, and column names match DSSAT's own (`HWAM`, `ADAT`, `LAID`, `SWTD`, `NUPC`). Five output files are parsed (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, and `Weather.OUT`); other output files remain listed in `result.outputs`.
+Dates are parsed into `datetime.date` objects, DSSAT's `-99` missing values become `None`, and column names match DSSAT's own (`HWAM`, `ADAT`, `LAID`, `SWTD`, `NUPC`). Six output files are parsed (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, and `Evaluate.OUT`); DSSAT evaluation dates stay as days after planting; other output files remain listed in `result.outputs`.
 
 ## Compare with your measurements
 
@@ -179,3 +179,25 @@ day and for Summary date values such as `ADAT`. Evaluation reports simulated min
 observed errors, plus RMSE, mean bias and Willmott's d-index for variables with at
 least two pairs. Observed data and matching problems are reported in one
 `DSSATCheckError`. See the [evaluation guide](docs/guide/evaluate.md).
+
+Already have DSSAT's own measurements? Read the FileA/FileT beside your FileX:
+
+```python
+result = dl.run("UFGA8201.MZX")  # keep UFGA8201.MZA and .MZT beside it
+observed_a = dl.read_dssat_observed("UFGA8201.MZA")
+observed_t = dl.read_dssat_observed("UFGA8201.MZT")
+ev = dl.evaluate(result, observed_a + observed_t)
+dl.plot_observed(result, observed_t, "LAID");
+print(result.dssat_evaluation())  # or dl.read_dssat_evaluation(result.run_dir)
+```
+
+- `read_dssat_observed(path)` reads supported Summary or Plant growth measurements
+  into observed rows under scenario `base`; `-99` measurements are omitted.
+- `plot_observed(results, observed, variable)` draws Plant growth curves and
+  measured points using optional matplotlib.
+- `read_dssat_evaluation(run_dir)` and `RunResult.dssat_evaluation()` read DSSAT's
+  `Evaluate.OUT` with its own column names and missing values as `None`.
+
+Short dates need the matching FileX beside the FileA/FileT. `Simulation.run()`
+copies those files when present so DSSAT can fill measured columns. No FileA/FileT
+is written. See [Use DSSAT's own measured data](docs/guide/evaluate.md#use-dssats-own-measured-data).

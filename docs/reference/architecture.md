@@ -11,6 +11,7 @@ The codebase under `src/dssatlab/` includes these modules:
 - `core.py`: Discovers, validates, and installs the DSSAT executable (`connect`, `detect`, `install`).
 - `controls.py`: Checks the experiment `controls` section (start date, water and nitrogen switches, output interval) and writes a new `SIMULATION CONTROLS` level in the copied FileX.
 - `cultivar.py`: Checks an experiment `cultivar` code against the `.CUL` file beside the FileX and writes a new `CULTIVARS` level in the copied FileX.
+- `dssat_observed.py`: Reads FileA/FileT into observed data rows, keeps supported measurements, and resolves short dates from the sibling FileX treatment's `SDATE` (ADR 0008).
 - `errors.py`: Defines the exception hierarchy for discovery, installation, input checks, and run failures.
 - `evaluate.py`: Matches observed data with Summary and Plant growth, collects check problems, and returns an `Evaluation` with pairs, RMSE, mean bias and Willmott's d-index.
 - `experiment.py`: Shared field, date and number checks for the experiment sections, and the `controls` shape check.
@@ -21,8 +22,8 @@ The codebase under `src/dssatlab/` includes these modules:
 - `management.py`: Validates management dictionary shape, field keys, numeric bounds, date order, and start date / weather bounds; formats structured check report lines.
 - `management_file.py`: Writes the YAML management template (`write_management_template`) and provides strict YAML loading (`_load_management`) using PyYAML SafeLoader with duplicate key rejection.
 - `observed.py`: Writes the commented observed data template (`write_observed_template`) and privately loads and checks CSV/DataFrame/list-of-dict measurements in DSSAT's own units.
-- `outputs.py`: Reads `Summary.OUT` and `PlantGro.OUT` using fixed-width headers, converts dates and `-99` missing values, and builds DataFrames (`to_dataframe`).
-- `plot.py`: Plots Plant growth variables against date across simulations (`plot_plant_growth`) and simulated versus observed values with a 1:1 line (`plot_evaluation`) using optional matplotlib.
+- `outputs.py`: Reads Summary, Plant growth, soil water, plant nitrogen and weather using fixed-width headers, and the DSSAT evaluation (`Evaluate.OUT`) using whitespace-separated columns. Converts missing values to `None`; DSSAT evaluation dates stay as days after planting. Also builds DataFrames (`to_dataframe`).
+- `plot.py`: Plots Plant growth variables against date across simulations (`plot_plant_growth`) and simulated versus observed values with a 1:1 line (`plot_evaluation`) using optional matplotlib. `plot_observed` overlays measured points on Plant growth curves and shares the private result-key mapping with `evaluate`.
 - `runner.py`: Executes the DSSAT executable on a FileX and moves generated output files into a dated run directory.
 - `simulation.py`: Coordinates pre-run checks, staging, weather, soil, and management file generation, execution, and output scanning for a single simulation.
 - `soil.py`: Writes the soil template, parses CSV/DataFrame/dict soil data, validates ranges and layer depths, and formats DSSAT soil files (`*.SOL`).
@@ -104,7 +105,7 @@ All identified issues are collected and returned as a list of strings. When `man
 
 ### 3. File generation and staging
 
-When checks pass, `Simulation.run()` creates a dated simulation folder (`dssat_sim_YYYY-MM-DD_HHMMSS`) beside the FileX to isolate the execution environment. The FileX and sibling model files with extensions `.CUL`, `.ECO`, or `.SPE` are copied into this folder.
+When checks pass, `Simulation.run()` creates a dated simulation folder (`dssat_sim_YYYY-MM-DD_HHMMSS`) beside the FileX to isolate the execution environment. The FileX and sibling model files with extensions `.CUL`, `.ECO`, or `.SPE` are copied into this folder. The FileA and FileT named after the FileX are also copied when present, so DSSAT can fill measured columns in `Evaluate.OUT`; no FileA/FileT is written.
 
 When management data is provided, `filex_write._write_management()` edits the copied FileX inside the simulation folder: it appends new levels to the planting details, irrigation, or fertilizer sections and updates the treatment pointer (`MP`, `MI`, `MF`). The original FileX remains untouched.
 
