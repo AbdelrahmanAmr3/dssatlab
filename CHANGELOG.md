@@ -2,6 +2,28 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.13.1] - UNDATED
+
+### Added
+- Crop rotations from the FileX template: the FileX template accepts `treatment_name` and `rotation`, a list of 2 to 9 rotation components, instead of single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`, `treatments`, `treatment_fields`) (ADR 0014).
+- Rotation components: crop components support the standard template crops with `crop`, `cultivar.code`, `planting`, and optional `harvest_date` (including potato rules and column-width validation); fallow components are defined with `{crop: "fallow", end_date: "YYYY-MM-DD"}`. Component errors identify their position (`FileX template, rotation[3]...`).
+- Pre-run rotation date checks: catches dates that DSSAT would silently move forward by whole years: the first component must be a crop (simulation starts on its planting date); the last component must have a known end date (fallow `end_date` or crop `harvest_date`); each component's start date must be strictly after the previous component's end date; and cycle closure requires the last component's day of year to end before the first planting's day of year, with an example valid end date suggested in the message.
+- Cycle length and multi-cycle runs: the rotation cycle in years (`year of last end + 1 day minus first planting year`) is written as the first component's `NYERS`, so a bare rotation template runs one full cycle by default; experiment data controls `years` overrides it to simulate multiple cycles (with experiment data restricted to controls `years` and `start_date`).
+- Rotation sequence execution: `Simulation(filex_template=rotation, weather=..., soil=...)` writes `<station><yy>01.SQX`, copies genotype files (`.CUL`, `.ECO`, `.SPE`) for every crop in the rotation, and executes in DSSAT's sequence mode (`Q`) via `DSSBatch.v48`. `check()` reports the rotation components (e.g. `FileX: treatment 1 is a sequence of 4 rotation components (R 1-4: MZ, FA, WH, FA); it runs in DSSAT's sequence mode.`).
+- `run_treatments(filex_template=rotation)` runs the rotation sequence once.
+- `write_filex()` writes a rotation template to `.SQX`.
+- `write_filex_template()` includes a commented rotation example.
+- Guide section "A rotation from the FileX template" in `docs/guide/sequence.md` and tutorial Case 10 demonstrating a maize-fallow-wheat-fallow rotation across 1 and 3 cycles with Gainesville weather and `IBSB910015` soil.
+- Architecture Decision Record 0014 recording rotation FileX templates and day-of-year date checks.
+
+### Changed
+- `list_crops` and `list_cultivars` moved from `filex_template.py` to `cultivar.py`; public imports from `dssatlab` remain unchanged.
+
+### Notes
+- Crops harvested at maturity can still overrun into a subsequent year depending on simulated weather; users should specify a fixed `harvest_date` or leave a margin before the next component.
+- Experiment data per rotation component is deferred to v0.13.2.
+- Upgrading from 0.13.0 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.13.0] - 2026-10-01
 
 ### Added

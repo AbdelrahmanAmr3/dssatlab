@@ -61,6 +61,10 @@ In addition, an optional top-level `harvest_date` may be specified as a quoted I
 
 **Potato requirements**: Potato requires all three fields: `planting_material_weight`, `sprout_length`, and `harvest_date`. Each missing field is reported as a separate problem. For other crops, these fields are optional.
 
+### Crop rotations
+
+To simulate a multi-year crop rotation (such as maize followed by fallow, wheat, and fallow) from scratch, provide `rotation`—a list of 2 to 9 crop or fallow components—instead of the single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`). See [A rotation from the FileX template](sequence.md#a-rotation-from-the-filex-template) for details on template structure, date checks, and multi-cycle simulations.
+
 ### Named treatments and multi-treatment experiments
 
 The FileX template accepts either `treatment_name` (one treatment) or `treatments`, a list of 1 to 99 treatment names. Supply exactly one of the two:

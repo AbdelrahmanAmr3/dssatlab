@@ -120,6 +120,110 @@ path.write_text(text, encoding="latin-1")
 
 Once updated, the FileX passes all checks.
 
+## A rotation from the FileX template
+
+In addition to running sequences from existing FileX files, you can build and run a sequence directly from a **FileX template** without hand-editing any FileX. Instead of single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`, `treatments`, `treatment_fields`), supply `treatment_name` and `rotation`, a list of 2 to 9 rotation components ([ADR 0014](../adr/0014-rotation-in-the-filex-template.md)).
+
+```yaml
+# rotation.yaml
+treatment_name: "Maize-wheat rotation"
+rotation:
+  - crop: "maize"
+    cultivar:
+      code: "IB0035"
+    planting:
+      date: "1978-03-15"
+      method: "S"
+      distribution: "R"
+      population: 7.2
+      row_spacing: 75
+      depth: 5
+  - crop: "fallow"
+    end_date: "1978-11-14"
+  - crop: "wheat"
+    cultivar:
+      code: "IB1500"
+    planting:
+      date: "1978-11-15"
+      method: "S"
+      distribution: "R"
+      population: 7.2
+      row_spacing: 75
+      depth: 5
+  - crop: "fallow"
+    end_date: "1979-03-14"
+```
+
+A crop component takes the standard template crop fields (`crop`, `cultivar.code`, `planting`, and optional `harvest_date`, validated under the same rules as the single-crop template, including potato requirements). A fallow component is defined with `{crop: "fallow", end_date: "YYYY-MM-DD"}`.
+
+### Run with `Simulation`
+
+Pass the template path or dictionary to `dl.Simulation` alongside your daily weather and soil data:
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation(
+    filex_template="rotation.yaml",  # or a Python dict
+    weather=weather_rows,
+    soil="soil.csv",  # or a list of soil layer dicts
+)
+
+# 1. Run strict pre-run checks
+problems = sim.check()
+# Report: "FileX: treatment 1 is a sequence of 4 rotation components (R 1-4: MZ, FA, WH, FA); it runs in DSSAT's sequence mode."
+
+# 2. Run the rotation simulation
+result = sim.run()
+```
+
+When `sim.run()` executes, `dssatlab` writes `<station><yy>01.SQX`, copies the genotype files (`.CUL`, `.ECO`, `.SPE`) for every crop in the rotation into the simulation folder, writes `SOIL.SOL` and `DSSBatch.v48`, and executes in DSSAT's sequence mode (`Q`).
+
+### One cycle by default, controls `years` for more
+
+By default, the rotation runs for **one complete cycle**. The cycle length in years (`year of last end + 1 day minus first planting year` = 1979 - 1978 = 1 year) is automatically calculated and written as the first component's `NYERS`. Running the single-cycle simulation above returns 4 summary rows (one for each rotation component).
+
+To run more cycles over multiple years, pass experiment data setting controls `years`:
+
+```python
+sim = dl.Simulation(
+    filex_template="rotation.yaml",
+    weather=weather_rows,
+    soil="soil.csv",
+    management={"treatments": {1: {"controls": {"years": 3}}}},
+)
+result = sim.run()
+```
+
+With `years: 3`, the rotation runs for 3 full cycles, returning 12 summary rows cycling through components 1–4. Experiment data for a rotation template is restricted to controls `years` and `start_date` (modifying management for individual rotation components via experiment data is deferred to v0.13.2). You can also run a rotation template with `run_treatments(filex_template=rotation)`.
+
+### Pre-run rotation date checks
+
+DSSAT's sequence mode enforces a silent date-advancement rule: it advances each component's dates forward by whole years, preserving their day of year (DOY), until they fall on or after the component's start date (the day following the previous component's end). Dates entered out of order, or a final component that ends too late in the calendar year, cause DSSAT to silently skip a full year without any warning or error.
+
+To protect against silent year skips, `dssatlab` validates all calendar dates before writing files or running DSSAT:
+
+1. **First component must be a crop**: the simulation begins on its planting date; a fallow cannot be the first component.
+   ```text
+   FileX template, rotation[1]: the first component must be a crop; the simulation starts on its planting date. Move the fallow later in the rotation.
+   ```
+2. **Last component needs a known end**: the final component must end on a definite date—either a fallow with `end_date` or a crop with `harvest_date`—so the cycle length is known and subsequent cycles start on time.
+   ```text
+   FileX template, rotation[4]: the last component needs a known end so the next cycle can start on time. Make it a fallow with end_date, or give it a harvest_date.
+   ```
+3. **Dates in rotation order**: each component's start date (planting date or fallow `end_date`) must be strictly after the previous component's last known date (its `harvest_date` or `end_date`, else its `planting` date).
+   ```text
+   FileX template, rotation[3], planting date: 1978-05-30 is not after rotation[2]'s end (1978-11-14). DSSAT would move it a year later. Supply rotation dates in order.
+   ```
+4. **Cycle closure**: the last component's end date day of year must be strictly before the first component's planting day of year so the next cycle starts on time. The check calculates the DOY and suggests a valid end date:
+   ```text
+   FileX template, rotation: the last component ends on 1979-03-20 (day 79 of the year), not before the first planting's day of the year (day 74, 1978-03-15); DSSAT would start the next cycle a year late. End the last component before day 74, for example on 1979-03-14.
+   ```
+
+### The maturity-overrun caveat
+
+When a crop is harvested at maturity (`harvest_date` omitted), DSSAT determines its actual harvest date dynamically based on weather conditions during simulation. In certain weather years, crop development may be delayed, causing the crop to mature after the next component's calendar date. When this happens, DSSAT moves the next component forward by an entire year. Because weather-driven maturity cannot be predicted prior to the run, this overrun cannot be caught by pre-run checks. To prevent unintended year shifts, specify an explicit `harvest_date` or leave an adequate buffer margin (such as a fallow period) before the following crop.
+
 ## Summary rows and rotation components
 
 In a sequence analysis, `result.summary()` returns one row per rotation component run:
