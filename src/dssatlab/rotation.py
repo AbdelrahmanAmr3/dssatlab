@@ -109,3 +109,133 @@ def _render_rotation(data, weather_rows, soil_rows):
                       *harvests, ""])
     lines.extend(["*SIMULATION CONTROLS", *controls])
     return f"{stem}.SQX", "\n".join(lines)
+
+
+def _control_lines(number, years, day, name, model, symbi, harvest):
+    """One controls level, including DSSAT automatic-management defaults."""
+    return [
+        "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
+        f"{number:2d} GE          {years:5d}     1     S {day}  2150 {name:<25} {model}",
+        "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
+        f"{number:2d} OP              Y     Y     {symbi}     N     N     N     N     N     M",
+        "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
+        f"{number:2d} ME              M     M     E     R     S     C     R     1     G     R     2",
+        "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
+        f"{number:2d} MA              R     R     R     N     {'R' if harvest else 'M'}",
+        "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
+        f"{number:2d} OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
+        "", "@  AUTOMATIC MANAGEMENT",
+        "@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN",
+        f"{number:2d} PL          {day} {day}    40   100    30    40    10",
+        "@N IRRIGATION  IMDEP ITHRL ITHRU IROFF IMETH IRAMT IREFF",
+        f"{number:2d} IR             30    50   100 GS000 IR001    10     1",
+        "@N NITROGEN    NMDEP NMTHR NAMNT NCODE NAOFF",
+        f"{number:2d} NI             30    50    25 FE001 GS000",
+        "@N RESIDUES    RIPCN RTIME RIDEP",
+        f"{number:2d} RE            100     1    20",
+        "@N HARVEST     HFRST HLAST HPCNP HPCNR",
+        f"{number:2d} HA              0   -99   100     0", "",
+    ]
+
+
+def _rotation_genotype_files(data, data_dir):
+    """List each crop's required genotype files once; fallow needs none."""
+    paths = {}
+    for component in data.get("rotation", []):
+        crop = component.get("crop") if isinstance(component, dict) else None
+        if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
+            _, _, prefix, extensions, _ = _CROPS[crop]
+            for suffix in extensions:
+                path = data_dir / "Genotype" / f"{prefix}.{suffix}"
+                paths.setdefault(path, None)
+    return list(paths)
+
+
+def _check_rotation_simulation(sim, data, data_dir, template_problems, experiment_data, load_problems):
+    """Check one field and sequence controls without writing a temporary FileX."""
+    from .controls import _controls_start_date
+    from .filex_skeleton import _parse_field_data
+    from .management import _check_management, _report_lines
+    from .sequence import _sequence_coverage, _sequence_experiment_data
+
+    weather, wp, wr = _parse_field_data(sim.weather, 1, "weather")
+    soil, sp, sr = _parse_field_data(sim.soil, 1, "soil")
+    for kind in ("weather", "soil"):
+        if isinstance(getattr(sim, kind), dict):
+            template_problems.append(f"{kind.capitalize()} data per field needs treatment_fields. "
+                                     f"Supply one {kind} source for a rotation FileX template.")
+    valid_treatment = (not isinstance(sim.treatment, bool)
+                       and isinstance(sim.treatment, (int, str))
+                       and re.fullmatch(r"0*1", str(sim.treatment)))
+    if not valid_treatment:
+        template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+    text, start, components, sequence_report = None, None, [], []
+    # The checked template already fixes R=1..N, FL=1 and NREPS=1.
+    if not template_problems:
+        components = [{"CR": "FA" if c["crop"] == "fallow" else _CROPS[c["crop"]][0]}
+                      for c in data["rotation"]]
+        crops = ", ".join(c["CR"] for c in components)
+        sequence_report = [f"FileX: treatment 1 is a sequence of {len(components)} rotation "
+                           f"components (R 1-{len(components)}: {crops}); "
+                           "it runs in DSSAT's sequence mode."]
+        start = (_controls_start_date(experiment_data, 1)
+                 or date.fromisoformat(data["rotation"][0]["planting"]["date"]))
+        days = [row["date"] for row in weather.get(1, []) if "date" in row]
+        template_problems.extend(_sequence_coverage(
+            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"])))
+        if days and start not in days:
+            template_problems.append(f"Simulation start date {start} is not covered by weather "
+                                     f"data ({min(days)} to {max(days)}). Supply weather for that date.")
+        if not (wp or sp):
+            _, text = _render_rotation(data, weather, soil)
+    for path in _rotation_genotype_files(data, data_dir) if isinstance(data["rotation"], list) else []:
+        if not path.is_file():
+            template_problems.append(f"FileX template: missing genotype file {path}. "
+                                     "Supply this file in the data directory's Genotype folder.")
+    found, checked_data = _sequence_experiment_data(experiment_data, 1, components)
+    template_problems.extend(found)
+    problems = wp + sp + template_problems
+    report = wr + sr + _report_lines("FileX template", template_problems) + sequence_report
+    if sim.management is not None:
+        if load_problems:
+            found, lines = load_problems, _report_lines("Management data", load_problems)
+        else:
+            found, lines = _check_management(checked_data, None, sim.treatment,
+                                             weather.get(1, []), start, text=text)
+        problems.extend(found)
+        report.extend(lines)
+    return problems, report
+
+
+def _write_rotation_simulation(sim, data, data_dir, experiment_data):
+    """Write the checked sequence and its one field, preserving component names."""
+    from pathlib import Path
+    import shutil
+    from .controls import _controls_start_date, _selected_controls
+    from .filex_skeleton import _parse_field_data, write_filex
+    from .filex_write import _repoint
+    from .runner import _create_dated_folder
+    from .soil import _write_soil_profiles
+    from .weather import write_weather_file
+
+    weather, _, _ = _parse_field_data(sim.weather, 1, "weather")
+    soil, _, _ = _parse_field_data(sim.soil, 1, "soil")
+    parent = (Path(sim.filex_template).resolve().parent
+              if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
+    folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
+    filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
+    start = (_controls_start_date(experiment_data, 1)
+             or date.fromisoformat(data["rotation"][0]["planting"]["date"]))
+    write_weather_file(weather[1], folder / f"{weather[1][0]['station']}{start.year % 100:02d}01.WTH")
+    _write_soil_profiles([soil[1]], folder / "SOIL.SOL")
+    for path in _rotation_genotype_files(data, data_dir):
+        shutil.copy2(path, folder / path.name)
+    # This new FileX owns its levels: edit level 1 directly, leaving later components intact.
+    controls = _selected_controls(experiment_data, 1)
+    lines = filex.read_text(encoding="ascii").splitlines(keepends=True)
+    for key, column, value in (("years", "NYERS", controls.get("years")),
+                               ("start_date", "SDATE", _dssat_date(start))):
+        if key in controls:
+            _repoint(lines, 1, column, value, "SIMULATION CONTROLS", "N")
+    filex.write_bytes("".join(lines).encode("ascii"))
+    return filex

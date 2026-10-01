@@ -13,6 +13,7 @@ from .filex_template import (_check_filex_template, _load_filex_template,
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
+from .rotation import _control_lines
 from .runner import _create_dated_folder
 from .soil import _parse_soil, _write_soil_profiles
 from .weather import _dssat_date, _parse_weather, write_weather_file
@@ -80,6 +81,10 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     # Shape/value checks still run when executable discovery fails.
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
+    if isinstance(data, dict) and "rotation" in data:
+        from .rotation import _check_rotation_simulation
+        return _check_rotation_simulation(sim, data, data_dir, template_problems,
+                                          experiment_data, load_problems)
     fields = _template_treatment_fields(data) if isinstance(data, dict) else [1]
     # Malformed field lists are reported by the template checks, never indexed,
     # and the field keys are then not compared with them (count None).
@@ -166,6 +171,9 @@ def _write_template_simulation(sim, experiment_data):
     """Write checked template inputs and experiment data dict; return the FileX path."""
     data_dir = _template_data_dir(sim.executable)
     data, _ = _load_filex_template(sim.filex_template)
+    if "rotation" in data:
+        from .rotation import _write_rotation_simulation
+        return _write_rotation_simulation(sim, data, data_dir, experiment_data)
     count = max(_template_treatment_fields(data))
     weather, _, _ = _parse_field_data(sim.weather, count, "weather")
     soil, _, _ = _parse_field_data(sim.soil, count, "soil")
@@ -290,31 +298,4 @@ def _field_lines(weather_rows, soil_rows, count):
         *field_lines,
         "@L ...........XCRD ...........YCRD .....ELEV .............AREA .SLEN .FLWR .SLAS FLHST FHDUR",
         *coordinate_lines, "",
-    ]
-
-
-def _control_lines(number, years, day, name, model, symbi, harvest):
-    """One controls level, including DSSAT automatic-management defaults."""
-    return [
-        "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
-        f"{number:2d} GE          {years:5d}     1     S {day}  2150 {name:<25} {model}",
-        "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
-        f"{number:2d} OP              Y     Y     {symbi}     N     N     N     N     N     M",
-        "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
-        f"{number:2d} ME              M     M     E     R     S     C     R     1     G     R     2",
-        "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
-        f"{number:2d} MA              R     R     R     N     {'R' if harvest else 'M'}",
-        "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
-        f"{number:2d} OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
-        "", "@  AUTOMATIC MANAGEMENT",
-        "@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN",
-        f"{number:2d} PL          {day} {day}    40   100    30    40    10",
-        "@N IRRIGATION  IMDEP ITHRL ITHRU IROFF IMETH IRAMT IREFF",
-        f"{number:2d} IR             30    50   100 GS000 IR001    10     1",
-        "@N NITROGEN    NMDEP NMTHR NAMNT NCODE NAOFF",
-        f"{number:2d} NI             30    50    25 FE001 GS000",
-        "@N RESIDUES    RIPCN RTIME RIDEP",
-        f"{number:2d} RE            100     1    20",
-        "@N HARVEST     HFRST HLAST HPCNP HPCNR",
-        f"{number:2d} HA              0   -99   100     0", "",
     ]
