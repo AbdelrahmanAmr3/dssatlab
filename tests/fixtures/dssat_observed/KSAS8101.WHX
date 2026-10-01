@@ -1,0 +1,11 @@
+! Narrow excerpt: treatment references, field and simulation start.
+*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 DRYLAND  - 0 KG N/HA       1  1  0  1  1  0  1  0  0  0  0  0  1
+ 2 1 0 0 DRYLAND  - 60 KG N/HA      1  1  0  1  1  0  2  0  0  0  0  0  1
+*FIELDS
+@L ID_FIELD WSTA....  FLSA  FLOB  FLDT  FLDD  FLDS  FLST SLTX  SLDP  ID_SOIL    FLNAME
+ 1 KSAS0001 KSAS       -99     0 DR000     0     0 00000 -99    180  IBWH980018 -99
+*SIMULATION CONTROLS
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 1 GE              1     1     S 81279  2150 N x IR ASHLAND,KS

@@ -122,13 +122,26 @@ _Avoid_: FileX generator
 
 **Observed data**:
 The user's own measured values (for example yield, anthesis day, or LAI on a date), given per
-scenario and treatment. dssatlab compares them with the Summary and Plant growth itself; nothing
-is written for DSSAT, so it is not DSSAT's FileA/FileT.
-_Avoid_: FileA, measured file
+scenario and treatment, as a CSV, DataFrame or list of rows. dssatlab compares them with the
+Summary and Plant growth itself and writes nothing for DSSAT. Observed data can also be read from a
+FileA/FileT.
+_Avoid_: measured file
+
+**FileA/FileT**:
+DSSAT's own observed files beside the FileX, with the same name and the last extension letter A
+(end-of-season averages per treatment) or T (values per treatment and date). dssatlab reads them into
+observed data; it never writes them. `-99` in them means "not measured".
+_Avoid_: observed file (ambiguous with the observed data CSV)
+
+**DSSAT evaluation**:
+DSSAT's own simulated-versus-measured table, `Evaluate.OUT`. DSSAT fills its measured columns only
+in some runs (verified: CERES-Maize through run() with the FileA beside the FileX); a Simulation runs
+one treatment and DSSAT leaves them -99. Read as rows; not the same as dssatlab's Evaluation.
+_Avoid_: evaluation (alone)
 
 **Evaluation**:
 The comparison of observed data with a run's Summary and Plant growth: the error for each
-variable, and RMSE, bias and d-index across scenarios. Not DSSAT's `Evaluate.OUT`, which is not read.
+variable, and RMSE, bias and d-index across scenarios, computed by dssatlab. Not the DSSAT evaluation.
 _Avoid_: Evaluate.OUT, validation
 
 **Example**:

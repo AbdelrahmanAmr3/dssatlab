@@ -53,3 +53,8 @@ def test_weather_public_api_is_exported():
                  "write_management_template", "DSSATCheckError"):
         assert name in dssatlab.__all__
         assert callable(getattr(dssatlab, name))
+
+
+def test_dssat_evaluation_public_api_is_exported():
+    assert callable(dssatlab.read_dssat_evaluation)
+    assert "read_dssat_evaluation" in dssatlab.__all__

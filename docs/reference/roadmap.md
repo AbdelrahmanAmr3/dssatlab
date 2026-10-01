@@ -16,6 +16,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.6 | Experiment data: `cultivar`, `initial_conditions` and `controls` sections beside planting, irrigation and fertilizer, applied to a copy of an existing FileX, and `write_experiment_template()`. Proven on real DSSAT with maize and wheat. |
 | 0.7 | FileX template: write a FileX for one field, one treatment and one crop (maize, wheat) from your own weather and soil, `write_filex_template()`; scenario name in `TNAM`; experiment data sets the station and soil ID of the copied FileX. Proven on real DSSAT. |
 | 0.8 | Observed data: a commented CSV template (`write_observed_template()`), comparison with Summary and Plant growth (`evaluate()`), an `Evaluation` with paired errors, RMSE, mean bias and Willmott's d-index, and a 1:1 scatter (`plot_evaluation()`). DSSAT's own column names and units; all observed data and matching problems in one `DSSATCheckError`. |
+| 0.9 | Read FileA/FileT as observed data (`read_dssat_observed()`), overlay measurements on Plant growth (`plot_observed()`), and read the DSSAT evaluation (`read_dssat_evaluation()`, `result.dssat_evaluation()`). No FileA/FileT is written (ADR 0008). |
 
 ## Deliberately not built yet
 
@@ -23,7 +24,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 
 | Not built | Why it waits |
 |---|---|
-| Full FileX or other output parsing | Five output files (Summary.OUT, PlantGro.OUT, SoilWat.OUT, PlantN.OUT, Weather.OUT) are read in 0.5; reading other output files (ET.OUT, OVERVIEW.OUT, Evaluate.OUT, etc.) and full FileX parsing wait for later phases. |
+| Full FileX or other output parsing | Six output files (Summary.OUT, PlantGro.OUT, SoilWat.OUT, PlantN.OUT, Weather.OUT, Evaluate.OUT) are read as of 0.9; reading other output files (ET.OUT, OVERVIEW.OUT, etc.) and full FileX parsing wait for later phases. |
 | Multi-field or multi-treatment FileX, more crops | 0.7 writes a FileX for one field, one treatment and one crop (maize, wheat); each further crop needs a real-DSSAT proof run first. |
 | Other management operations | Planting, irrigation, and inorganic fertilizer are supported; operations like tillage, organic amendments, harvest, and chemical applications wait for later phases. |
 | Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |

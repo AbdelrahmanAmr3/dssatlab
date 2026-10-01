@@ -4,12 +4,98 @@ from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
 
-from .errors import DSSATError, DSSATOutputError
-from .evaluate import Evaluation
+from .errors import DSSATCheckError, DSSATError, DSSATOutputError
+from .evaluate import Evaluation, _results_by_key
+from .observed import _KEYS, _SUMMARY_COLUMNS, _load_observed
 from .outputs import _SUMMARY_DATES, _date_value, read_plant_growth, read_summary
+from .runner import RunResult
 
 
 _EXCLUDED_COLUMNS = {"YEAR", "DOY", "DATE", "RUNNO", "TRNO"}
+
+
+def plot_observed(results: RunResult | dict[tuple[str, int], RunResult], observed, variable: str):
+    """Draw Plant growth curves and observed points (v0.9 stories 18–23).
+
+    Accept the same results and CSV, DataFrame or list of rows as evaluate().
+    A single run uses scenario 'base' and its Summary treatments. Each observed
+    scenario/treatment gets one line and matching-colour markers, including
+    measurements outside the simulated season; dates are never paired.
+
+    Return the matplotlib Axes. Input and output problems raise one
+    DSSATCheckError before drawing. Summary variables, variables without dated
+    measurements, and missing matplotlib raise DSSATError.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as exc:
+        raise DSSATError(
+            "Plotting needs matplotlib. Install it with: pip install dssatlab[plot]"
+        ) from exc
+
+    observed, problems = _load_observed(observed)
+    results, cache = _results_by_key(results, problems)
+    groups = {}
+    for row in observed:
+        if row["date"] is not None and variable in row:
+            groups.setdefault((row["scenario"], row["treatment"]), []).append(row)
+
+    if variable in _SUMMARY_COLUMNS or (not groups and any(variable in row for row in observed)):
+        raise DSSATError(
+            f"{variable!r} is an end-of-season variable. Checked observed data columns. "
+            "Use plot_evaluation(evaluate(...), variable)."
+        )
+
+    simulations = []
+    for (scenario, treatment), measurements in groups.items():
+        where = f"Scenario {scenario!r}, treatment {treatment}"
+        result = results.get((scenario, treatment))
+        if result is None:
+            problems.append(f"{where}: no matching result. Check the observed keys "
+                            "against the supplied results.")
+            continue
+        key = (result.run_dir, True)
+        if key not in cache:
+            try:
+                cache[key] = result.plant_growth()
+            except DSSATOutputError as error:
+                cache[key] = None
+                problems.append(f"{where}: {error}")
+        if cache[key] is None:
+            continue
+        rows = [row for row in cache[key] if row["TRNO"] == treatment]
+        if not rows:
+            problems.append(f"{where}: no Plant growth rows for this treatment in PlantGro.OUT. "
+                            "Supply output containing the observed treatment.")
+        elif not any(variable in row for row in rows):
+            problems.append(f"{where}, {variable}: variable absent from PlantGro.OUT. "
+                            "Check the measurement column against the simulated output.")
+        else:
+            simulations.append((f"{scenario}, treatment {treatment}", rows, measurements))
+    if problems:
+        raise DSSATCheckError(problems)
+    if not groups:
+        available = sorted({name for row in observed if row["date"] is not None
+                            for name in row if name not in _KEYS})
+        raise DSSATError(
+            f"No dated observed rows contain {variable!r}. "
+            f"Available dated variables are: {', '.join(available) or 'none'}. "
+            "Choose an available variable or supply dated measurements."
+        )
+
+    fig, ax = plt.subplots()
+    for label, rows, measurements in simulations:
+        points = [row for row in rows if row.get("DATE") is not None
+                  and row.get(variable) is not None]
+        line, = ax.plot([row["DATE"] for row in points],
+                        [row[variable] for row in points], label=label)
+        ax.scatter([row["date"] for row in measurements],
+                   [row[variable] for row in measurements], color=line.get_color())
+    ax.set_title(f"{variable}: simulated and observed")
+    ax.set_xlabel("Date")
+    ax.set_ylabel(variable)
+    ax.legend()
+    return ax
 
 
 def plot_plant_growth(run_dirs: str | Path | Sequence[str | Path], variable: str):
