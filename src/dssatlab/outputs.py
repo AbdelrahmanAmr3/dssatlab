@@ -244,3 +244,74 @@ def _read_daily(run_dir: str | Path, filename: str) -> list[dict]:
                 f"in run block starting at line {start + 1}: {exc}. {checked} {next_step}"
             ) from exc
     return rows
+
+
+def _evaluate_value(name: str, value: str):
+    if re.fullmatch(r"-99(?:\.0*)?", value):
+        return None
+    if name in {"EXCODE", "CR"}:
+        return value
+    try:
+        return int(value)
+    except ValueError:
+        try:
+            return float(value)
+        except ValueError:
+            return value
+
+
+def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
+    """Return DSSAT's simulated-versus-measured evaluation table from Evaluate.OUT.
+
+    Header line starts with @. Values are int, float, or str (EXCODE, CR), with
+    -99 missing values as None. Date columns remain days after planting. Multiple
+    *EVALUATION blocks read each row under its own header.
+
+    Raises DSSATOutputError if Evaluate.OUT is missing, empty, or malformed.
+    """
+    path = Path(run_dir) / "Evaluate.OUT"
+    checked = (f"Checked {path} in the run directory. DSSAT writes measured columns only when "
+               "the FileA is in the run directory or FileX folder.")
+    next_step = "Place the matching FileA beside the FileX and rerun DSSAT to produce Evaluate.OUT."
+    try:
+        lines = path.read_text(encoding="latin-1").splitlines()
+    except OSError as exc:
+        raise DSSATOutputError(
+            f"Evaluate.OUT is missing or unreadable ({exc}). {checked} {next_step}"
+        ) from exc
+
+    columns = None
+    rows = []
+    header_seen = False
+    for line_number, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("!", "*")):
+            continue
+        if stripped.startswith("@"):
+            header_seen = True
+            cols = line.lstrip()[1:].split()
+            if not cols or len(cols) != len(set(cols)):
+                raise DSSATOutputError(
+                    f"Invalid Evaluate header at line {line_number}: column names must be unique. "
+                    f"{checked} {next_step}"
+                )
+            columns = cols
+            continue
+        if columns is None:
+            raise DSSATOutputError(
+                f"Evaluate.OUT has data before header at line {line_number}. {checked} {next_step}"
+            )
+        values = stripped.split()
+        if len(values) != len(columns):
+            raise DSSATOutputError(
+                f"Malformed Evaluate.OUT data row at line {line_number}: "
+                f"expected {len(columns)} columns, got {len(values)}. {checked} {next_step}"
+            )
+        row = {col: _evaluate_value(col, val) for col, val in zip(columns, values)}
+        rows.append(row)
+
+    if not header_seen:
+        raise DSSATOutputError(f"Evaluate header (@ line) not found. {checked} {next_step}")
+    if not rows:
+        raise DSSATOutputError(f"Evaluate.OUT has no data rows. {checked} {next_step}")
+    return rows
