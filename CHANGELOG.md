@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.11.1] - UNDATED
+## [0.11.1] - 2026-10-01
 
 ### Added
 - FileX template key `treatment_fields`: an optional list of field numbers 1..K (whole numbers without gaps) matching `treatments` in length, placing each treatment on a specific field. When omitted, all treatments grow on field 1.
