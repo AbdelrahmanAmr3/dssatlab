@@ -241,12 +241,15 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
-                      soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None):
+                      soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None,
+                      rotation_template=None, data_dir=None):
     """Check every treatment without mutation; compare selected dates with FileX and weather.
 
     If FileX is unreadable, Simulation reports that failure; shape checks still run.
     Template simulations supply rendered text and their fixed model's cultivar path.
     """
+    from .rotation_data import _check_rotation_data
+
     label = "Management data"
     if not isinstance(source, dict):
         problems = ["Management data must be a dict. Supply a Management template "
@@ -280,12 +283,17 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
     for key, entry in source["treatments"].items():
         number, where, entry_problems = _check_treatment_key(key, seen_numbers, text, filex)
         is_selected = number is not None and number == selected_number
+        entry, rotation_problems, rotation_report = _check_rotation_data(
+            entry, number, filex, text, start_date if is_selected else None,
+            weather_range if is_selected else None, rotation_template, data_dir)
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
             soil_depth if is_selected else None, cultivar_path,
             start_date_note=start_date_note if is_selected else
             "only the selected treatment has a resolved simulation start date")
+        treatment_problems.extend(rotation_problems)
+        lines.extend(rotation_report)
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
         report.extend(lines)

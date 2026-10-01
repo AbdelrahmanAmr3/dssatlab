@@ -84,7 +84,7 @@ def test_sequence_coverage(sim, years, override, last, short):
 def test_experiment_data_limit(sim, installed, entry):
     sim.management = {"treatments": {1: entry}}
     expected = ("Treatment 1 is a sequence of 4 rotation components; experiment data for a "
-                "sequence takes only controls years and start_date. Edit the components "
+                "sequence takes only controls years, start_date and rotation. Edit the components "
                 "in the FileX for other changes.")
     assert sim.check(False) == [expected]
     with pytest.raises(DSSATCheckError):

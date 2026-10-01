@@ -191,7 +191,7 @@ def test_sequence_rejects_component_experiment_data(sequence, fake_dssat, entry,
     sequence.management = {"treatments": {"01": entry}}
     original = deepcopy(sequence.management)
     expected = ("Treatment 1 is a sequence of 6 rotation components; experiment data for a "
-                "sequence takes only controls years and start_date. Edit the components "
+                "sequence takes only controls years, start_date and rotation. Edit the components "
                 "in the FileX for other changes.")
     assert sequence.check(True) == [expected]
     assert "FileX: REJECTED" in capsys.readouterr().out
