@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .errors import DSSATCheckError, DSSATError, DSSATRunError
 from .filex import read_treatment_numbers
+from .filex_template import _load_filex_template
 from .management_file import _load_yaml
 from .outputs import read_summary
 from .runner import RunResult
@@ -44,11 +45,17 @@ def _scenario_inputs(source):
     return entries
 
 
-def run_treatments(filex, weather, treatments=None, soil=None, management=None,
-                   executable=None, scenarios=None) -> dict[tuple[str, int], RunResult]:
+def run_treatments(filex=None, weather=None, treatments=None, soil=None, management=None,
+                   executable=None, scenarios=None, filex_template=None) -> dict[tuple[str, int], RunResult]:
     """Check every scenario/treatment, then run each in its own simulation folder.
 
-    ``treatments=None`` selects every FileX treatment in file order. Otherwise,
+    Supply exactly one of ``filex`` (a FileX path) or ``filex_template`` (a YAML
+    path or dict). Templates require soil data, as for Simulation. Simulation
+    folders go beside the FileX or template YAML, or in the current directory
+    for a template dict.
+
+    ``treatments=None`` selects every FileX treatment in file order, or 1..N
+    in template name order (one for ``treatment_name``). Otherwise,
     pass a non-empty list or tuple of distinct treatment numbers (ints or digit
     strings, as for Simulation); their order is retained in the results.
 
@@ -70,7 +77,17 @@ def run_treatments(filex, weather, treatments=None, soil=None, management=None,
     The first DSSATRunError stops the batch and names earlier kept run
     directories. ``executable`` selects the DSSAT executable as for Simulation.
     """
-    if treatments is None:
+    if (filex is None) == (filex_template is None):
+        raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
+    if treatments is None and filex_template is not None:
+        data, _ = _load_filex_template(filex_template)
+        names = data.get("treatments") if isinstance(data, dict) else None
+        # Count only an unambiguous list. Simulation reports malformed or
+        # unreadable templates through its checks, using treatment 1 as fallback.
+        count = (len(names) if isinstance(names, list) and 1 <= len(names) <= 99
+                 and "treatment_name" not in data else 1)
+        treatments = list(range(1, count + 1))
+    elif treatments is None:
         try:
             treatments = read_treatment_numbers(filex)
         except ValueError as error:
@@ -78,7 +95,7 @@ def run_treatments(filex, weather, treatments=None, soil=None, management=None,
     if not isinstance(treatments, (list, tuple)) or not treatments:
         raise DSSATCheckError([
             "Scenario 'base', treatment selection: supply a non-empty list or tuple of "
-            "treatment numbers, or None for all FileX treatments."
+            "treatment numbers, or None for all treatments."
         ])
 
     base = dict(weather=weather, soil=soil, management=management)
@@ -87,7 +104,8 @@ def run_treatments(filex, weather, treatments=None, soil=None, management=None,
         inputs = {**base, **overrides}
         seen = set()
         for treatment in treatments:
-            sim = Simulation(filex, treatment, executable=executable, name=name, **inputs)
+            sim = Simulation(filex, treatment, filex_template=filex_template,
+                             executable=executable, name=name, **inputs)
             found, _ = sim._check_inputs()
             # Simulation reports invalid treatment types/values; only normalize
             # here to detect aliases such as 1 and "01" before results overwrite.
