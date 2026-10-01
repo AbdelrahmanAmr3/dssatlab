@@ -169,7 +169,7 @@ def _check_treatment_key(key, seen_numbers, text, filex):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
-                 soil_depth, cultivar_path):
+                 soil_depth, cultivar_path, *, start_date_note=None):
     sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
@@ -198,6 +198,15 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                 detail = f"FileX {filex}: {error}" if section == "planting" else str(error)
                 section_problems.append(f"{where}, {section}: {detail}")
                 lines = _report_lines(label, section_problems)
+        if section == "planting":
+            reason = start_date_note
+            planting_date = entry[section].get("date") if isinstance(entry[section], dict) else None
+            if reason is None and _check_date(planting_date, where):
+                reason = "planting date is missing or invalid; supply yyyy-mm-dd"
+            if reason is None and start_date is None:
+                reason = "simulation start date is unavailable; check the FileX start controls"
+            if reason is not None:
+                lines.append(f"      Note: planting-date-versus-start-date check was skipped ({reason}).")
         problems.extend(section_problems)
         report.extend(lines)
     if "cultivar" in entry:
@@ -232,7 +241,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
-                      soil_depth=None, *, text=None, cultivar_path=None):
+                      soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None):
     """Check every treatment without mutation; compare selected dates with FileX and weather.
 
     If FileX is unreadable, Simulation reports that failure; shape checks still run.
@@ -274,7 +283,9 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
-            soil_depth if is_selected else None, cultivar_path)
+            soil_depth if is_selected else None, cultivar_path,
+            start_date_note=start_date_note if is_selected else
+            "only the selected treatment has a resolved simulation start date")
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
         report.extend(lines)

@@ -158,3 +158,24 @@ ax = dl.plot_plant_growth([run_dir_rainfed, run_dir_irrigated], "LAID")
 ```
 
 Dates are parsed into `datetime.date` objects, DSSAT's `-99` missing values become `None`, and column names match DSSAT's own (`HWAM`, `ADAT`, `LAID`, `SWTD`, `NUPC`). Five output files are parsed (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, and `Weather.OUT`); other output files remain listed in `result.outputs`.
+
+## Compare with your measurements
+
+Put your observed data in a commented CSV template, using DSSAT's column names and
+units. Compare it with one run result or the dictionary from `run_treatments()`:
+
+```python
+dl.write_observed_template("observed.csv")
+# Replace the example rows with your observed data before continuing.
+ev = dl.evaluate(result, "observed.csv")
+print(ev.pairs)
+print(ev.statistics)
+dl.plot_evaluation(ev, variable="HWAM");  # requires dssatlab[plot]
+```
+
+Rows use `scenario` (`base` for one run) and `treatment`. Leave `date` blank for
+Summary values such as `HWAM`; use `yyyy-mm-dd` for Plant growth measurements on a
+day and for Summary date values such as `ADAT`. Evaluation reports simulated minus
+observed errors, plus RMSE, mean bias and Willmott's d-index for variables with at
+least two pairs. Observed data and matching problems are reported in one
+`DSSATCheckError`. See the [evaluation guide](docs/guide/evaluate.md).

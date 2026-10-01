@@ -333,6 +333,7 @@ dssatlab deliberately restricts output parsing to five files: `Summary.OUT`, `Pl
   are collected into the run directory and listed in `result.outputs`, but their contents
   are not parsed.
 - **No unit conversions**: Values remain in DSSAT's native output units.
-- **No automated statistics or aggregation**: dssatlab extracts the exact numbers DSSAT
-  simulated without computing means, standard errors, or gap-filling.
+- **Readers preserve simulated values**: readers do not compute statistics or fill gaps.
+  Use [evaluate()](evaluate.md) to compare these values with observed data and compute
+  RMSE, bias, and d-index.
 - **No new plots**: Plotting functions focus specifically on plant growth curves over time.

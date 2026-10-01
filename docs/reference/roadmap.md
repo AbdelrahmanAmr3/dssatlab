@@ -15,6 +15,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.5 | Run all or selected FileX treatments and what-if scenarios in separate folders (`run_treatments()`), scenario template (`write_scenario_template()`), merge summaries (`combine_summaries()`), and read three more output files: `SoilWat.OUT` (`read_soil_water()`), `PlantN.OUT` (`read_plant_nitrogen()`), and `Weather.OUT` (`read_weather()`). Access via `result.soil_water()`, `result.plant_nitrogen()`, and `result.weather()`. |
 | 0.6 | Experiment data: `cultivar`, `initial_conditions` and `controls` sections beside planting, irrigation and fertilizer, applied to a copy of an existing FileX, and `write_experiment_template()`. Proven on real DSSAT with maize and wheat. |
 | 0.7 | FileX template: write a FileX for one field, one treatment and one crop (maize, wheat) from your own weather and soil, `write_filex_template()`; scenario name in `TNAM`; experiment data sets the station and soil ID of the copied FileX. Proven on real DSSAT. |
+| 0.8 | Observed data: a commented CSV template (`write_observed_template()`), comparison with Summary and Plant growth (`evaluate()`), an `Evaluation` with paired errors, RMSE, mean bias and Willmott's d-index, and a 1:1 scatter (`plot_evaluation()`). DSSAT's own column names and units; all observed data and matching problems in one `DSSATCheckError`. |
 
 ## Deliberately not built yet
 

@@ -1,10 +1,12 @@
-"""Plot plant growth variables from DSSAT output files across simulations."""
+"""Plot Plant growth across simulations and Evaluation against observed data."""
 
 from collections.abc import Sequence
+from datetime import timedelta
 from pathlib import Path
 
 from .errors import DSSATError, DSSATOutputError
-from .outputs import read_plant_growth, read_summary
+from .evaluate import Evaluation
+from .outputs import _SUMMARY_DATES, _date_value, read_plant_growth, read_summary
 
 
 _EXCLUDED_COLUMNS = {"YEAR", "DOY", "DATE", "RUNNO", "TRNO"}
@@ -78,5 +80,72 @@ def plot_plant_growth(run_dirs: str | Path | Sequence[str | Path], variable: str
     ax.set_title(f"Plant growth: {variable}")
     ax.set_xlabel("Date")
     ax.set_ylabel(variable)
+    ax.legend()
+    return ax
+
+
+def plot_evaluation(evaluation: Evaluation, variable: str | None = None):
+    """Draw simulated versus observed pairs with a dashed 1:1 line (v0.8 story 11).
+
+    Parameters:
+        evaluation: The Evaluation returned by evaluate().
+        variable: DSSAT variable name, required when pairs contain multiple variables.
+
+    Values retain their original units; date variables use calendar axes. Statistics
+    are not required, so a variable with only one pair can also be plotted.
+
+    Returns:
+        The matplotlib Axes containing the scatter plot.
+
+    Raises:
+        DSSATError: If matplotlib is missing, there are no pairs, or the variable
+            is unknown or must be selected to avoid mixing units.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as exc:
+        raise DSSATError(
+            "Plotting needs matplotlib. Install it with: pip install dssatlab[plot]"
+        ) from exc
+
+    available = sorted({pair["variable"] for pair in evaluation.pairs})
+    if not available:
+        raise DSSATError(
+            "Cannot plot an empty Evaluation: checked pairs and found none. "
+            "Use evaluate() with observed measurements and matching results first."
+        )
+    if variable is None:
+        if len(available) != 1:
+            raise DSSATError(
+                "Cannot plot multiple variables together because their units may differ. "
+                "Checked Evaluation pairs. "
+                f"Available variables are: {', '.join(available)}. "
+                f"Choose one with plot_evaluation(evaluation, variable={available[0]!r})."
+            )
+        variable = available[0]
+    if variable not in available:
+        raise DSSATError(
+            f"Unknown Evaluation variable {variable!r}. Checked Evaluation pairs. "
+            f"Available variables are: {', '.join(available)}. "
+            "Choose an available variable to plot."
+        )
+
+    pairs = [pair for pair in evaluation.pairs if pair["variable"] == variable]
+    observed = [pair["observed"] for pair in pairs]
+    simulated = [pair["simulated"] for pair in pairs]
+    if variable in _SUMMARY_DATES:
+        observed = [_date_value(variable, str(value)) for value in observed]
+        simulated = [_date_value(variable, str(value)) for value in simulated]
+    low, high = min(observed + simulated), max(observed + simulated)
+    if low == high:
+        padding = timedelta(days=1) if variable in _SUMMARY_DATES else abs(low) * 0.05 or 0.5
+        low, high = low - padding, high + padding
+
+    fig, ax = plt.subplots()
+    ax.scatter(observed, simulated, label=variable)
+    ax.plot([low, high], [low, high], linestyle="--", color="gray")
+    ax.set_title(f"Evaluation: {variable}")
+    ax.set_xlabel("Observed")
+    ax.set_ylabel("Simulated")
     ax.legend()
     return ax

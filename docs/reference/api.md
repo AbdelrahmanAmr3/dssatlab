@@ -53,6 +53,19 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
       docstring_options:
         warn_missing_types: false
 
+## Observed data and evaluation
+
+::: dssatlab.write_observed_template
+
+::: dssatlab.evaluate
+
+::: dssatlab.evaluate.Evaluation
+
+::: dssatlab.plot_evaluation
+    options:
+      docstring_options:
+        warn_missing_types: false
+
 ## Exceptions
 
 ::: dssatlab.DSSATError

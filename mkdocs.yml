@@ -33,6 +33,7 @@ nav:
       - Run with experiment data: guide/experiment.md
       - Run treatments and scenarios: guide/scenarios.md
       - Reading results: guide/reading-results.md
+      - Evaluate against observed data: guide/evaluate.md
       - Troubleshooting: guide/troubleshooting.md
   - Reference and Architecture:
       - reference/index.md

@@ -4,7 +4,7 @@
 
 ## Module map
 
-The codebase under `src/dssatlab/` consists of fifteen modules:
+The codebase under `src/dssatlab/` includes these modules:
 
 - `__init__.py`: Defines `__version__` and exports the public API via `__all__`.
 - `config.py`: Reads and writes persistent JSON configuration storing the remembered DSSAT executable path.
@@ -12,6 +12,7 @@ The codebase under `src/dssatlab/` consists of fifteen modules:
 - `controls.py`: Checks the experiment `controls` section (start date, water and nitrogen switches, output interval) and writes a new `SIMULATION CONTROLS` level in the copied FileX.
 - `cultivar.py`: Checks an experiment `cultivar` code against the `.CUL` file beside the FileX and writes a new `CULTIVARS` level in the copied FileX.
 - `errors.py`: Defines the exception hierarchy for discovery, installation, input checks, and run failures.
+- `evaluate.py`: Matches observed data with Summary and Plant growth, collects check problems, and returns an `Evaluation` with pairs, RMSE, mean bias and Willmott's d-index.
 - `experiment.py`: Shared field, date and number checks for the experiment sections, and the `controls` shape check.
 - `filex.py`: Reads a FileX to extract field station codes (`WSTA`), field soil profile IDs (`ID_SOIL`), and simulation controls (`START`, `SDATE`) for a treatment.
 - `filex_write.py`: Modifies FileX text to append new management levels (planting details, irrigation schedules, fertilizer applications) and repoints treatment entries without altering other sections.
@@ -19,8 +20,9 @@ The codebase under `src/dssatlab/` consists of fifteen modules:
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
 - `management.py`: Validates management dictionary shape, field keys, numeric bounds, date order, and start date / weather bounds; formats structured check report lines.
 - `management_file.py`: Writes the YAML management template (`write_management_template`) and provides strict YAML loading (`_load_management`) using PyYAML SafeLoader with duplicate key rejection.
+- `observed.py`: Writes the commented observed data template (`write_observed_template`) and privately loads and checks CSV/DataFrame/list-of-dict measurements in DSSAT's own units.
 - `outputs.py`: Reads `Summary.OUT` and `PlantGro.OUT` using fixed-width headers, converts dates and `-99` missing values, and builds DataFrames (`to_dataframe`).
-- `plot.py`: Plots plant growth variables against date across simulations (`plot_plant_growth`) using optional matplotlib.
+- `plot.py`: Plots Plant growth variables against date across simulations (`plot_plant_growth`) and simulated versus observed values with a 1:1 line (`plot_evaluation`) using optional matplotlib.
 - `runner.py`: Executes the DSSAT executable on a FileX and moves generated output files into a dated run directory.
 - `simulation.py`: Coordinates pre-run checks, staging, weather, soil, and management file generation, execution, and output scanning for a single simulation.
 - `soil.py`: Writes the soil template, parses CSV/DataFrame/dict soil data, validates ranges and layer depths, and formats DSSAT soil files (`*.SOL`).
