@@ -1,4 +1,4 @@
-"""The tutorial notebook's two editable cells must match the committed data files."""
+"""The tutorial notebook's editable cells must match the committed data files."""
 import json
 from pathlib import Path
 
@@ -17,7 +17,7 @@ def _writefile_cells():
 
 def test_editable_cells_match_data_files():
     cells = dict(_writefile_cells())
-    for name in ("my_soil.csv", "my_experiment.yaml"):
+    for name in ("my_soil.csv", "my_experiment.yaml", "my_observed.csv"):
         expected = (DATA / name).read_text(encoding="utf-8").replace("\r\n", "\n")
         assert cells[name].rstrip("\n") == expected.rstrip("\n")
 

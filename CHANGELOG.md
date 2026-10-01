@@ -2,6 +2,24 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.8.0] - 2026-09-30
+
+### Added
+- `write_observed_template(path)` writes one commented CSV for your measurements: one row per scenario and treatment for end-of-season Summary values (`HWAM`, `ADAT`, `MDAT`, ...), and one row per date (yyyy-mm-dd) for Plant growth values (`LAID`, `CWAD`, ...). Use DSSAT's own column names and units; nothing is converted.
+- `evaluate(results, observed)` compares one `RunResult` (scenario `base`) or the `run_treatments()` results with your observed data (CSV path, list of dicts or DataFrame). It returns an `Evaluation` with the error of each pair and, for variables with at least two pairs, RMSE, mean bias (simulated minus observed) and Willmott's d-index. Date errors are in days. `to_dataframe()` gives the pairs as a table.
+- Every problem is reported at once in one `DSSATCheckError` before anything is compared: unknown column names (with the closest valid names), bad dates, `-99` measurements, keys with no matching run, dates with no simulated row and `-99` simulated values. Nothing is dropped silently.
+- `plot_evaluation(evaluation, variable=None)` draws a 1:1 simulated-versus-observed scatter (optional matplotlib); dates are plotted on calendar axes.
+- Proven on real DSSAT 4.8 with all six treatments of maize `UFGA8201` and wheat `KSAS8101`, compared with the measured data DSSAT ships for them.
+- Tutorial Case 3 compares a run with invented observed numbers.
+
+### Changed
+- `check()` says when the planting-versus-start-date check was skipped and why (unreadable or impossible `SDATE`, no or ambiguous weather year), instead of skipping silently (#57).
+- `Simulation.run()` loads the experiment data once and uses the same checked dict to write the FileX (#58).
+
+### Notes
+- No FileA/FileT is written and `Evaluate.OUT` is not read (ADR 0007).
+- Irrigation header placement re-measured on real DSSAT (#56): the writer's layout was already correct; no change.
+
 ## [0.7.0] - 2026-09-30
 
 ### Added

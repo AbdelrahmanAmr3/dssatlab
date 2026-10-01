@@ -26,4 +26,4 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "run_treatments", "combine_summaries", "write_scenario_template",
            ]
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
