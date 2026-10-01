@@ -125,8 +125,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                                      f"weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for that date.")
     problems = weather_problems + soil_problems + template_problems
-    report = (weather_report + soil_report
-              + _report_lines("FileX template", template_problems))
+    report = weather_report + soil_report + _report_lines("FileX template", template_problems)
     if sim.management is not None:
         if load_problems:
             problems.extend(load_problems)
@@ -178,9 +177,10 @@ def _write_template_simulation(sim, experiment_data):
     for path in _template_genotype_files(data, data_dir):
         shutil.copy2(path, folder / path.name)
     if rotation:
-        # Import only at dispatch: rotation uses the shared skeleton helpers.
         from .rotation import _write_rotation_controls
+        from .rotation_data import _write_rotation_data
         _write_rotation_controls(filex, experiment_data, start)
+        _write_rotation_data(filex, sim.treatment, experiment_data)
         return filex
     if isinstance(experiment_data, dict) and isinstance(experiment_data.get("treatments"), dict):
         for key in sorted(experiment_data["treatments"], key=int):
