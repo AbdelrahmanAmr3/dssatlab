@@ -5,7 +5,7 @@ import pytest
 
 from dssatlab import DSSATCheckError, DSSATNotFoundError, list_crops, list_cultivars, to_dataframe
 from dssatlab import core
-from dssatlab.filex_template import _CROPS
+from dssatlab.cultivar import _CROPS
 
 
 @pytest.fixture
