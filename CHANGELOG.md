@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.7.0] - UNDATED
+## [0.7.0] - 2026-09-30
 
 ### Added
 - `write_filex_template(path)` writes one commented YAML for a new experiment: one field, one treatment, one crop (maize or wheat), a cultivar and planting details. `Simulation(filex_template=..., weather=..., soil=...)` writes the FileX for you, so no existing FileX is needed. Station, coordinates and elevation come from your weather data and the soil ID from your soil data. Give exactly one of `filex` and `filex_template`; soil is required with a template.
@@ -18,7 +18,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Upgrading from 0.6.x needs no changes. `Simulation` gains one optional keyword, `name`, and `filex` and `treatment` now have defaults.
 - Still one field and one treatment per template; other crops are added only after a real-DSSAT run.
 
-## [0.6.1] - UNDATED
+## [0.6.1] - 2026-09-30
 
 ### Fixed
 - `run(filex)` now stops before starting when the FileX folder holds a `.csv` file DSSAT would delete (`weather.csv`, `summary.csv`, `plantgro.csv`, and the other Output file names). Checked on real DSSAT 4.8. `Simulation` was never affected because it runs in its own folder.
@@ -35,7 +35,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Upgrading from 0.6.0 needs no changes.
 - Weather that ends before the crop matures is still caught by `run()`, not `check()`.
 
-## [0.6.0] - UNDATED
+## [0.6.0] - 2026-09-30
 
 ### Added
 - Experiment data: the per-treatment management YAML (or dict) gains three sections, `cultivar`, `initial_conditions` and `controls`, applied to a copy of your FileX. The original is never changed, and an omitted section keeps the FileX's own level.
@@ -54,7 +54,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - Upgrading from 0.5.0 needs no changes.
 - Not included yet: building a FileX from scratch, writing `.CUL`, `.ECO` or `.SPE` parameters, simulation controls beyond the four named, per-crop parameter checks.
 
-## [0.5.0] - UNDATED
+## [0.5.0] - 2026-09-30
 
 ### Added
 - `run_treatments(filex, weather, treatments=None, soil=None, management=None, executable=None, scenarios=None)` runs all treatments (or a selected subset) of a FileX across named scenarios in separate, isolated folders and returns a `dict[(scenario, treatment)] -> RunResult`.
