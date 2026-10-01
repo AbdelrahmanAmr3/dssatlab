@@ -169,7 +169,7 @@ def _check_treatment_key(key, seen_numbers, text, filex):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
-                 soil_depth, cultivar_path):
+                 soil_depth, cultivar_path, *, start_date_note=None):
     sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
@@ -186,6 +186,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         if section == "planting":
             section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
             lines = _report_lines(label, section_problems)
+            if start_date_note is not None and not entry_problems and isinstance(entry[section], dict):
+                lines.append(f"      Note: planting-date-versus-start-date check was skipped ({start_date_note}).")
         else:
             section_problems, lines = _check_events(entry[section], section, where, weather_range)
         if not section_problems and not entry_problems and text is not None:
@@ -232,7 +234,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
-                      soil_depth=None, *, text=None, cultivar_path=None):
+                      soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None):
     """Check every treatment without mutation; compare selected dates with FileX and weather.
 
     If FileX is unreadable, Simulation reports that failure; shape checks still run.
@@ -274,7 +276,8 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
-            soil_depth if is_selected else None, cultivar_path)
+            soil_depth if is_selected else None, cultivar_path,
+            start_date_note=start_date_note if is_selected else None)
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
         report.extend(lines)

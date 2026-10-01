@@ -28,7 +28,7 @@ def _template_data_dir(executable):
     return found.parent
 
 
-def _check_template_simulation(sim):
+def _check_template_simulation(sim, management_data=None):
     """Check template inputs and experiment edits entirely in memory."""
     weather, weather_problems = _parse_weather(sim.weather)
     soil, soil_problems = (_parse_soil(sim.soil) if sim.soil is not None else
@@ -46,7 +46,9 @@ def _check_template_simulation(sim):
             or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
             or int(sim.treatment) != 1):
         template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
-    management, load_problems = _load_management(sim.management)
+    management, load_problems = (
+        _load_management(sim.management) if management_data is None else management_data
+    )
     start = _controls_start_date(management, sim.treatment)
     if start is None and isinstance(data, dict) and isinstance(data.get("planting"), dict):
         planting_date = data["planting"].get("date")
@@ -92,13 +94,16 @@ def _check_template_simulation(sim):
     return problems, report
 
 
-def _write_template_simulation(sim):
+def _write_template_simulation(sim, management_dict=None):
     """Write checked template inputs in a fresh folder and return the FileX path."""
     data_dir = _template_data_dir(sim.executable)
     data, _ = _load_filex_template(sim.filex_template)
     weather, _ = _parse_weather(sim.weather)
     soil, _ = _parse_soil(sim.soil)
-    management, _ = _load_management(sim.management)
+    management = (
+        management_dict if management_dict is not None
+        else _load_management(sim.management)[0]
+    )
     parent = (Path(sim.filex_template).resolve().parent
               if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
     folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")

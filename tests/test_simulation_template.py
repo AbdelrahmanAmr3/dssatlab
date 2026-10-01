@@ -240,3 +240,28 @@ def test_missing_genotype_files_are_reported_before_writing(data, rows, installe
         sim.run()
     assert snapshot(tmp_path) == before
     assert not list(tmp_path.glob("dssat_sim_*"))
+
+
+def test_simulation_template_run_loads_management_yaml_once(data, rows, installed, monkeypatch, tmp_path):
+    pytest.importorskip("yaml")
+    from dssatlab import management_file
+
+    yaml_file = tmp_path / "mgmt.yaml"
+    yaml_file.write_text("treatments:\n  1:\n    planting:\n      date: '2021-03-01'\n      method: 'S'\n      distribution: 'R'\n      population: 8\n      row_spacing: 75.0\n      depth: 4.0\n", encoding="utf-8")
+
+    load_calls = []
+    real_load = management_file._load_management
+
+    def counting_load(source):
+        load_calls.append(source)
+        return real_load(source)
+
+    monkeypatch.setattr(management_file, "_load_management", counting_load)
+    monkeypatch.setattr("dssatlab.simulation._load_management", counting_load)
+    monkeypatch.setattr("dssatlab.filex_skeleton._load_management", counting_load)
+
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], management=yaml_file)
+    result = sim.run()
+    assert result.returncode == 0
+    assert len(load_calls) == 1
+    assert load_calls[0] == yaml_file

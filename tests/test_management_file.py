@@ -425,6 +425,88 @@ def test_simulation_run_with_yaml_management(inputs, fake_dssat, monkeypatch, tm
     assert seen, "DSSAT was called"
 
 
+def test_simulation_run_loads_management_yaml_once(inputs, fake_dssat, monkeypatch, tmp_path):
+    pytest.importorskip("yaml")
+    from test_planting_run import HEADER, OLD_ROW, TREATMENT
+    from dssatlab import management_file
+
+    text = SAMPLE_FILEX.replace(TREATMENT, TREATMENT.replace(" 2 ", " 1 ", 1) + "\n" + TREATMENT)
+    text = text.replace("*SIMULATION CONTROLS", "*PLANTING DETAILS\n" + HEADER + "\n"
+                        + OLD_ROW + "\n\n*SIMULATION CONTROLS")
+    inputs.filex.write_bytes(text.encode("latin-1"))
+
+    yaml_content = """treatments:
+  "02":
+    planting:
+      date: "1982-02-25"
+      method: "S"
+      distribution: "R"
+      population: 8
+      row_spacing: 75.0
+      depth: 4.0
+"""
+    yaml_file = tmp_path / "plan.yaml"
+    yaml_file.write_text(yaml_content, encoding="utf-8")
+
+    load_calls = []
+    real_load = management_file._load_management
+
+    def counting_load(source):
+        load_calls.append(source)
+        return real_load(source)
+
+    monkeypatch.setattr(management_file, "_load_management", counting_load)
+    monkeypatch.setattr("dssatlab.simulation._load_management", counting_load)
+
+    sim = Simulation(inputs.filex, "02", inputs.rows, management=yaml_file)
+    result = sim.run()
+    assert result.returncode == 0
+    assert len(load_calls) == 1
+    assert load_calls[0] == yaml_file
+
+
+def test_simulation_run_writes_checked_content_when_yaml_file_edited_between_checks_and_write(
+        inputs, fake_dssat, monkeypatch, tmp_path):
+    pytest.importorskip("yaml")
+    from test_planting_run import HEADER, OLD_ROW, TREATMENT
+
+    text = SAMPLE_FILEX.replace(TREATMENT, TREATMENT.replace(" 2 ", " 1 ", 1) + "\n" + TREATMENT)
+    text = text.replace("*SIMULATION CONTROLS", "*PLANTING DETAILS\n" + HEADER + "\n"
+                        + OLD_ROW + "\n\n*SIMULATION CONTROLS")
+    inputs.filex.write_bytes(text.encode("latin-1"))
+
+    yaml_content = """treatments:
+  "02":
+    planting:
+      date: "1982-02-25"
+      method: "S"
+      distribution: "R"
+      population: 8
+      row_spacing: 75.0
+      depth: 4.0
+"""
+    yaml_file = tmp_path / "plan.yaml"
+    yaml_file.write_text(yaml_content, encoding="utf-8")
+
+    sim = Simulation(inputs.filex, "02", inputs.rows, management=yaml_file)
+
+    original_check_inputs = sim._check_inputs
+
+    def check_inputs_and_tamper(*args, **kwargs):
+        res = original_check_inputs(*args, **kwargs)
+        # Edit the file on disk after checks have loaded/checked the YAML:
+        yaml_file.write_text("corrupted / invalid YAML: [[[", encoding="utf-8")
+        return res
+
+    monkeypatch.setattr(sim, "_check_inputs", check_inputs_and_tamper)
+
+    result = sim.run()
+    assert result.returncode == 0
+    sim_filex = result.run_dir.parent / inputs.filex.name
+    content = sim_filex.read_text(encoding="latin-1")
+    assert "8.0" in content or "  8  " in content or "4.0" in content
+
+
 @pytest.mark.skipif(not Path(r"C:\DSSAT48\Maize\UFGA8201.MZX").exists(),
                     reason="DSSAT48 installation not found")
 def test_template_passes_checks_against_real_ufga8201_mzx(tmp_path):
