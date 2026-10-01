@@ -51,9 +51,20 @@ _Avoid_: site, location
 
 **Simulation**:
 One treatment of one experiment, described by its inputs, checked, and run to produce
-one set of results. The unit a future `Simulation` object stands for. A run carries out
+one set of results (one per season in a seasonal analysis). The unit a future `Simulation` object stands for. A run carries out
 one or more simulations (one per treatment it covers).
 _Avoid_: job, experiment (an experiment holds several simulations)
+
+**Season**:
+One year of a seasonal analysis: the same treatment run again from the same day of year in the
+next weather year, with its management dates moved by the same years. DSSAT runs the seasons
+of a treatment in one run, one Summary row each.
+_Avoid_: year (alone), replicate
+
+**Seasonal analysis**:
+Running one experiment's treatments over several seasons (DSSAT's NYERS, set by the controls
+`years`) and comparing the results across seasons: mean, spread and range of a Summary variable.
+_Avoid_: multi-year run, long-term run
 
 **Scenario**:
 A named set of input overrides applied to a base Simulation's inputs (weather, soil, or
@@ -190,7 +201,7 @@ soil water, plant nitrogen, and weather); every other one is only listed.
 _Avoid_: result file
 
 **Summary**:
-The parsed `Summary.OUT` of a run directory: one row per simulation, with DSSAT's own
+The parsed `Summary.OUT` of a run directory: one row per simulation and season, with DSSAT's own
 column names (`HWAM`, `ADAT`, ...).
 
 **Plant growth**:
