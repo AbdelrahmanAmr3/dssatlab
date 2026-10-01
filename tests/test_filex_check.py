@@ -366,7 +366,8 @@ def test_two_row_treatment_level_two_w_reported_once(filex, weather):
  2 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
 """
     path = filex(text=treatments + fields + controls)
-    assert Simulation(path, 1, weather()).check() == [
+    problems = Simulation(path, 1, weather()).check()
+    assert [p for p in problems if "WTHER" in p or "FNAME" in p] == [
         "FileX WTHER 'W' in controls level 2 (treatment 1): DSSAT would generate weather "
         "and ignore the weather data supplied. Set WTHER to M."
     ]
@@ -388,7 +389,8 @@ def test_two_rows_both_using_level_one_with_w_reported_once(filex, weather):
  1 OU              N     N     Y     1     N     N     N     N     N     N     Y     N     N     A
 """
     path = filex(text=treatments + fields + controls)
-    assert Simulation(path, 1, weather()).check() == [
+    problems = Simulation(path, 1, weather()).check()
+    assert [p for p in problems if "WTHER" in p or "FNAME" in p] == [
         "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
         "and ignore the weather data supplied. Set WTHER to M."
     ]

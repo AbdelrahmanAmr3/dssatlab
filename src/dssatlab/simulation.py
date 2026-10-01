@@ -13,7 +13,8 @@ from .filex_write import _identity_text, _write_management
 from .management import _check_management, _report_lines
 from .management_file import _load_management
 from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
-from .sequence import _check_sequence, _rotation_components, _run_sequence
+from .sequence import (_check_sequence, _rotation_components, _run_sequence,
+                       _sequence_coverage, _sequence_experiment_data)
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
@@ -147,7 +148,9 @@ class Simulation:
         values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
         components = _rotation_components(self.filex, self.treatment)
         sequence_problems, sequence_report = _check_sequence(self.filex, self.treatment, components)
-        filex_problems.extend(sequence_problems)
+        data_problems, checked_data = _sequence_experiment_data(
+            experiment_data, self.treatment, components)
+        filex_problems.extend(sequence_problems + data_problems)
         filex_problems.extend(_check_filex_controls(self.filex, self.treatment,
                                                     [row["SM"] for row in components]))
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
@@ -168,7 +171,8 @@ class Simulation:
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate, days))
-        filex_problems.extend(_season_coverage(
+        coverage = _sequence_coverage if len(components) > 1 else _season_coverage
+        filex_problems.extend(coverage(
             experiment_data, self.treatment, start_date, days, values.get("NYERS")))
         if override_start is not None and days:
             if override_start not in days:
@@ -226,7 +230,7 @@ class Simulation:
                 report.extend(_report_lines("Management data", load_problems))
             else:
                 management_problems, management_report = _check_management(
-                    experiment_data, self.filex, self.treatment, rows, start_date, soil_depth,
+                    checked_data, self.filex, self.treatment, rows, start_date, soil_depth,
                     start_date_note=skip_reason,
                 )
                 problems.extend(management_problems)

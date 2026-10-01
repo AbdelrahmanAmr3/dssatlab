@@ -1,5 +1,7 @@
 """Sequence checks and runs through Simulation and a fake DSSAT executable."""
 
+from copy import deepcopy
+from datetime import date, timedelta
 from pathlib import Path
 import platform
 import re
@@ -8,6 +10,7 @@ import subprocess
 import pytest
 
 from dssatlab import DSSATCheckError, DSSATRunError, Simulation
+from test_season_coverage import weather
 from test_simulation_run import fake_dssat  # noqa: F401; caches uname before mocking subprocess
 
 
@@ -24,9 +27,7 @@ def sequence(tmp_path):
     text = re.sub(r"(?m)^( *\d+ OU {14})Y", r"\1N", text)
     filex = tmp_path / "UFGA7804.SQX"
     filex.write_text(text, encoding="latin-1")
-    weather = [dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
-                    date="1978-04-20", srad=20, tmax=25, tmin=10, rain=0)]
-    return Simulation(filex, 1, weather)
+    return Simulation(filex, 1, weather("1978-04-20", "1979-04-19"))
 
 
 def change_component(sim, index, column, value):
@@ -167,3 +168,126 @@ def test_sequence_runner_errors(sequence, fake_dssat, failure):
     assert (folder / "DSSBatch.v48").is_file()
     if failure != "start":
         assert next(folder.glob("dssat_run_*/Summary.OUT")).is_file()
+
+
+@pytest.mark.parametrize("entry", [
+    {"planting": {}}, {"controls": {"unknown": 1}},
+    {"controls": {"water": "N"}}, {"irrigation": [], "fertilizer": []},
+])
+def test_sequence_rejects_component_experiment_data(sequence, fake_dssat, entry, capsys):
+    sequence.management = {"treatments": {"01": entry}}
+    original = deepcopy(sequence.management)
+    expected = ("Treatment 1 is a sequence of 6 rotation components; experiment data for a "
+                "sequence takes only controls years and start_date. Edit the components "
+                "in the FileX for other changes.")
+    assert sequence.check(True) == [expected]
+    assert "FileX: REJECTED" in capsys.readouterr().out
+    before = set(sequence.filex.parent.iterdir())
+    with pytest.raises(DSSATCheckError) as error:
+        sequence.run()
+    assert error.value.problems == [expected]
+    assert set(sequence.filex.parent.iterdir()) == before
+    assert fake_dssat.calls == []
+    assert sequence.management == original
+
+
+@pytest.mark.parametrize("controls", [
+    {"years": 2}, {"start_date": "1978-04-21"},
+    {"years": 2, "start_date": "1978-04-21"},
+])
+def test_sequence_controls_copy_only_first_component(sequence, fake_dssat, monkeypatch, controls):
+    sequence.weather = weather("1978-04-20", "1980-04-21", station="TEST")
+    sequence.management = {"treatments": {1: {"controls": controls}}}
+    original = sequence.filex.read_bytes()
+    seen = {}
+    fake_run = subprocess.run
+
+    def record(command, *, cwd, **kwargs):
+        seen["filex"] = (cwd / sequence.filex.name).read_bytes()
+        return fake_run(command, cwd=cwd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", record)
+    assert sequence.check(False) == []
+    sequence.run()
+    written = seen["filex"]
+    original_rows = original.split(b"*TREATMENTS")[1].split(b"*CULTIVARS")[0].splitlines(keepends=True)
+    written_rows = written.split(b"*TREATMENTS")[1].split(b"*CULTIVARS")[0].splitlines(keepends=True)
+    first = next(i for i, row in enumerate(original_rows) if row.startswith(b" 1 1"))
+    assert written_rows[first] == original_rows[first][:70] + b"  5" + original_rows[first][73:]
+    assert written_rows[:first] + written_rows[first+1:] == original_rows[:first] + original_rows[first+1:]
+    old_controls = original.split(b"*SIMULATION CONTROLS")[1]
+    new_controls = written.split(b"*SIMULATION CONTROLS")[1]
+    old_rows = [row for row in old_controls.splitlines() if row.startswith(b" 1 ")]
+    new_rows = [row for row in new_controls.splitlines() if row.startswith(b" 5 ")]
+    expected = [b" 5" + row[2:] for row in old_rows]
+    if "years" in controls:
+        expected[0] = expected[0].replace(b"GE              1", b"GE              2")
+    if "start_date" in controls:
+        expected[0] = expected[0].replace(b"78110", b"78111")
+    assert new_rows == expected
+    assert [row for row in new_controls.splitlines(keepends=True) if row[:3] in
+            (b" 1 ", b" 2 ", b" 3 ", b" 4 ")] == [
+                row for row in old_controls.splitlines(keepends=True) if row[:3] in
+                (b" 1 ", b" 2 ", b" 3 ", b" 4 ")]
+    assert b"TEST" in written.split(b"*FIELDS")[1].split(b"*INITIAL")[0]
+    assert sequence.filex.read_bytes() == original
+
+
+@pytest.mark.parametrize("override", [False, True])
+@pytest.mark.parametrize("start,years,last", [
+    ("1978-04-20", 10, "1988-04-18"),
+    ("1980-02-29", 1, "1981-02-28"),
+    ("1978-04-20", 1, "1979-04-19"),
+])
+@pytest.mark.parametrize("short", [False, True, "year-end"])
+def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, years, last, short):
+    first, last_day = date.fromisoformat(start), date.fromisoformat(last)
+    end = (date(last_day.year - 1, 12, 31) if short == "year-end" else
+           last_day - timedelta(days=int(short)))
+    text = sequence.filex.read_text().replace("78110", first.strftime("%y%j"))
+    text = text.replace(" 1 GE              1", f" 1 GE          {years:5d}")
+    sequence.filex.write_text(text)
+    if override:
+        sequence.management = {"treatments": {1: {"controls": {"years": years, "start_date": start}}}}
+        sequence.filex.write_text(text.replace(f" 1 GE          {years:5d}", " 1 GE             99")
+                                 .replace(first.strftime("%y%j"), "78110"))
+    sequence.weather = weather(start, end.isoformat())
+    prefix = "Controls years" if override else "FileX NYERS"
+    expected = ([f"{prefix} {years}: the sequence runs from {start} through {last}, "
+                 f"after the weather data ends ({end}). Supply weather through {last}, "
+                 "or fewer years."] if short else [])
+    before = set(sequence.filex.parent.iterdir())
+    assert sequence.check(True) == expected
+    report = capsys.readouterr().out
+    if short:
+        assert "FileX: REJECTED" in report and expected[0] in report
+        with pytest.raises(DSSATCheckError) as error:
+            sequence.run()
+        assert error.value.problems == expected
+    assert set(sequence.filex.parent.iterdir()) == before
+    assert fake_dssat.calls == []
+
+
+@pytest.mark.parametrize("replacement", ["P 78110", "S XXXXX", "S 79110"])
+def test_sequence_unresolved_start_skips_coverage(sequence, replacement):
+    sequence.filex.write_text(sequence.filex.read_text().replace("S 78110", replacement))
+    sequence.weather = weather("1978-04-20", "1978-04-21")
+    assert not any("sequence runs from" in p or "season 1" in p for p in sequence.check(False))
+
+
+@pytest.mark.parametrize("override", [False, True])
+def test_sequence_start_still_needs_weather(sequence, override):
+    sequence.weather = weather("1978-04-21", "1979-04-19")
+    if override:
+        sequence.management = {"treatments": {1: {"controls": {"start_date": "1978-04-20"}}}}
+    expected = ("Controls start_date '1978-04-20'" if override else "FileX start year 78 day 110")
+    assert sequence.check(False) == [
+        f"{expected} is not covered by weather data (1978-04-21 to 1979-04-19). "
+        "Supply weather for the simulation's start date."]
+
+
+def test_sequence_missing_nyers_defaults_to_one(sequence):
+    sequence.filex.write_text(sequence.filex.read_text().replace("NYERS", "OTHER"))
+    assert sequence.check(False) == []
+    sequence.weather.pop()
+    assert sequence.check(False)[0].startswith("FileX NYERS 1: the sequence runs")
