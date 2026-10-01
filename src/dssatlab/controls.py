@@ -52,7 +52,8 @@ def _controls_text(text, treatment, controls):
     if "start_date" in controls:
         day = date.fromisoformat(controls["start_date"])
         changes["GENERAL", "SDATE"] = _dssat_date(day)
-    for field, block, column in (("water", "OPTIONS", "WATER"),
+    for field, block, column in (("years", "GENERAL", "NYERS"),
+                                 ("water", "OPTIONS", "WATER"),
                                  ("nitrogen", "OPTIONS", "NITRO"),
                                  ("output_interval", "OUTPUTS", "FROPT")):
         if field in controls:

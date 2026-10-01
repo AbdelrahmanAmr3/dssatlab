@@ -8,7 +8,10 @@ import shutil
 import pytest
 
 import dssatlab
-from dssatlab import DSSATError, Simulation
+from dssatlab import DSSATError, Simulation, run_treatments
+from dssatlab.filex import _section_row
+from test_filex_template import data, rows
+from test_simulation_template import installed
 from test_management_file import sim_inputs as management_inputs
 from test_simulation_run import fake_dssat, inputs
 
@@ -61,6 +64,11 @@ def test_template_loads_and_passes_checks(tmp_path, sim_inputs, writer_name):
         assert entry.keys() == {"planting", "irrigation", "fertilizer"}
     # Passing the path exercises DSSATLab's strict loader, not yaml.safe_load.
     assert Simulation(filex, 1, weather, management=dest).check() == []
+    if writer_name == "write_experiment_template":
+        text = dest.read_text(encoding="utf-8")
+        assert "# years: 9" in text and "Number of seasons (DSSAT NYERS)" in text
+        dest.write_text(text.replace("# years: 9", "years: 9"), encoding="utf-8")
+        assert Simulation(filex, 1, weather, management=dest).check() == []
 
 
 @pytest.mark.parametrize("writer_name", WRITERS)
@@ -181,3 +189,33 @@ def test_new_fields_use_strict_yaml_checks(tmp_path, sim_inputs, fragment, word)
     path.write_text(f"treatments:\n  1:\n    {fragment}\n", encoding="utf-8")
     problems = Simulation(filex, 1, weather, management=path).check()
     assert any(word in p for p in problems)
+
+
+@pytest.mark.parametrize("template", [False, True])
+@pytest.mark.parametrize("batch", [False, True])
+@pytest.mark.parametrize("years", [None, 9])
+def test_seasons_follow_existing_controls_path(sim_inputs, data, rows, installed, template, batch, years):
+    filex, weather = sim_inputs
+    kwargs = dict(filex_template=data, weather=rows[0], soil=rows[1]) if template else dict(
+        filex=filex, weather=weather)
+    controls = {"water": "N"}
+    if years is not None:
+        controls["years"] = years
+    kwargs["management"] = {"treatments": {1: {"controls": controls}}}
+    if batch:
+        result = run_treatments(**kwargs, treatments=[1])["base", 1]
+    else:
+        result = Simulation(**kwargs, treatment=1).run()
+    written = next(result.run_dir.parent.glob("*.MZX")).read_bytes()
+    text = written.decode("latin-1")
+    treatment = _section_row(text, "TREATMENTS", "N", 1, ("SM",))
+    level = int(treatment["SM"])
+    assert level == 2
+    section = written.split(b"*SIMULATION CONTROLS")[1]
+    base = [row for row in section.splitlines() if row.startswith(b" 1 ")]
+    copied = [row for row in section.splitlines() if row.startswith(b" 2 ")]
+    expected = [b" 2" + row[2:] for row in base]
+    expected[0] = expected[0][:15] + str(years or 1).encode().rjust(5) + expected[0][20:]
+    expected[1] = expected[1][:19] + b"N" + expected[1][20:]
+    assert copied == expected
+    assert len(installed.calls) == 1
