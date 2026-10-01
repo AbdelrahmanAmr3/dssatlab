@@ -229,7 +229,8 @@ def test_sequence_controls_copy_only_first_component(sequence, fake_dssat, monke
             (b" 1 ", b" 2 ", b" 3 ", b" 4 ")] == [
                 row for row in old_controls.splitlines(keepends=True) if row[:3] in
                 (b" 1 ", b" 2 ", b" 3 ", b" 4 ")]
-    assert b"TEST" in written.split(b"*FIELDS")[1].split(b"*INITIAL")[0]
+    field = written.split(b"*FIELDS")[1].splitlines()[2]
+    assert field[12:20] == b"TEST    "  # DSSAT's mode Q reads WSTA as (I3,9X,A8): no leading blank
     assert sequence.filex.read_bytes() == original
 
 

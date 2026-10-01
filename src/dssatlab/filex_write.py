@@ -168,8 +168,10 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N"):
                 left, right = columns[column]
                 if line[left:right].strip() == str(level):
                     break
-                lines[index] = (line[:left] + _cell(level, right - left, section, column)
-                                + line[right:])
+                cell = _cell(level, right - left, section, column)
+                if column == "WSTA":  # DSSAT's sequence mode reads WSTA left-justified (A8).
+                    cell = " " + cell.strip().ljust(right - left - 1)
+                lines[index] = line[:left] + cell + line[right:]
                 break
 
 
