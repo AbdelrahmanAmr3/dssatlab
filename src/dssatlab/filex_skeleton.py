@@ -5,10 +5,10 @@ from pathlib import Path
 import shutil
 
 from .controls import _controls_start_date, _season_coverage
+from .cultivar import _CROPS, _template_data_dir
 from .errors import DSSATCheckError
 from .experiment import _check_date
-from .filex_template import (_CROPS, _check_filex_template, _load_filex_template,
-                             _template_data_dir,
+from .filex_template import (_check_filex_template, _load_filex_template,
                              _template_treatment_fields, _template_treatment_names)
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
@@ -224,6 +224,9 @@ def write_filex(source, weather_rows: list[dict] | dict[int, list[dict]],
 
 def _render_filex(data, weather_rows, soil_rows):
     """Return the filename and skeleton text from checked inputs without writing."""
+    if "rotation" in data:
+        from .rotation import _render_rotation
+        return _render_rotation(data, weather_rows, soil_rows)
     crop = _CROPS[data["crop"]][0]
     day = date.fromisoformat(data["planting"]["date"])
     # Four station characters + YY + 01, then .<crop>X: exactly 8.3 characters.
@@ -242,17 +245,6 @@ def _skeleton_text(data, weather_rows, soil_rows, stem):
     weather_rows = weather_rows if isinstance(weather_rows, dict) else {1: weather_rows}
     soil_rows = soil_rows if isinstance(soil_rows, dict) else {1: soil_rows}
     name, station = names[0], weather_rows[1][0]["station"]
-    field_lines, coordinate_lines = [], []
-    for number in range(1, max(fields) + 1):
-        weather = weather_rows[number][0]
-        soil = max(soil_rows[number], key=lambda row: row["slb"])
-        field_station = weather["station"]
-        field_lines.append(
-            f"{number:2d} {field_station}{number:04d} {field_station:<8}   -99     0 DR000     0     0 00000 -99 "
-            f"{soil['slb']:6.0f}  {soil['soil_id']:<10} -99")
-        coordinate_lines.append(
-            f"{number:2d}{weather['longitude']:16.5f}{weather['latitude']:16.5f}"
-            f"{weather['elevation']:10.1f}{'-99':>18}   -99   -99   -99   -99   -99")
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
     harvest = []
@@ -260,8 +252,6 @@ def _skeleton_text(data, weather_rows, soil_rows, stem):
         harvest_day = _dssat_date(date.fromisoformat(data["harvest_date"]))
         harvest = ["*HARVEST DETAILS", "@H HDATE  HSTG  HCOM HSIZE   HPC  HBPC HNAME",
                    f" 1 {harvest_day} GS000   -99   -99   -99   -99 -99", ""]
-    # SMODEL occupies eight characters starting at column 72, past its header.
-    # ID_SOIL likewise occupies ten characters, starting at column 70.
     lines = [
         f"*EXP.DETAILS: {stem}{crop} {name}", "",
         "*GENERAL", "@PEOPLE", " DSSATLab", "@ADDRESS", " -99", "@SITE",
@@ -272,34 +262,59 @@ def _skeleton_text(data, weather_rows, soil_rows, stem):
           for number, treatment_name in enumerate(names, 1)), "",
         "*CULTIVARS", "@C CR INGENO CNAME",
         f" 1 {crop} {data['cultivar']['code']} -99", "",
+        *_field_lines(weather_rows, soil_rows, max(fields)),
+        "*INITIAL CONDITIONS", *_INITIAL_HEADERS, "",
+        "*PLANTING DETAILS", _PLANTING_HEADER, planting, "",
+        *harvest, "*SIMULATION CONTROLS",
+        *_control_lines(1, 1, day, name, model, symbi, bool(harvest)),
+    ]
+    return "\n".join(lines)
+
+
+def _field_lines(weather_rows, soil_rows, count):
+    """Shared field and coordinate columns for single crops and sequences."""
+    field_lines, coordinate_lines = [], []
+    for number in range(1, count + 1):
+        weather = weather_rows[number][0]
+        soil = max(soil_rows[number], key=lambda row: row["slb"])
+        field_station = weather["station"]
+        field_lines.append(
+            f"{number:2d} {field_station}{number:04d} {field_station:<8}   -99     0 DR000     0     0 00000 -99 "
+            f"{soil['slb']:6.0f}  {soil['soil_id']:<10} -99")
+        coordinate_lines.append(
+            f"{number:2d}{weather['longitude']:16.5f}{weather['latitude']:16.5f}"
+            f"{weather['elevation']:10.1f}{'-99':>18}   -99   -99   -99   -99   -99")
+    return [
         "*FIELDS",
         "@L ID_FIELD WSTA....  FLSA  FLOB  FLDT  FLDD  FLDS  FLST SLTX  SLDP  ID_SOIL    FLNAME",
         *field_lines,
         "@L ...........XCRD ...........YCRD .....ELEV .............AREA .SLEN .FLWR .SLAS FLHST FHDUR",
         *coordinate_lines, "",
-        "*INITIAL CONDITIONS", *_INITIAL_HEADERS, "",
-        "*PLANTING DETAILS", _PLANTING_HEADER, planting, "",
-        *harvest, "*SIMULATION CONTROLS",
+    ]
+
+
+def _control_lines(number, years, day, name, model, symbi, harvest):
+    """One controls level, including DSSAT automatic-management defaults."""
+    return [
         "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
-        f" 1 GE              1     1     S {day}  2150 {name:<25} {model}",
+        f"{number:2d} GE          {years:5d}     1     S {day}  2150 {name:<25} {model}",
         "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
-        f" 1 OP              Y     Y     {symbi}     N     N     N     N     N     M",
+        f"{number:2d} OP              Y     Y     {symbi}     N     N     N     N     N     M",
         "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
-        " 1 ME              M     M     E     R     S     C     R     1     G     R     2",
+        f"{number:2d} ME              M     M     E     R     S     C     R     1     G     R     2",
         "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
-        f" 1 MA              R     R     R     N     {'R' if harvest else 'M'}",
+        f"{number:2d} MA              R     R     R     N     {'R' if harvest else 'M'}",
         "@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT",
-        " 1 OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
+        f"{number:2d} OU              N     Y     Y     1     Y     N     Y     Y     N     N     Y     N     Y     A",
         "", "@  AUTOMATIC MANAGEMENT",
         "@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN",
-        f" 1 PL          {day} {day}    40   100    30    40    10",
+        f"{number:2d} PL          {day} {day}    40   100    30    40    10",
         "@N IRRIGATION  IMDEP ITHRL ITHRU IROFF IMETH IRAMT IREFF",
-        " 1 IR             30    50   100 GS000 IR001    10     1",
+        f"{number:2d} IR             30    50   100 GS000 IR001    10     1",
         "@N NITROGEN    NMDEP NMTHR NAMNT NCODE NAOFF",
-        " 1 NI             30    50    25 FE001 GS000",
+        f"{number:2d} NI             30    50    25 FE001 GS000",
         "@N RESIDUES    RIPCN RTIME RIDEP",
-        " 1 RE            100     1    20",
+        f"{number:2d} RE            100     1    20",
         "@N HARVEST     HFRST HLAST HPCNP HPCNR",
-        " 1 HA              0   -99   100     0", "",
+        f"{number:2d} HA              0   -99   100     0", "",
     ]
-    return "\n".join(lines)
