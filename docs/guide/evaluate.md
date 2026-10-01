@@ -38,6 +38,17 @@ The frozen `Evaluation` dataclass contains:
 `evaluation.to_dataframe()` converts the pairs using optional pandas, imported
 only when needed. Evaluation itself needs no extra dependencies.
 
+Use `plot_evaluation` for a scatter of simulated versus observed values with a
+dashed 1:1 line. Install the optional plotting extra with
+`pip install dssatlab[plot]`. Select one variable to keep different units separate;
+you can omit `variable` when the Evaluation contains exactly one variable. The
+function returns a matplotlib Axes. Date values stay as `YYYYDDD` codes, while
+their errors and statistics remain in days.
+
+```python
+ax = dl.plot_evaluation(evaluation, variable="HWAM")
+```
+
 Missing results, simulated rows, variables, or simulated values (`-99`) are
 reported together in one `DSSATCheckError` before errors are calculated. No pair
 is silently dropped. Results without observations are fine. DSSAT's
