@@ -43,6 +43,12 @@ One numbered row of a FileX. A run covers all treatments or a single one.
 **Experiment**:
 The set of treatments one FileX describes. A FileX holds one experiment.
 
+**Field**:
+One numbered row of a FileX's FIELDS section: where a treatment grows, with one weather station
+and one soil profile. Several treatments can share a field. In a FileX template each field gets its
+own weather data and soil data, keyed by field number.
+_Avoid_: site, location
+
 **Simulation**:
 One treatment of one experiment, described by its inputs, checked, and run to produce
 one set of results. The unit a future `Simulation` object stands for. A run carries out
@@ -115,8 +121,8 @@ data is one part of it, not a synonym.
 _Avoid_: management (for the whole dict), FileX input
 
 **FileX template**:
-The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one field, one
-crop, and one treatment or a list of named treatments. Every treatment starts from the template's
+The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one crop, one or
+more fields, and one treatment or a list of named treatments, each on one field. Every treatment starts from the template's
 cultivar, planting and harvest; experiment data keyed by treatment number varies each one. Built
 from the experiment data plus the crop, station and soil profile.
 Not the same as the experiment template, which only edits a copy of an existing FileX.

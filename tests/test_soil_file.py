@@ -9,7 +9,7 @@ import shutil
 import pytest
 
 from dssatlab.runner import run
-from dssatlab.soil import _parse_soil, write_soil_file, write_soil_template
+from dssatlab.soil import _parse_soil, _write_soil_profiles, write_soil_file, write_soil_template
 
 
 SAMPLE_PROFILE = (
@@ -206,3 +206,72 @@ def test_fractional_layer_depth_is_not_rounded(tmp_path):
                  sloc=-99)]
     text = write_soil_file(rows, tmp_path / "SOIL.SOL").read_text()
     assert "   7.5   -99 0.100" in text
+
+
+@pytest.fixture
+def second_profile(sample_rows):
+    return [
+        dict(r, soil_id="IBMZ910299", slb=slb)
+        for r, slb in zip(sample_rows, (10.0, 30.0, 90.0))
+    ]
+
+
+def _parse_soil_blocks(text: str) -> list[dict]:
+    blocks, current, in_layers = [], None, False
+    for line in text.splitlines():
+        if line.startswith("*") and not line.startswith("*SOILS:"):
+            current = {"soil_id": line[1:].split()[0], "depths": []}
+            blocks.append(current)
+            in_layers = False
+        elif not line.strip():
+            in_layers = False
+        elif line.startswith("@  SLB"):
+            in_layers = True
+        elif in_layers and current is not None:
+            current["depths"].append(float(line.split()[0]))
+    return blocks
+
+
+@pytest.mark.parametrize("as_string", [False, True])
+def test_one_profile_equals_write_soil_file_output(tmp_path, sample_rows, as_string):
+    single_path = tmp_path / "single.SOL"
+    multi_path = tmp_path / "multi.SOL"
+    write_soil_file(sample_rows, single_path)
+    result = _write_soil_profiles([sample_rows], str(multi_path) if as_string else multi_path)
+    assert isinstance(result, Path)
+    assert result == multi_path
+    assert multi_path.read_bytes() == single_path.read_bytes()
+
+
+@pytest.mark.parametrize("order", [(0, 1), (1, 0)])
+def test_two_profiles_in_given_order_with_one_header(tmp_path, sample_rows, second_profile, order):
+    pair = [sample_rows, second_profile]
+    profiles = [pair[i] for i in order]
+    expected_ids = [p[0]["soil_id"] for p in profiles]
+
+    path = tmp_path / "SOIL.SOL"
+    assert _write_soil_profiles(profiles, path) == path
+    lines = path.read_text(encoding="ascii").splitlines()
+
+    assert [l for l in lines if l.startswith("*SOILS:")] == [f"*SOILS: {expected_ids[0]} (written by dssatlab)"]
+    id_lines = [l for l in lines if l.startswith("*") and not l.startswith("*SOILS:")]
+    assert len(id_lines) == 2
+    assert id_lines[0].startswith(f"*{expected_ids[0]:<10}")
+    assert id_lines[1].startswith(f"*{expected_ids[1]:<10}")
+    assert lines[lines.index(id_lines[1]) - 1] == ""
+
+
+@pytest.mark.parametrize("order", [(0, 1), (1, 0)])
+def test_two_profiles_read_back_finds_both_ids_and_depths(tmp_path, sample_rows, second_profile, order):
+    pair = [sample_rows, second_profile]
+    profiles = [pair[i] for i in order]
+
+    path = tmp_path / "SOIL.SOL"
+    _write_soil_profiles(profiles, path)
+    blocks = _parse_soil_blocks(path.read_text(encoding="ascii"))
+
+    assert len(blocks) == 2
+    for block, expected in zip(blocks, profiles):
+        assert block["soil_id"] == expected[0]["soil_id"]
+        assert block["depths"] == [r["slb"] for r in expected]
+

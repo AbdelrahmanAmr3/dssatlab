@@ -19,6 +19,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.9 | Read FileA/FileT as observed data (`read_dssat_observed()`), overlay measurements on Plant growth (`plot_observed()`), and read the DSSAT evaluation (`read_dssat_evaluation()`, `result.dssat_evaluation()`). No FileA/FileT is written (ADR 0008). |
 | 0.10 | Ten template crops: maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut and dry bean; potato planting fields and harvest date; `list_crops()` and `list_cultivars()`. |
 | 0.11 | Multi-treatment experiments from scratch: FileX template `treatments` list, experiment data per treatment number, whole experiment written to simulation folder, and `run_treatments(filex_template=...)`. |
+| 0.11.1 | Several fields from scratch: FileX template `treatment_fields` list, per-field `weather=` and `soil=` dicts, shared station and soil ID rules, and one `SOIL.SOL` with all profiles. |
 
 ## Deliberately not built yet
 
@@ -27,7 +28,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 | Not built | Why it waits |
 |---|---|
 | Full FileX or other output parsing | Six output files (Summary.OUT, PlantGro.OUT, SoilWat.OUT, PlantN.OUT, Weather.OUT, Evaluate.OUT) are read as of 0.9; reading other output files (ET.OUT, OVERVIEW.OUT, etc.) and full FileX parsing wait for later phases. |
-| Multi-field FileX, several stations or soils, more crops | Multi-treatment experiments from scratch are supported as of 0.11; several fields (stations or soil profiles, v0.11.1) and further crops wait for later phases. |
+| Multi-field FileX with copied FileX, more crops | Several fields from scratch are supported as of 0.11.1; multiple fields for copied FileX and further crops wait for later phases. |
 | Other management operations | Planting, irrigation, and inorganic fertilizer are supported; operations like tillage, organic amendments, harvest, and chemical applications wait for later phases. |
 | Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |
 | Unit converters | The weather template is in DSSAT's own units, and nothing is converted silently. |

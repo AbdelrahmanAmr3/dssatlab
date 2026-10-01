@@ -138,6 +138,9 @@ class Simulation:
         if self.filex_template is not None:
             return _check_template_simulation(self, experiment_data, load_problems)
         rows, weather_problems = _parse_weather(self.weather)
+        if isinstance(self.weather, dict):
+            weather_problems.append("Weather data per field needs a FileX template. "
+                                    "Supply one weather source for a FileX.")
         edit_identity = _overrides_section(experiment_data, self.treatment)
         override_start = _controls_start_date(experiment_data, self.treatment)
         values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
@@ -184,6 +187,9 @@ class Simulation:
         soil_problems, soil_depth, template_id = [], None, None
         if self.soil is not None:
             soil_rows, soil_problems = _parse_soil(self.soil)
+            if isinstance(self.soil, dict):
+                soil_problems.append("Soil data per field needs a FileX template. "
+                                     "Supply one soil source for a FileX.")
             if not soil_problems:
                 soil_depth = max(row["slb"] for row in soil_rows)
                 template_id = soil_rows[0]["soil_id"]
