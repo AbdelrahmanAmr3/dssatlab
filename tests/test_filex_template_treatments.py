@@ -1,15 +1,16 @@
 """Named template treatments share base levels and preserve the original FileX."""
 
 from copy import deepcopy
+from datetime import date, timedelta
 
 import pytest
 
-from dssatlab import Simulation, write_filex_template
+from dssatlab import DSSATCheckError, Simulation, write_filex_template
 from dssatlab.filex import _section_row, read_treatment_numbers
 from dssatlab.filex_skeleton import _render_filex, write_filex
 from dssatlab.filex_template import _check_filex_template, _load_filex_template
 from test_filex_template import data, data_dir, rows
-from test_simulation_run import fake_dssat
+from test_simulation_run import fake_dssat, snapshot
 from test_simulation_template import installed
 
 
@@ -129,3 +130,117 @@ def test_template_simulation_still_runs_treatment_one(data, rows, installed):
     filex = result.run_dir.parent / "TEST2101.MZX"
     assert read_treatment_numbers(filex) == [1, 2, 3]
     assert installed.calls[0][0] == [str(installed.executable), "C", filex.name, "1"]
+
+
+@pytest.mark.parametrize("treatment", [2, "2"])
+def test_template_simulation_runs_selected_treatment(data, rows, installed, treatment):
+    data["treatments"] = [data.pop("treatment_name"), "Second", "Third"]
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=treatment)
+    assert sim.check(verbose=False) == []
+    result = sim.run()
+    assert result.returncode == 0
+    filex = result.run_dir.parent / "TEST2101.MZX"
+    assert read_treatment_numbers(filex) == [1, 2, 3]
+    assert installed.calls[0][0] == [str(installed.executable), "C", filex.name, "2"]
+
+
+def test_template_simulation_writes_each_treatment_experiment_data_and_scenario_name(data, rows, installed):
+    del data["treatment_name"]
+    data["treatments"] = ["Control", "Second", "Third"]
+    management = {"treatments": {
+        2: {"fertilizer": [{"date": "2021-03-01", "material": "FE005", "application": "AP002",
+                            "depth": 5, "n": 60}]},
+        3: {"irrigation": [{"date": "2021-04-01", "method": "IR001", "amount": 30}],
+            "cultivar": {"crop": "MZ", "code": "ZZ0001"}},
+    }}
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1],
+                     treatment=2, management=management, name="Variant B")
+    assert sim.check(verbose=False) == []
+    result = sim.run()
+    filex = result.run_dir.parent / "TEST2101.MZX"
+    text = filex.read_text()
+
+    row1 = _section_row(text, "TREATMENTS", "N", 1, ("CU", "MP", "MI", "MF"))
+    assert row1["TNAME"] == "Control"
+    assert row1["CU"] == "1"
+    assert row1["MF"] == "0"
+    assert row1["MI"] == "0"
+
+    row2 = _section_row(text, "TREATMENTS", "N", 2, ("CU", "MP", "MI", "MF"))
+    assert row2["TNAME"] == "Variant B"
+    assert row2["CU"] == "1"
+    assert row2["MF"] == "1"
+    assert row2["MI"] == "0"
+    assert _section_row(text, "FERTILIZERS (INORGANIC)", "F", 1, ("FAMN",))["FAMN"] == "60"
+
+    row3 = _section_row(text, "TREATMENTS", "N", 3, ("CU", "MP", "MI", "MF"))
+    assert row3["TNAME"] == "Third"
+    assert row3["CU"] == "2"
+    assert row3["MF"] == "0"
+    assert row3["MI"] == "1"
+    assert _section_row(text, "CULTIVARS", "C", 2, ("INGENO",))["INGENO"] == "ZZ0001"
+    assert _section_row(text, "IRRIGATION AND WATER MANAGEMENT", "I", 1, ("IRVAL",))["IRVAL"] == "30"
+
+    assert text.splitlines()[0] == "*EXP.DETAILS: TEST2101MZ Control"
+    assert next(line for line in text.splitlines() if line.startswith(" 1 GE"))[45:70] == f"{'Control':<25}"
+
+
+@pytest.mark.parametrize("treatment", [0, "0", 4, "4", 99, True, "bad", None])
+def test_template_simulation_rejects_out_of_range_treatment(data, rows, installed, treatment):
+    data["treatments"] = [data.pop("treatment_name"), "Second", "Third"]
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=treatment)
+    problems = sim.check(verbose=False)
+    expected = "FileX template has treatments 1 to 3. Supply treatment=<k> with 1 <= k <= 3."
+    assert expected in problems
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+    assert expected in error.value.problems
+    assert installed.calls == []
+
+
+@pytest.mark.parametrize("names", [
+    {"treatment_name": "Control"},
+    {"treatments": ["Control"]},
+])
+@pytest.mark.parametrize("treatment", [0, "0", 2, "2", True, "bad", None])
+def test_template_simulation_n1_message_unchanged(data, rows, installed, names, treatment):
+    data.pop("treatment_name", None)
+    data.update(names)
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=treatment)
+    problems = sim.check(verbose=False)
+    expected = "FileX template has only treatment 1. Supply treatment=1."
+    assert expected in problems
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+    assert expected in error.value.problems
+    assert installed.calls == []
+
+
+def test_template_simulation_rejects_treatment_n_plus_1_key_before_writing(data, rows, installed, tmp_path):
+    data["treatments"] = [data.pop("treatment_name"), "Second", "Third"]
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=2,
+                     management={"treatments": {4: {"irrigation": []}}})
+    before = snapshot(tmp_path)
+    problems = sim.check(verbose=False)
+    assert any("treatment 4" in p and "TREATMENTS" in p for p in problems)
+    with pytest.raises(DSSATCheckError):
+        sim.run()
+    assert snapshot(tmp_path) == before
+    assert installed.calls == []
+    assert not list(tmp_path.glob("dssat_sim_*"))
+
+
+@pytest.mark.parametrize("treatment,expected_year", [(1, "22"), (2, "21")])
+def test_template_simulation_weather_named_from_selected_treatment_start_year(
+        data, rows, installed, treatment, expected_year):
+    data["planting"]["date"] = "2022-01-01"
+    data["treatments"] = [data.pop("treatment_name"), "Second"]
+    weather = [dict(rows[0][0], date=date(2021, 12, 31) + timedelta(days=i)) for i in range(2)]
+    management = {"treatments": {2: {"controls": {"start_date": "2021-12-31"}}}}
+    sim = Simulation(filex_template=data, weather=weather, soil=rows[1],
+                     treatment=treatment, management=management)
+    assert sim.check(verbose=False) == []
+    result = sim.run()
+    wth = result.run_dir.parent / f"TEST{expected_year}01.WTH"
+    assert wth.is_file()
+

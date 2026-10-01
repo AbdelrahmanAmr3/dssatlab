@@ -66,7 +66,7 @@ class Simulation:
     Construction only stores inputs. Positional order remains filex, treatment,
     weather, executable; defaults None, 1, None allow filex to be omitted for a
     template. Exactly one of filex/filex_template is required by check() and run().
-    A template requires soil data and treatment 1.
+    A template requires soil data and a treatment within its treatments (1..N).
 
     Args:
         filex (str | Path | None): Path to the FileX (*.MZX, *.SBX, etc.).

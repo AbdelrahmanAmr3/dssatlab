@@ -30,10 +30,18 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     # Shape/value checks still run when executable discovery fails.
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
+    n = len(data["treatments"]) if (isinstance(data, dict) and "treatments" in data
+                                    and "treatment_name" not in data
+                                    and isinstance(data["treatments"], list)) else 1
     if (isinstance(sim.treatment, bool) or not isinstance(sim.treatment, (int, str))
             or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
-            or int(sim.treatment) != 1):
-        template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+            or not (1 <= int(sim.treatment) <= n)):
+        if n <= 1:
+            template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+        else:
+            template_problems.append(
+                f"FileX template has treatments 1 to {n}. Supply treatment=<k> with 1 <= k <= {n}."
+            )
     start = _controls_start_date(experiment_data, sim.treatment)
     if start is None and isinstance(data, dict) and isinstance(data.get("planting"), dict):
         planting_date = data["planting"].get("date")
@@ -76,12 +84,17 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                 text=text, cultivar_path=cultivar_path)
             problems.extend(found)
             report.extend(lines)
-            if not problems and any(int(k) == 1 and v for k, v in experiment_data["treatments"].items()):
-                try:
-                    _identity_text(text, 1, sim.name, weather[0]["station"], soil[0]["soil_id"])
-                except ValueError as error:
-                    problems.append(f"FileX: {error}")
-                    report.extend(_report_lines("FileX identity", [str(error)]))
+    if not problems and text is not None:
+        selected = int(sim.treatment)
+        has_override = (isinstance(experiment_data, dict)
+                        and isinstance(experiment_data.get("treatments"), dict)
+                        and any(int(k) == selected and v for k, v in experiment_data["treatments"].items()))
+        if has_override or sim.name not in (None, "base"):
+            try:
+                _identity_text(text, selected, sim.name, weather[0]["station"], soil[0]["soil_id"])
+            except ValueError as error:
+                problems.append(f"FileX: {error}")
+                report.extend(_report_lines("FileX identity", [str(error)]))
     return problems, report
 
 
@@ -102,8 +115,11 @@ def _write_template_simulation(sim, experiment_data):
     for suffix in extensions:
         name = f"{prefix}.{suffix}"
         shutil.copy2(data_dir / "Genotype" / name, folder / name)
-    _write_management(filex, sim.treatment, experiment_data, name=sim.name,
-                      station=weather[0]["station"], soil_id=soil[0]["soil_id"])
+    if isinstance(experiment_data, dict) and isinstance(experiment_data.get("treatments"), dict):
+        for key in sorted(experiment_data["treatments"], key=int):
+            _write_management(filex, int(key), experiment_data)
+    if sim.name not in (None, "base"):
+        _write_management(filex, sim.treatment, None, name=sim.name)
     return filex
 
 
