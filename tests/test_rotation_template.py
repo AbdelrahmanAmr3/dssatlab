@@ -128,8 +128,7 @@ def test_probe_a_fixture(rotation, genotype, rows, tmp_path):
     assert rotation == before
 
 
-@pytest.mark.parametrize("end,years", [("1979-03-14", "1"), ("1980-03-14", "2"),
-                                      ("1979-12-31", "2")])
+@pytest.mark.parametrize("end,years", [("1979-03-14", "1"), ("1980-03-13", "2")])
 def test_cycle_years_and_dated_crop(rotation, genotype, rows, tmp_path, end, years):
     rotation["rotation"][-1]["end_date"] = end
     rotation["rotation"][0]["harvest_date"] = "1978-08-01"
@@ -140,12 +139,6 @@ def test_cycle_years_and_dated_crop(rotation, genotype, rows, tmp_path, end, yea
         assert _section_row(text, "SIMULATION CONTROLS", "N", level, ("NYERS",))["NYERS"] == (
             years if level == 1 else "1")
     assert _section_row(text, "SIMULATION CONTROLS", "N", 1, ("HARVS",))["HARVS"] == "R"
-
-
-def test_unknown_last_end_defaults_to_one(rotation, genotype, rows, tmp_path):
-    rotation["rotation"].pop()
-    text = write_filex(rotation, *rows, tmp_path, data_dir=genotype).read_text()
-    assert _section_row(text, "SIMULATION CONTROLS", "N", 1, ("NYERS",))["NYERS"] == "1"
 
 
 def test_commented_example(tmp_path, data_dir):
@@ -178,9 +171,14 @@ def test_missing_required_fields(rotation, genotype, key):
 
 
 def test_nine_components_and_crop_controls(rotation, genotype, rows, tmp_path):
-    soybean = deepcopy(rotation["rotation"][0])
-    soybean.update(crop="soybean", cultivar={"code": "IB0011"})
-    rotation["rotation"] = [soybean] * 8 + [rotation["rotation"][-1]]
+    components = []
+    for month in range(3, 11):
+        c = deepcopy(rotation["rotation"][0])
+        c.update(crop="soybean", cultivar={"code": "IB0011"})
+        c["planting"]["date"] = f"1978-{month:02d}-15"
+        c["harvest_date"] = f"1978-{month:02d}-25"
+        components.append(c)
+    rotation["rotation"] = components + [rotation["rotation"][-1]]
     text = write_filex(rotation, {1: rows[0]}, {1: rows[1]}, tmp_path,
                        data_dir=genotype).read_text()
     for level in range(1, 10):
@@ -192,9 +190,3 @@ def test_nine_components_and_crop_controls(rotation, genotype, rows, tmp_path):
         assert row[71:] == ("CRGRO048" if level < 9 else "")
     assert " 9 FA IB0001 -99" in text
     assert " 1 9 0 0 Rotation                   9  1  0  0  0" in text
-
-
-def test_date_order_checks_left_for_next_ticket(rotation, genotype):
-    # Shape checks do not reject a leading fallow or require a last known end.
-    rotation["rotation"] = rotation["rotation"][1:3]
-    assert _check_filex_template(rotation, genotype) == []

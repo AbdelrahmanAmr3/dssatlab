@@ -30,33 +30,90 @@ def _check_rotation_template(data, data_dir):
                         "Supply a list of 2 to 9 rotation components.")
     if not isinstance(components, list):
         return problems
+    valid_components = {}
     for number, component in enumerate(components, 1):
         location = f"{where}, rotation[{number}]"
+        found = []
         if not isinstance(component, dict):
-            problems.append(f"{location}: expected a dict. Supply a crop with cultivar and "
-                            "planting, or a fallow with end_date.")
+            found.append(f"{location}: expected a dict. Supply a crop with cultivar and "
+                         "planting, or a fallow with end_date.")
         elif component.get("crop") == "fallow":
-            problems.extend(_check_fields(component, ("crop", "end_date"), (), location, "FileX"))
+            found.extend(_check_fields(component, ("crop", "end_date"), (), location, "FileX"))
             if "end_date" in component:
-                problems.extend(_check_date(component["end_date"], f"{location}, end_date"))
+                found.extend(_check_date(component["end_date"], f"{location}, end_date"))
         else:
-            problems.extend(_check_fields(component, ("crop", "cultivar", "planting"),
-                                          ("harvest_date",), location, "FileX"))
-            problems.extend(p.replace(where, location, 1)
-                            for p in _check_template_crop(component, data_dir))
+            found.extend(_check_fields(component, ("crop", "cultivar", "planting"),
+                                       ("harvest_date",), location, "FileX"))
+            found.extend(p.replace(where, location, 1)
+                         for p in _check_template_crop(component, data_dir))
+        problems.extend(found)
+        if not found:
+            valid_components[number] = component
+    problems.extend(_check_rotation_dates(components, valid_components, where))
+    return problems
+
+
+def _check_rotation_dates(components, valid_components, where):
+    """Check dates of components whose shape passed: leading crop, end, order, closure."""
+    problems = []
+    if 1 in valid_components and valid_components[1].get("crop") == "fallow":
+        problems.append(f"{where}, rotation[1]: the first component must be a crop; "
+                        "the simulation starts on its planting date. Move the fallow later in the rotation.")
+    last_number = len(components)
+    if last_number in valid_components:
+        last = valid_components[last_number]
+        if last.get("crop") != "fallow" and not last.get("harvest_date"):
+            problems.append(f"{where}, rotation[{last_number}]: the last component needs a known end "
+                            "so the next cycle can start on time. Make it a fallow with end_date, "
+                            "or give it a harvest_date.")
+    for number in range(2, len(components) + 1):
+        if (number - 1) in valid_components and number in valid_components:
+            prev, curr = valid_components[number - 1], valid_components[number]
+            if prev.get("crop") == "fallow":
+                prev_end = prev["end_date"]
+            elif prev.get("harvest_date"):
+                prev_end = prev["harvest_date"]
+            else:
+                prev_end = prev["planting"]["date"]
+            if curr.get("crop") == "fallow":
+                curr_start, field = curr["end_date"], "end_date"
+            else:
+                curr_start, field = curr["planting"]["date"], "planting date"
+            if date.fromisoformat(curr_start) <= date.fromisoformat(prev_end):
+                problems.append(f"{where}, rotation[{number}], {field}: {curr_start} is not after "
+                                f"rotation[{number - 1}]'s end ({prev_end}). "
+                                "DSSAT would move it a year later. Supply rotation dates in order.")
+    if 1 in valid_components and last_number in valid_components:
+        first, last = valid_components[1], valid_components[last_number]
+        if first.get("crop") != "fallow":
+            start_date = date.fromisoformat(first["planting"]["date"])
+            last_end = last.get("end_date") if last.get("crop") == "fallow" else last.get("harvest_date")
+            if last_end:
+                end_date = date.fromisoformat(last_end)
+                first_doy, last_doy = start_date.timetuple().tm_yday, end_date.timetuple().tm_yday
+                if last_doy >= first_doy:
+                    if first_doy > 1:
+                        example = date(end_date.year, 1, 1) + timedelta(days=first_doy - 2)
+                    else:
+                        example = date(end_date.year - 1, 12, 31)
+                    problems.append(
+                        f"{where}, rotation: the last component ends on {last_end} "
+                        f"(day {last_doy} of the year), not before the first planting's day of the year "
+                        f"(day {first_doy}, {first['planting']['date']}); DSSAT would start the next cycle "
+                        f"a year late. End the last component before day {first_doy}, "
+                        f"for example on {example.isoformat()}."
+                    )
     return problems
 
 
 def _rotation_cycle_years(components):
-    """Cycle years for checked components; maturity at the end defaults to one.
+    """Cycle years for checked components; the end plus one day gives the next cycle's year.
 
     Date-order and cycle-closure checks belong to the caller. Do not clamp or
     repair dates here: the end plus one day determines the next cycle's year.
     """
     last = components[-1]
-    end = last.get("end_date") if last["crop"] == "fallow" else last.get("harvest_date")
-    if end is None:
-        return 1
+    end = last.get("end_date") if last["crop"] == "fallow" else last["harvest_date"]
     start = date.fromisoformat(components[0]["planting"]["date"])
     end = date.fromisoformat(end)
     # Avoid overflowing datetime at 9999-12-31; only the resulting year is needed.
