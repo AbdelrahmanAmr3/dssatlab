@@ -59,7 +59,7 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.evaluate
 
-::: dssatlab.Evaluation
+::: dssatlab.evaluate.Evaluation
 
 ::: dssatlab.plot_evaluation
     options:
