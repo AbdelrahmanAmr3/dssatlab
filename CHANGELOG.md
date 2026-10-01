@@ -2,6 +2,21 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.13.2] - UNDATED
+
+### Added
+- Experiment data per rotation component: a sequence treatment accepts `rotation` beside `controls`, keyed by the FileX R number (Summary `R#`), with optional planting, cultivar, fertilizer and irrigation using the single-treatment fields and checks (ADR 0015).
+- Component edits for copied sequence FileX files and rotation FileX templates through `Simulation`, `run_treatments()` and scenarios. Each edit adds a new level for that component only, preserving other components, shared levels and the original FileX, and applies in every cycle.
+- Component period checks: planting and event dates must fall inside the known first-cycle bounds. Messages identify the treatment, component, section, event and bound; unreadable or `-99` FileX dates give a report note instead of a bound. Unknown R numbers, edits on fallows, a cultivar of another crop and `rotation` on a non-sequence treatment are rejected.
+- Commented rotation example in `write_experiment_template()`, guide section "Experiment data per rotation component", and tutorial Case 11 with maize fertilizer and irrigation and wheat fertilizer over three cycles.
+- Architecture Decision Record 0015 recording component edits and period checks.
+
+### Notes
+- DSSAT silently skips fertilizer and irrigation outside the component's run. Events after weather-dependent crop maturity cannot be checked before the run; leave a margin and inspect Summary `NICM` and `IRCM`.
+- Real DSSAT probe: every maize row received 120 kg N/ha and 50 mm irrigation, and every wheat row received 40 kg N/ha over three cycles.
+- Initial conditions, controls and harvest per component, edits on fallows and automatic date repair remain out of scope.
+- Upgrading from 0.13.1 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.13.1] - 2026-10-01
 
 ### Added

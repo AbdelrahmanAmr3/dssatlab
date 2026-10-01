@@ -19,6 +19,16 @@ It refuses to overwrite an existing path. `write_management_template` is unchang
 management-only YAML is still valid: add a section only when you want to change it. Omit a
 section and the treatment keeps the FileX's own level.
 
+## Experiment data for sequences
+
+A sequence entry takes `controls` (`years` and `start_date`) and `rotation`, a dictionary
+keyed by the rotation component's R number. Each crop component can have its own planting,
+cultivar, fertilizer and irrigation. This works for copied sequence FileX files and rotation
+FileX templates, including scenarios. The experiment template includes a commented example;
+replace its single-treatment sections when using it for a sequence. See
+[Experiment data per rotation component](sequence.md#experiment-data-per-rotation-component)
+for the YAML, component period checks and the maturity caveat.
+
 ## The three new sections
 
 ```yaml
