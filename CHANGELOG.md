@@ -2,6 +2,22 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.7.0] - UNDATED
+
+### Added
+- `write_filex_template(path)` writes one commented YAML for a new experiment: one field, one treatment, one crop (maize or wheat), a cultivar and planting details. `Simulation(filex_template=..., weather=..., soil=...)` writes the FileX for you, so no existing FileX is needed. Station, coordinates and elevation come from your weather data and the soil ID from your soil data. Give exactly one of `filex` and `filex_template`; soil is required with a template.
+- `check()` validates the template at once with the rest of the inputs: unsupported crop (with the supported list) and a cultivar missing from the crop's `.CUL` file (with the closest codes). Nothing is written.
+- `run()` writes the FileX beside the weather and soil files and copies the crop's `.CUL`, `.ECO` and `.SPE` from the DSSAT `Genotype` folder. Experiment data (planting, irrigation, fertilizer, cultivar, initial conditions, controls) works on top of it.
+- Proven on real DSSAT 4.8 with maize (`MZCER048`) and wheat (`CSCER048`, genotype files `WHCER048`).
+
+### Changed
+- With experiment data, the copied FileX takes the weather data's station (`WSTA`) and the soil data's profile ID (`ID_SOIL`), so your own site data no longer has to be named after the source FileX's station.
+- A named scenario writes its name into `TNAM` of the copied FileX, so `Summary.OUT` identifies it. The `base` scenario and a `Simulation` without `name=` keep the FileX treatment name.
+
+### Notes
+- Upgrading from 0.6.x needs no changes. `Simulation` gains one optional keyword, `name`, and `filex` and `treatment` now have defaults.
+- Still one field and one treatment per template; other crops are added only after a real-DSSAT run.
+
 ## [0.6.1] - UNDATED
 
 ### Fixed

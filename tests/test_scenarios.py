@@ -57,7 +57,9 @@ def test_subset_scenarios_replace_whole_inputs_without_mutating_them(
     assert (base / "SOIL.SOL").read_text().startswith("*SOILS")
     assert (changed / "SOIL.SOL").read_text() == "original SOIL.SOL"
     assert (base / batch_inputs.filex.name).read_bytes() != batch_inputs.filex.read_bytes()
-    assert (changed / batch_inputs.filex.name).read_bytes() == batch_inputs.filex.read_bytes()
+    expected = batch_inputs.filex.read_bytes().splitlines(keepends=True)
+    expected[3] = expected[3][:8] + b"                   changed" + expected[3][34:]
+    assert (changed / batch_inputs.filex.name).read_bytes() == b"".join(expected)
     assert (base / "UFGA8201.WTH").read_bytes() != (changed / "UFGA8201.WTH").read_bytes()
     assert (scenarios, management, soil_rows) == before
 

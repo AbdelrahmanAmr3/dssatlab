@@ -24,6 +24,8 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.write_experiment_template
 
+::: dssatlab.write_filex_template
+
 ## Treatments and scenarios
 
 ::: dssatlab.run_treatments

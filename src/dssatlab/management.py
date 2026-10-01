@@ -168,7 +168,8 @@ def _check_treatment_key(key, seen_numbers, text, filex):
     return number, where, problems
 
 
-def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range, soil_depth):
+def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
+                 soil_depth, cultivar_path):
     sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
@@ -200,7 +201,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         problems.extend(section_problems)
         report.extend(lines)
     if "cultivar" in entry:
-        section_problems = _check_cultivar(entry["cultivar"], where, filex, text, number)
+        section_problems = _check_cultivar(entry["cultivar"], where, filex, text, number,
+                                          cultivar_path=cultivar_path)
         problems.extend(section_problems)
         report.extend(_report_lines("    cultivar", section_problems))
     else:
@@ -230,10 +232,11 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
-                      soil_depth=None):
+                      soil_depth=None, *, text=None, cultivar_path=None):
     """Check every treatment without mutation; compare selected dates with FileX and weather.
 
     If FileX is unreadable, Simulation reports that failure; shape checks still run.
+    Template simulations supply rendered text and their fixed model's cultivar path.
     """
     label = "Management data"
     if not isinstance(source, dict):
@@ -250,8 +253,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
     if not isinstance(source.get("treatments"), dict):
         return problems, _report_lines(label, problems)
     root_problems = list(problems)
-    text = None
-    if isinstance(filex, (str, Path)):
+    if text is None and isinstance(filex, (str, Path)):
         try:
             text = Path(filex).read_text(encoding="latin-1")
         except (OSError, ValueError):
@@ -272,7 +274,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
-            soil_depth if is_selected else None)
+            soil_depth if is_selected else None, cultivar_path)
         treatment_label = f"  Treatment {number}" if number is not None else f"  Treatment {_show_value(key)}"
         report.extend(_report_lines(treatment_label, treatment_problems, details=entry_problems))
         report.extend(lines)

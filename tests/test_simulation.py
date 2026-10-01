@@ -43,7 +43,8 @@ def test_construction_stores_inputs_without_work(tmp_path, monkeypatch):
     assert simulation.treatment is treatment
     assert simulation.weather is weather
     assert simulation.check()
-    assert dssatlab.Simulation(None, None, None).check()
+    with pytest.raises(dssatlab.DSSATCheckError, match="exactly one"):
+        dssatlab.Simulation(None, None, None).check()
 
 
 @pytest.mark.parametrize("form", ["rows", "path", "str"])
