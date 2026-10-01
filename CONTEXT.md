@@ -120,6 +120,17 @@ treatment, one crop. Built from the experiment data plus the crop, station and s
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 
+**Observed data**:
+The user's own measured values (for example yield, anthesis day, or LAI on a date), given per
+scenario and treatment. dssatlab compares them with the Summary and Plant growth itself; nothing
+is written for DSSAT, so it is not DSSAT's FileA/FileT.
+_Avoid_: FileA, measured file
+
+**Evaluation**:
+The comparison of observed data with a run's Summary and Plant growth: the error for each
+variable, and RMSE, bias and d-index across scenarios. Not DSSAT's `Evaluate.OUT`, which is not read.
+_Avoid_: Evaluate.OUT, validation
+
 **Example**:
 A complete, ready-to-run folder of filled-in files (a FileX with its genotype files,
 plus weather data, soil data and experiment data) that runs with no edits. Shows what a
