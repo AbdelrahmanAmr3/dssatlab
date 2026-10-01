@@ -7,7 +7,8 @@ from .errors import (DSSATCheckError, DSSATError, DSSATInstallError,
 from .evaluate import evaluate
 from .observed import write_observed_template
 from .management_file import write_experiment_template, write_management_template
-from .filex_template import list_crops, list_cultivars, write_filex_template
+from .cultivar import list_crops, list_cultivars
+from .filex_template import write_filex_template
 from .outputs import (read_dssat_evaluation, read_plant_growth,
                       read_plant_nitrogen, read_soil_water, read_summary,
                       read_weather, to_dataframe)
@@ -31,4 +32,4 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template",
            ]
 
-__version__ = "0.13.0"
+__version__ = "0.13.1"

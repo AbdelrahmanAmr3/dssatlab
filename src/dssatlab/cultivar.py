@@ -4,10 +4,26 @@ from difflib import get_close_matches
 from pathlib import Path
 import re
 
+from . import core
+from .errors import DSSATCheckError, DSSATNotFoundError
 from .experiment import _check_fields
 from .filex_write import _cultivar_text
 from .weather import _show_value
 
+
+# Crop code, fixed model, genotype prefix, required extensions, SYMBI.
+_CROPS = {
+    "maize": ("MZ", "MZCER048", "MZCER048", ("CUL", "ECO", "SPE"), "N"),
+    "wheat": ("WH", "CSCER048", "WHCER048", ("CUL", "ECO", "SPE"), "N"),
+    "rice": ("RI", "RICER048", "RICER048", ("CUL", "SPE"), "N"),
+    "soybean": ("SB", "CRGRO048", "SBGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    "potato": ("PT", "PTSUB048", "PTSUB048", ("CUL", "ECO", "SPE"), "N"),
+    "sorghum": ("SG", "SGCER048", "SGCER048", ("CUL", "ECO", "SPE"), "N"),
+    "pearl millet": ("ML", "MLCER048", "MLCER048", ("CUL", "ECO", "SPE"), "N"),
+    "barley": ("BA", "CSCER048", "BACER048", ("CUL", "ECO", "SPE"), "N"),
+    "peanut": ("PN", "CRGRO048", "PNGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    "dry bean": ("BN", "CRGRO048", "BNGRO048", ("CUL", "ECO", "SPE"), "Y"),
+}
 
 def _cultivar_codes(filex, crop):
     """Read only VAR# from one crop's .CUL; never inspect model coefficients."""
@@ -103,3 +119,101 @@ def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None):
         except ValueError as error:
             problems.append(f"{where}: FileX {filex}: {error}")
     return problems
+
+
+def _template_data_dir(executable=None):
+    """Locate Genotype beside the executable, without connect()'s config write."""
+    found = (core.detect()["dssat_path"] if executable is None
+             else core.find_dssat_path(Path(executable)))
+    if found is None:
+        raise DSSATCheckError(["FileX template: cannot find the DSSAT data directory. "
+                               "Supply executable pointing to DSSAT beside its Genotype folder."])
+    return found.parent
+
+
+def _listing_data_dir(executable):
+    """Data directory for the listings; a missing DSSAT is DSSATNotFoundError."""
+    try:
+        return _template_data_dir(executable)
+    except DSSATCheckError:
+        checked = (f"Checked {executable}." if executable is not None
+                   else "Checked saved configuration, DSSAT_HOME, and PATH/platform defaults "
+                        "(including the managed cache on Linux).")
+        raise DSSATNotFoundError(f"DSSAT was not found. {checked} "
+                                 "Supply executable= pointing to the DSSAT executable or directory.") from None
+
+
+def _listed_cultivars(path, crop):
+    """Cultivar rows of a .CUL; an unreadable table is DSSATCheckError."""
+    try:
+        return _read_cultivar_codes(path, names=True)
+    except ValueError as error:
+        raise DSSATCheckError([f"Cannot list cultivars for {crop!r}: {error}"]) from None
+
+
+def list_crops(executable: str | Path | None = None) -> list[dict]:
+    """List template crops whose genotype files exist in the installed DSSAT.
+
+    Parameters:
+        executable: Optional path to the DSSAT executable or its directory.
+            If None, discovery finds DSSAT without prompting or saving config.
+
+    Returns:
+        list[dict]: Rows with keys "crop", "code", "model", and "cultivars"
+        in table order. Rows can be passed to to_dataframe().
+
+    Examples:
+        >>> import dssatlab as dl
+        >>> crops = dl.list_crops()
+        >>> crops[0]["crop"]
+        'maize'
+    """
+    genotype_dir = _listing_data_dir(executable) / "Genotype"
+    rows = []
+    for crop, (code, model, prefix, extensions, _) in _CROPS.items():
+        if not all((genotype_dir / f"{prefix}.{ext}").is_file() for ext in extensions):
+            continue
+        cultivars = _listed_cultivars(genotype_dir / f"{prefix}.CUL", crop)
+        rows.append({"crop": crop, "code": code, "model": model, "cultivars": len(cultivars)})
+    return rows
+
+
+def list_cultivars(crop: str, executable: str | Path | None = None) -> list[dict]:
+    """List cultivar codes and names for a template crop in file order.
+
+    Parameters:
+        crop: Template crop name (e.g. "maize", "wheat", "rice").
+        executable: Optional path to the DSSAT executable or its directory.
+            If None, discovery finds DSSAT without prompting or saving config.
+
+    Returns:
+        list[dict]: Rows with keys "code" and "name" in .CUL order, listing
+        the first occurrence of each distinct code. Rows can be passed to
+        to_dataframe().
+
+    Raises:
+        DSSATCheckError: If crop is not a template crop, or if the crop's .CUL
+            file is missing or has no cultivar table.
+        DSSATNotFoundError: If DSSAT executable or data directory cannot be found.
+
+    Examples:
+        >>> import dssatlab as dl
+        >>> cultivars = dl.list_cultivars("maize")
+        >>> cultivars[0]["code"]
+        '999991'
+    """
+    if not isinstance(crop, str) or crop not in _CROPS:
+        raise DSSATCheckError([
+            f"{_show_value(crop)} is not a template crop. "
+            f"Use one of the template crops: {', '.join(_CROPS)}."
+        ])
+
+    prefix = _CROPS[crop][2]
+    cul_path = _listing_data_dir(executable) / "Genotype" / f"{prefix}.CUL"
+    if not cul_path.is_file():
+        raise DSSATCheckError([
+            f"Missing .CUL file for crop {crop!r} at {cul_path}. "
+            "Supply this file in the data directory's Genotype folder."
+        ])
+
+    return _listed_cultivars(cul_path, crop)

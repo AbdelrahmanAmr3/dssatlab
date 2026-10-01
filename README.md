@@ -31,7 +31,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 - [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
 - [x] Run multi-year seasonal analyses (`controls: years`), check weather coverage across seasons, and compute season statistics across treatments and scenarios (`summarize_seasons()`)
-- [x] Run multi-year crop rotations and sequence analyses in DSSAT's sequence mode (`Q`) from a sequence FileX, with per-component summary statistics and continuous soil water series
+- [x] Run multi-year crop rotations and sequence analyses in DSSAT's sequence mode (`Q`) from a sequence FileX or a FileX template (`rotation`), with per-component summary statistics and continuous soil water series
 
 ```python
 import dssatlab as dl
@@ -81,7 +81,7 @@ dl.write_filex_template("filex.yaml")   # crop, treatment name(s), cultivar, pla
 sim = dl.Simulation(filex_template="filex.yaml", weather="weather.csv", soil="soil.csv")
 ```
 
-Templates also support multi-treatment experiments and several fields: supply a `treatments` list instead of `treatment_name`, optionally assign fields with `treatment_fields`, supply `weather` and `soil` per field as dictionaries (`{1: ..., 2: ...}`), vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`.
+Templates also support multi-treatment experiments and several fields: supply a `treatments` list instead of `treatment_name`, optionally assign fields with `treatment_fields`, supply `weather` and `soil` per field as dictionaries (`{1: ..., 2: ...}`), vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`. Supply `rotation` (a list of 2 to 9 crop and fallow components) to run a multi-year crop rotation in DSSAT's sequence mode.
 
 Values are in DSSAT's own units and nothing is converted:
 
