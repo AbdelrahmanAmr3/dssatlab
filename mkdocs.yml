@@ -47,6 +47,12 @@ nav:
           - adr/0003-optional-pyyaml-for-management.md
           - adr/0004-optional-matplotlib-for-plots.md
           - adr/0005-experiment-data-edits-an-existing-filex.md
+          - adr/0006-filex-written-from-a-fixed-template.md
+          - adr/0007-evaluation-computed-in-python.md
+          - adr/0008-read-filea-filet-and-evaluate-out.md
+          - adr/0009-ten-template-crops-and-listing.md
+          - adr/0010-template-treatments-named-in-template-varied-by-experiment-data.md
+          - adr/0011-template-fields-numbered-per-treatment-data-keyed-by-field.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md
