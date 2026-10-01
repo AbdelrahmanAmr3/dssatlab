@@ -157,7 +157,8 @@ def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
     problems = []
     if (not isinstance(variables, (list, tuple)) or not variables
             or not all(isinstance(name, str) for name in variables)):
-        problems.append("Supply variables as a list of Summary column names, such as ['HWAM'].")
+        problems.append(f"Variables: found {variables!r}. "
+                        "Supply variables as a list of Summary column names, such as ['HWAM'].")
         variables = ()
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         raise DSSATCheckError(["Summary rows: expected a list of dicts. Supply the rows from "
@@ -179,10 +180,11 @@ def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
                             "Use a column name from the Summary rows, such as HWAM.")
     for (scenario, treatment), group in groups.items():
         for name in variables:
-            for value in (row.get(name) for row in group):
-                if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))):
-                    problems.append(f"Variable {name!r} has a non-numeric value {value!r} (scenario "
-                                    f"{scenario!r}, treatment {treatment}). Choose a numeric Summary column.")
+            bad = [value for value in (row.get(name) for row in group) if value is not None
+                   and (isinstance(value, bool) or not isinstance(value, (int, float)))]
+            if bad:  # One problem per group, not one per season.
+                problems.append(f"Variable {name!r} has a non-numeric value {bad[0]!r} (scenario "
+                                f"{scenario!r}, treatment {treatment}). Choose a numeric Summary column.")
     if problems:
         raise DSSATCheckError(problems)
 

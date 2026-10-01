@@ -107,6 +107,7 @@ def test_bad_values_reported_before_any_write(sim, fake_dssat, field, value):
     if field == "years":
         if value == 10 ** 10:
             assert any("column NYERS" in p and "does not fit" in p for p in problems)
+            assert not any("season" in p for p in problems)
         else:
             assert any(p.endswith(f"controls, field 'years': found {value!r}. "
                                   "Supply a positive integer number of seasons, not a boolean.")

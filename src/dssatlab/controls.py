@@ -44,8 +44,8 @@ def _season_coverage(source, treatment, start, days, nyers=None):
     controls = _selected_controls(source, treatment)
     if "years" in controls:
         years, label = controls["years"], "Controls years"
-        if type(years) is not int or years < 1:
-            return []  # The controls checks report invalid overrides.
+        if type(years) is not int or not 1 <= years <= 99999:
+            return []  # The controls checks and the NYERS column-fit check report these.
     else:
         try:
             years = int(nyers)

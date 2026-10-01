@@ -194,7 +194,8 @@ def test_bad_rows_missing_treatment_and_trno(rows):
 def test_bad_variables(variables):
     with pytest.raises(lab.DSSATCheckError) as exc:
         lab.summarize_seasons([{"TRNO": 1, "HWAM": 1000}], variables=variables)
-    assert "Supply variables as a list of Summary column names, such as ['HWAM']." in exc.value.problems
+    assert any(p.startswith("Variables: found ") and p.endswith(
+        "Supply variables as a list of Summary column names, such as ['HWAM'].") for p in exc.value.problems)
 
 
 def test_several_problems_collected_in_one_check_error():
@@ -216,7 +217,8 @@ def test_bad_rows_and_bad_variables_collected_together():
         lab.summarize_seasons("not a list", variables=123)
     assert len(exc.value.problems) == 2
     assert "Summary rows: expected a list of dicts. Supply the rows from result.summary() or combine_summaries()." in exc.value.problems
-    assert "Supply variables as a list of Summary column names, such as ['HWAM']." in exc.value.problems
+    assert any(p.startswith("Variables: found ") and p.endswith(
+        "Supply variables as a list of Summary column names, such as ['HWAM'].") for p in exc.value.problems)
 
 
 def test_to_dataframe_round_trip():
@@ -239,3 +241,14 @@ def test_to_dataframe_round_trip():
     assert df["mean"].tolist() == [1500]
     assert df["min"].tolist() == [1000]
     assert df["max"].tolist() == [2000]
+
+
+def test_non_numeric_reported_once_per_group():
+    rows = [{"TRNO": 1, "TNAM": "Low N"}, {"TRNO": 1, "TNAM": "Low N"}, {"TRNO": 2, "TNAM": "High N"}]
+    with pytest.raises(lab.DSSATCheckError) as exc:
+        lab.summarize_seasons(rows, variables=["TNAM"])
+    assert exc.value.problems == [
+        "Variable 'TNAM' has a non-numeric value 'Low N' (scenario 'base', treatment 1). "
+        "Choose a numeric Summary column.",
+        "Variable 'TNAM' has a non-numeric value 'High N' (scenario 'base', treatment 2). "
+        "Choose a numeric Summary column."]
