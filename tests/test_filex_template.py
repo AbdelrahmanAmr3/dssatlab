@@ -202,7 +202,7 @@ def test_skeleton_fixed_width_and_existing_writers(tmp_path, data, data_dir, row
     assert read_treatment_numbers(path) == [1]
     values, problems = _read_filex(path, 1)
     assert problems == []
-    assert values == dict(WSTA="TEST", ID_SOIL="SOIL123456", START="S", SDATE="21060")
+    assert values == dict(WSTA="TEST", ID_SOIL="SOIL123456", START="S", SDATE="21060", NYERS="1")
     text = path.read_text(encoding="ascii")
     for section in ("EXP.DETAILS", "GENERAL", "TREATMENTS", "CULTIVARS", "FIELDS",
                     "INITIAL CONDITIONS", "PLANTING DETAILS", "SIMULATION CONTROLS"):

@@ -6,7 +6,7 @@ import re
 import shutil
 
 from .errors import DSSATCheckError, DSSATRunError
-from .controls import _controls_start_date
+from .controls import _controls_start_date, _season_coverage
 from .filex import _irrigation_dates, _read_filex, _weather_filename
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
@@ -162,6 +162,8 @@ class Simulation:
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate, days))
+        filex_problems.extend(_season_coverage(
+            experiment_data, self.treatment, start_date, days, values.get("NYERS")))
         if override_start is not None and days:
             if override_start not in days:
                 filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "

@@ -1,6 +1,7 @@
 """Experiment templates and shape checks through the public Simulation interface."""
 
 from copy import deepcopy
+from datetime import date, timedelta
 from pathlib import Path
 import sys
 import shutil
@@ -68,6 +69,8 @@ def test_template_loads_and_passes_checks(tmp_path, sim_inputs, writer_name):
         text = dest.read_text(encoding="utf-8")
         assert "# years: 9" in text and "Number of seasons (DSSAT NYERS)" in text
         dest.write_text(text.replace("# years: 9", "years: 9"), encoding="utf-8")
+        start = date.fromisoformat(weather[0]["date"])
+        weather = [dict(weather[0], date=start + timedelta(days=i)) for i in range(9 * 366)]
         assert Simulation(filex, 1, weather, management=dest).check() == []
 
 
@@ -201,6 +204,10 @@ def test_seasons_follow_existing_controls_path(sim_inputs, data, rows, installed
     controls = {"water": "N"}
     if years is not None:
         controls["years"] = years
+        first = kwargs["weather"][0]
+        start = date.fromisoformat(str(first["date"]))
+        kwargs["weather"] = [dict(first, date=start + timedelta(days=i))
+                             for i in range(years * 366)]
     kwargs["management"] = {"treatments": {1: {"controls": controls}}}
     if batch:
         result = run_treatments(**kwargs, treatments=[1])["base", 1]
