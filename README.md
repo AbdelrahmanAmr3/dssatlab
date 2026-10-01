@@ -29,7 +29,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
-- [x] Write a FileX from a template (single- or multi-treatment) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
+- [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
 
 ```python
 import dssatlab as dl
@@ -79,7 +79,7 @@ dl.write_filex_template("filex.yaml")   # crop, treatment name(s), cultivar, pla
 sim = dl.Simulation(filex_template="filex.yaml", weather="weather.csv", soil="soil.csv")
 ```
 
-Templates also support multi-treatment experiments: supply a `treatments` list instead of `treatment_name`, vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`.
+Templates also support multi-treatment experiments and several fields: supply a `treatments` list instead of `treatment_name`, optionally assign fields with `treatment_fields`, supply `weather` and `soil` per field as dictionaries (`{1: ..., 2: ...}`), vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`.
 
 Values are in DSSAT's own units and nothing is converted:
 
@@ -97,7 +97,7 @@ What happens:
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a FileX with more than one field, or crops outside the ten template crops, and parallel or resumed runs.
+Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a copied FileX with more than one field, or crops outside the ten template crops, and parallel or resumed runs.
 
 ## Multi-treatment and scenario runs
 

@@ -102,6 +102,68 @@ treatments:
 - When `sim.run()` executes, the generated FileX in the simulation folder holds the **whole experiment**: every treatment with its experiment data applied, so you can open or run the entire experiment in DSSAT. If a scenario name is supplied, it is written to the selected treatment row only. Only one weather file is written, for the selected treatment's start year, so give every treatment a start date in that year if you plan to run the whole experiment.
 - To run every treatment at once, pass `filex_template=` to `run_treatments()` (see [Run treatments and scenarios](scenarios.md)).
 
+### Several fields in one experiment
+
+In DSSAT, an experiment can define multiple fields, allowing treatments to grow at different locations or on different soils.
+
+The FileX template supports multiple fields through the optional `treatment_fields` list beside `treatments`. Provide one field number per treatment, numbered 1..K without gaps:
+
+```yaml
+crop: "maize"
+treatments:
+  - "Site A"
+  - "Site B"
+treatment_fields: [1, 2]
+cultivar:
+  code: "IB0035"
+planting:
+  date: "2021-03-01"
+  method: "S"
+  distribution: "R"
+  population: 7.2
+  row_spacing: 75
+  depth: 5
+```
+
+When `treatment_fields` is omitted, every treatment grows on field 1, as in single-field experiments.
+
+#### Per-field weather and soil data
+
+When a template defines several fields (1..K), supply `weather` and `soil` as dictionaries keyed by field number (using integers or digit strings):
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation(
+    filex_template="two_fields.yaml",
+    weather={1: "site_a_weather.csv", 2: "site_b_weather.csv"},
+    soil={1: "site_a_soil.csv", 2: "site_b_soil.csv"},
+    treatment=2,
+)
+sim.run()
+```
+
+Each value in the dictionary can be any supported weather or soil input: a CSV file path, a list of dicts, or a pandas DataFrame. When only one field exists (K = 1), a single source can still be passed directly without a dictionary.
+
+#### Shared station and soil rules
+
+Fields may share a weather station or a soil profile ID, but only when their underlying data is identical:
+
+- **Comparing two soils at the same site**: Two fields can specify the same weather station code (or use the same weather data) if the parsed weather rows are identical.
+- **Comparing two sites on the same soil**: Two fields can share the same soil ID if their soil layers and properties are identical.
+
+If two fields specify the same station code (or soil profile ID) but have different data, `check()` reports a problem so that one field's data never silently overwrites another's.
+
+#### What gets written
+
+Inside the simulation folder, DSSAT receives:
+
+- One generated weather file per distinct station (named `<station><yy>01.WTH` using the selected treatment's start year).
+- A single `SOIL.SOL` holding every distinct soil profile in field order.
+- A generated FileX defining each field in both `FIELDS` tables with its own station, coordinates, elevation, soil ID, and depth.
+
+Note that per-field dictionaries are supported only for FileX templates. A copied FileX (`filex=...`) represents an existing experiment and expects a single weather source and a single soil source.
+
 ### Which crops and cultivars can I use?
 
 To inspect which template crops your installed DSSAT has genotype files for:
