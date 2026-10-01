@@ -55,7 +55,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     folders go beside the FileX or template YAML, or in the current directory
     for a template dict.
 
-    ``treatments=None`` selects every FileX treatment in file order, or 1..N
+    ``treatments=None`` selects each FileX treatment number once in file order, or 1..N
     in template name order (one for ``treatment_name``). Otherwise,
     pass a non-empty list or tuple of distinct treatment numbers (ints or digit
     strings, as for Simulation); their order is retained in the results.
@@ -86,7 +86,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
         treatments = list(range(1, len(_template_treatment_names(data)) + 1))
     elif treatments is None:
         try:
-            treatments = read_treatment_numbers(filex)
+            treatments = list(dict.fromkeys(read_treatment_numbers(filex)))
         except ValueError as error:
             raise DSSATCheckError([f"Scenario 'base', treatment all: {error}"]) from error
     if not isinstance(treatments, (list, tuple)) or not treatments:
@@ -149,10 +149,13 @@ def combine_summaries(results: dict[tuple[str, int], RunResult]) -> list[dict]:
 
 
 def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
-    """Return season statistics per scenario, treatment and variable from Summary rows.
+    """Return season statistics per scenario, treatment, rotation component and variable.
 
     Takes result.summary() rows (scenario "base", treatment = TRNO) or combine_summaries()
-    rows. Missing values (None) are counted and left out of the statistics.
+    rows. A sequence's Summary has one row per component run: R# names the rotation
+    component (1 when absent or None), and CR names the crop. Groups retain first
+    appearance order and take the crop from their first row. Missing values (None)
+    are counted and left out of the statistics.
     """
     problems = []
     if (not isinstance(variables, (list, tuple)) or not variables
@@ -173,12 +176,13 @@ def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
         if treatment is None:
             problems.append(f"Summary row {number}: found neither 'treatment' nor 'TRNO'. "
                             "Supply rows from result.summary() or combine_summaries().")
-        groups.setdefault((row.get("scenario") or "base", treatment), []).append(row)
+        component = row["R#"] if row.get("R#") is not None else 1
+        groups.setdefault((row.get("scenario") or "base", treatment, component), []).append(row)
     for name in variables:
         if not any(name in row for row in rows):
             problems.append(f"Variable {name!r} is not a Summary column. "
                             "Use a column name from the Summary rows, such as HWAM.")
-    for (scenario, treatment), group in groups.items():
+    for (scenario, treatment, component), group in groups.items():
         for name in variables:
             bad = [value for value in (row.get(name) for row in group) if value is not None
                    and (isinstance(value, bool) or not isinstance(value, (int, float)))]
@@ -189,7 +193,7 @@ def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
         raise DSSATCheckError(problems)
 
     summary = []
-    for (scenario, treatment), group in groups.items():
+    for (scenario, treatment, component), group in groups.items():
         for name in variables:
             values = [row[name] for row in group if row.get(name) is not None]
             stats = dict.fromkeys(("mean", "sd", "min", "p25", "median", "p75", "max"))
@@ -199,7 +203,8 @@ def summarize_seasons(rows: list[dict], variables=("HWAM",)) -> list[dict]:
                 stats.update(mean=statistics.mean(values), min=min(values), max=max(values),
                              sd=statistics.stdev(values) if len(values) > 1 else None,
                              p25=quartiles[0], median=quartiles[1], p75=quartiles[2])
-            summary.append({"scenario": scenario, "treatment": treatment, "variable": name,
+            summary.append({"scenario": scenario, "treatment": treatment,
+                            "component": component, "crop": group[0].get("CR"), "variable": name,
                             "seasons": len(group), "missing": len(group) - len(values), **stats})
     return summary
 
