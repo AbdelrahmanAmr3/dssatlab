@@ -5,9 +5,9 @@ Real studies often evaluate all treatments of an experiment or compare "what if"
 questions—such as shifting planting dates, varying nitrogen rates, or testing
 different weather years.
 
-`run_treatments()` runs every treatment of a FileX (or a selected subset),
+`run_treatments()` runs every treatment of a FileX or FileX template (or a selected subset),
 optionally across several named **scenarios**, in a single call. Each simulation
-executes in its own isolated simulation folder beside the FileX, ensuring runs
+executes in its own isolated simulation folder beside the FileX or template YAML, ensuring runs
 never overwrite each other.
 
 The un-overridden run is always included under the scenario name `"base"`. Results
@@ -66,6 +66,28 @@ results = dl.run_treatments(
 Treatments must be specified as a list of integers. Supplying an empty list,
 non-integers, or treatment numbers not present in the FileX raises `DSSATCheckError`
 before any simulation runs.
+
+## Run multi-treatment template experiments
+
+Instead of an existing FileX, you can pass a FileX template via `filex_template`:
+
+```python
+import dssatlab as dl
+
+results = dl.run_treatments(
+    filex_template="filex.yaml",
+    weather="weather.csv",
+    soil="soil.csv",
+    management="experiment.yaml",
+)
+```
+
+- **One source**: Supply exactly one of `filex` or `filex_template`. Supplying both or neither raises `DSSATCheckError`.
+- **Soil is required**: Just as with a template `Simulation`, `soil` data is required when using a template.
+- **All treatments by default**: When `treatments=None`, `run_treatments()` runs all treatments 1..N defined in the template's `treatments` list in order (or treatment 1 for a single-treatment template).
+- **Subset selection**: Pass `treatments=[1, 3]` to run only selected treatment numbers.
+- **Whole experiment written**: Each simulation folder holds the complete generated FileX with all treatments and their experiment data applied. The scenario name is written to the selected treatment row only.
+- **Scenarios**: `scenarios=` works identically with template experiments, allowing you to test weather, soil, or management overrides across all template treatments.
 
 ## Define scenarios
 

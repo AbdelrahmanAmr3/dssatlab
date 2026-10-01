@@ -27,7 +27,7 @@ same fields (no extra dependency). Supply exactly one of `filex` and
 `filex_template`; both or neither raise `DSSATCheckError` from `check()` and
 `run()`. The existing positional order remains `filex, treatment, weather,
 executable`, with defaults `None, 1, None, None`. Templates require `soil` and
-use treatment 1. Station and soil IDs come from your data. The simulation starts
+default to treatment 1. Station and soil IDs come from your data. The simulation starts
 on the template's planting date, which must be covered by weather, unless
 experiment controls override the start date.
 
@@ -60,6 +60,47 @@ The template `planting` section accepts the standard fields (`date`, `method`, `
 In addition, an optional top-level `harvest_date` may be specified as a quoted ISO date (`"YYYY-MM-DD"`). When given, dssatlab writes a `*HARVEST DETAILS` section (`HDATE`, stage code `GS000`) and sets harvest management to `R` (harvest on reported date). When omitted, the crop harvests at maturity (`M`). `harvest_date` must be after the planting date and within the weather data.
 
 **Potato requirements**: Potato requires all three fields: `planting_material_weight`, `sprout_length`, and `harvest_date`. Each missing field is reported as a separate problem. For other crops, these fields are optional.
+
+### Named treatments and multi-treatment experiments
+
+The FileX template accepts either `treatment_name` (one treatment) or `treatments`, a list of 1 to 99 treatment names. Supply exactly one of the two:
+
+```yaml
+# Single treatment:
+treatment_name: "My treatment"
+
+# Or multiple treatments:
+treatments:
+  - "Control"
+  - "Nitrogen 120"
+  - "Irrigated"
+```
+
+Treatments are numbered 1..N in the order listed. In the written FileX, `EXP.DETAILS` and simulation controls (`SNAME`) use the first treatment name. Every treatment starts from the template's cultivar, planting details, and optional harvest date.
+
+To vary treatments, supply **experiment data** keyed by treatment number (`treatments: {2: {...}, 3: {...}}`). Any section you give—such as `fertilizer`, `irrigation`, `cultivar`, `planting`, `initial_conditions`, or `controls`—adds a new level and points that treatment to it:
+
+```yaml
+# experiment.yaml
+treatments:
+  2:
+    fertilizer:
+      - {date: "2021-03-15", material: "FE005", application: "AP001", depth: 5, n: 60}
+      - {date: "2021-04-15", material: "FE005", application: "AP001", depth: 5, n: 60}
+  3:
+    cultivar:
+      crop: "MZ"
+      code: "IB0060"
+    irrigation:
+      - {date: "2021-03-20", amount: 30, method: "IR001"}
+      - {date: "2021-04-10", amount: 30, method: "IR001"}
+```
+
+- A treatment with no entry (like treatment 1, `"Control"`) remains the unchanged base.
+- Each entry receives its own new level; equal levels are not shared (ADR 0010).
+- When you create a single `Simulation(filex_template="filex.yaml", treatment=k, ...)`, `treatment` can be any integer from 1 to N (`treatment=1` by default). Out-of-range treatment numbers are rejected by `check()` with the valid range.
+- When `sim.run()` executes, the generated FileX in the simulation folder holds the **whole experiment**: every treatment with its experiment data applied, so you can open or run the entire experiment in DSSAT. If a scenario name is supplied, it is written to the selected treatment row only.
+- To run every treatment at once, pass `filex_template=` to `run_treatments()` (see [Run treatments and scenarios](scenarios.md)).
 
 ### Which crops and cultivars can I use?
 
@@ -94,9 +135,9 @@ skeleton in memory, then experiment overrides apply to the generated FileX.
 Cultivar overrides must keep the template's crop and use its fixed model's table.
 
 `sim.run()` creates a fresh simulation folder beside the YAML file, or in the
-current directory for a dict. It writes the FileX, weather and `SOIL.SOL`, and
+current directory for a dict. It writes the FileX (holding all treatments), weather and `SOIL.SOL`, and
 copies the crop's required genotype files from `Genotype`. Your original files are unchanged.
-`run_treatments()` continues to accept an existing FileX path only.
+`run_treatments()` also accepts `filex_template=` to run all or selected template treatments (see [Run treatments and scenarios](scenarios.md)).
 
 ## Prepare the weather template
 
