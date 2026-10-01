@@ -22,6 +22,8 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.11.1 | Several fields from scratch: FileX template `treatment_fields` list, per-field `weather=` and `soil=` dicts, shared station and soil ID rules, and one `SOIL.SOL` with all profiles. |
 | 0.12 | Seasonal analysis: experiment data controls `years` (NYERS), weather coverage check across seasons, per-season Summary rows, and `summarize_seasons()`. |
 | 0.13 | Sequence analysis: multi-year crop rotations from a sequence FileX, batch file and mode Q (`Simulation.run()`), pre-run sequence checks, controls `years` and `start_date`, and `summarize_seasons()` per rotation component. |
+| 0.13.1 | A rotation from the FileX template: 2 to 9 components (crops and fallows), DSSAT day-of-year date checks, cycle NYERS by default, controls `years`, write `.SQX`, and genotype file copying. |
+
 
 ## Deliberately not built yet
 
