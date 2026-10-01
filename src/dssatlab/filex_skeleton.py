@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 import shutil
 
-from .controls import _controls_start_date
+from .controls import _controls_start_date, _season_coverage
 from .errors import DSSATCheckError
 from .experiment import _check_date
 from .filex_template import (_CROPS, _check_filex_template, _load_filex_template,
@@ -124,6 +124,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                 template_problems.append(f"FileX template: missing genotype file {path}. "
                                          "Supply this file in the data directory's Genotype folder.")
     days = [row["date"] for row in weather if "date" in row]
+    template_problems.extend(_season_coverage(experiment_data, sim.treatment, start, days))
     if start is not None and days and start not in days:
         template_problems.append(f"Simulation start date {start} is not covered by weather "
                                  f"data ({min(days)} to {max(days)}). Supply weather for that date.")

@@ -1,7 +1,7 @@
 """Controls checks and copied FileX behaviour through Simulation."""
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,12 +23,20 @@ def sim(sim_inputs):
     }}}})
 
 
+@pytest.fixture
+def seasonal_weather(sim):
+    # Writer tests requesting several seasons need continuous weather for them.
+    start = date.fromisoformat(sim.weather[0]["date"])
+    sim.weather = [dict(sim.weather[0], date=(start + timedelta(days=i)).isoformat())
+                   for i in range(9 * 366)]
+
+
 def copied(sim, fake_dssat):
     sim.run()
     return (Path(fake_dssat.calls[-1][1]) / sim.filex.name).read_bytes()
 
 
-def test_all_controls_applied_and_every_other_byte_preserved(sim, fake_dssat, capsys):
+def test_all_controls_applied_and_every_other_byte_preserved(sim, seasonal_weather, fake_dssat, capsys):
     original, inputs = sim.filex.read_bytes(), deepcopy(sim.management)
     assert sim.check() == []
     assert "controls: OK" in capsys.readouterr().out
@@ -70,7 +78,7 @@ def test_omitted_empty_or_other_treatment_controls_keep_exact_copy(sim, fake_dss
     ("nitrogen", "N", b"OP              Y     Y", b"OP              Y     N"),
     ("output_interval", 3, b"OU              N     Y     Y     1", b"OU              N     Y     Y     3"),
 ])
-def test_each_field_keeps_all_omitted_fields(sim, fake_dssat, field, value, old, new):
+def test_each_field_keeps_all_omitted_fields(sim, seasonal_weather, fake_dssat, field, value, old, new):
     sim.filex.write_bytes(sim.filex.read_bytes().replace(b"GE              1", b"GE              4"))
     sim.management["treatments"][3]["controls"] = {field: value}
     base = sim.filex.read_bytes().split(b"*SIMULATION CONTROLS")[1].splitlines()
@@ -190,7 +198,7 @@ def test_start_override_names_weather_file_for_new_year(sim, fake_dssat):
 
 
 @pytest.mark.parametrize("grouped_rows", [False, True])
-def test_selected_level_cloned_using_highest_number_across_blocks(sim, fake_dssat, grouped_rows):
+def test_selected_level_cloned_using_highest_number_across_blocks(sim, seasonal_weather, fake_dssat, grouped_rows):
     prefix, controls = sim.filex.read_bytes().split(b"*SIMULATION CONTROLS")
     treatment = next(line for line in prefix.splitlines(keepends=True) if line.startswith(b" 3 1"))
     prefix = prefix.replace(treatment, treatment[:70] + b"  7" + treatment[73:])
@@ -216,7 +224,7 @@ def test_selected_level_cloned_using_highest_number_across_blocks(sim, fake_dssa
 
 
 @pytest.mark.parametrize("old_start", [b"S XXXXX", b"P 82056"])
-def test_valid_override_replaces_sdate_but_preserves_start_switch(sim, fake_dssat, old_start):
+def test_valid_override_replaces_sdate_but_preserves_start_switch(sim, seasonal_weather, fake_dssat, old_start):
     sim.filex.write_bytes(sim.filex.read_bytes().replace(b"S 82056", old_start))
     assert sim.check() == []
     assert old_start[:1] + b" 82057" in copied(sim, fake_dssat)

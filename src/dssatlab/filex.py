@@ -61,7 +61,7 @@ def _section_row(text, section, key, level, required):
 
 
 def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], list[str]]:
-    """Return available WSTA/ID_SOIL/START/SDATE values and problems, without writing.
+    """Return available WSTA/ID_SOIL/START/SDATE/NYERS values and problems, without writing.
 
     Partial results let check() compare a valid station even if the start is bad,
     or compare a valid start even if the field cannot be resolved.
@@ -98,6 +98,12 @@ def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], 
             problems.append(f"FileX {source}: treatment {treatment} has invalid "
                             f"{reference} {row[reference]!r}. Supply an integer level.")
             continue
+        if reference == "SM":
+            try:
+                general = _section_row(text, section, key, level, ("GENERAL", "NYERS"))
+                values["NYERS"] = general["NYERS"]
+            except ValueError:
+                pass  # Missing/unreadable NYERS defaults to one season.
         try:
             selected = _section_row(text, section, key, level, required)
         except ValueError as error:
