@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.9.0] - UNDATED
+## [0.9.0] - 2026-09-30
 
 ### Added
 - `read_dssat_observed(path)` reads DSSAT's FileA/FileT into observed data under scenario `base`, ready for `evaluate()`. Reads supported Summary and Plant growth measurements, omits `-99` cells, and resolves short dates from the sibling FileX treatment's `SDATE`. Problems are reported together with paths and line numbers.
