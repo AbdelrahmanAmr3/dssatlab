@@ -17,12 +17,11 @@ print(evaluation.statistics)
 `evaluate(results, observed)` accepts one `RunResult` or the dictionary returned by
 `run_treatments()`. For one run, use scenario `base` and the treatment number from
 its Summary (`TRNO`). For a dictionary, use its `(scenario, treatment)` keys.
-`observed` can also be a pandas DataFrame or the list returned by `load_observed()`
-(import it with `from dssatlab.evaluate import load_observed`).
+`observed` can also be a pandas DataFrame or a list of dictionaries.
 
 Leave `date` empty for Summary measurements such as `HWAM` or `ADAT`. Supply
-`yyyy-mm-dd` or `YYYYDDD` for Plant growth measurements such as `LAID` or `CWAD`.
-Leave unmeasured cells blank.
+`yyyy-mm-dd` for Plant growth measurements such as `LAID` or `CWAD`.
+Summary date variables also require `yyyy-mm-dd`. Leave unmeasured cells blank.
 
 The frozen `Evaluation` dataclass contains:
 
@@ -42,8 +41,8 @@ Use `plot_evaluation` for a scatter of simulated versus observed values with a
 dashed 1:1 line. Install the optional plotting extra with
 `pip install dssatlab[plot]`. Select one variable to keep different units separate;
 you can omit `variable` when the Evaluation contains exactly one variable. The
-function returns a matplotlib Axes. Date values stay as `YYYYDDD` codes, while
-their errors and statistics remain in days.
+function returns a matplotlib Axes. Date variables use calendar dates on both
+axes; their errors and statistics are in days.
 
 ```python
 ax = dl.plot_evaluation(evaluation, variable="HWAM")

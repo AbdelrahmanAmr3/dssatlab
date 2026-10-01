@@ -12,7 +12,6 @@ from .filex_template import _CROPS, _check_filex_template, _load_filex_template
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
-from .management_file import _load_management
 from .runner import _create_dated_folder
 from .soil import _parse_soil, write_soil_file
 from .weather import _dssat_date, _parse_weather, write_weather_file
@@ -28,8 +27,8 @@ def _template_data_dir(executable):
     return found.parent
 
 
-def _check_template_simulation(sim, management_data=None):
-    """Check template inputs and experiment edits entirely in memory."""
+def _check_template_simulation(sim, experiment_data, load_problems):
+    """Check template inputs and the loaded experiment data dict in memory."""
     weather, weather_problems = _parse_weather(sim.weather)
     soil, soil_problems = (_parse_soil(sim.soil) if sim.soil is not None else
                           ([], ["Soil data is required with a FileX template. Supply soil=..."]))
@@ -46,10 +45,7 @@ def _check_template_simulation(sim, management_data=None):
             or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
             or int(sim.treatment) != 1):
         template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
-    management, load_problems = (
-        _load_management(sim.management) if management_data is None else management_data
-    )
-    start = _controls_start_date(management, sim.treatment)
+    start = _controls_start_date(experiment_data, sim.treatment)
     if start is None and isinstance(data, dict) and isinstance(data.get("planting"), dict):
         planting_date = data["planting"].get("date")
         if not _check_date(planting_date, "planting date"):
@@ -80,12 +76,12 @@ def _check_template_simulation(sim, management_data=None):
             report.extend(_report_lines("Management data", load_problems))
         else:
             found, lines = _check_management(
-                management, None, sim.treatment, weather, start,
+                experiment_data, None, sim.treatment, weather, start,
                 max(row["slb"] for row in soil) if not soil_problems else None,
                 text=text, cultivar_path=cultivar_path)
             problems.extend(found)
             report.extend(lines)
-            if not problems and any(int(k) == 1 and v for k, v in management["treatments"].items()):
+            if not problems and any(int(k) == 1 and v for k, v in experiment_data["treatments"].items()):
                 try:
                     _identity_text(text, 1, sim.name, weather[0]["station"], soil[0]["soil_id"])
                 except ValueError as error:
@@ -94,28 +90,24 @@ def _check_template_simulation(sim, management_data=None):
     return problems, report
 
 
-def _write_template_simulation(sim, management_dict=None):
-    """Write checked template inputs in a fresh folder and return the FileX path."""
+def _write_template_simulation(sim, experiment_data):
+    """Write checked template inputs and experiment data dict; return the FileX path."""
     data_dir = _template_data_dir(sim.executable)
     data, _ = _load_filex_template(sim.filex_template)
     weather, _ = _parse_weather(sim.weather)
     soil, _ = _parse_soil(sim.soil)
-    management = (
-        management_dict if management_dict is not None
-        else _load_management(sim.management)[0]
-    )
     parent = (Path(sim.filex_template).resolve().parent
               if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
     folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
     filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
-    start = _controls_start_date(management, sim.treatment) or date.fromisoformat(data["planting"]["date"])
+    start = _controls_start_date(experiment_data, sim.treatment) or date.fromisoformat(data["planting"]["date"])
     write_weather_file(weather, folder / f"{weather[0]['station']}{start.year % 100:02d}01.WTH")
     write_soil_file(soil, folder / "SOIL.SOL")
     prefix = _CROPS[data["crop"]][2]
     for suffix in ("CUL", "ECO", "SPE"):
         name = f"{prefix}.{suffix}"
         shutil.copy2(data_dir / "Genotype" / name, folder / name)
-    _write_management(filex, sim.treatment, management, name=sim.name,
+    _write_management(filex, sim.treatment, experiment_data, name=sim.name,
                       station=weather[0]["station"], soil_id=soil[0]["soil_id"])
     return filex
 

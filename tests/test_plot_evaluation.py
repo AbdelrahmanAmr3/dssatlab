@@ -108,14 +108,19 @@ def test_plot_evaluation_single_pair_without_statistics(pyplot, value):
     assert list(line.get_ydata()) == [low, high]
 
 
-def test_plot_evaluation_date_codes_are_plotted_unchanged(pyplot):
+def test_plot_evaluation_dates_use_calendar_axes(pyplot):
+    from datetime import date
+
     evaluation = Evaluation([
         dict(scenario="base", treatment=1, date=None, variable="ADAT",
-             observed=2024366, simulated=2025002, error=2),
+             observed=2021365, simulated=2022001, error=1),
     ], {})
     ax = dl.plot_evaluation(evaluation)
 
-    assert ax.collections[0].get_offsets().tolist() == [[2024366, 2025002]]
+    observed, simulated = ax.collections[0].get_offsets().tolist()[0]
+    assert simulated - observed == 1
+    assert list(ax.lines[0].get_xdata()) == [date(2021, 12, 31), date(2022, 1, 1)]
+    assert list(ax.lines[0].get_ydata()) == [date(2021, 12, 31), date(2022, 1, 1)]
 
 
 def test_plot_evaluation_missing_matplotlib(monkeypatch, evaluation):

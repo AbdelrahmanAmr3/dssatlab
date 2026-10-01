@@ -3,7 +3,8 @@
 from .core import connect, detect, install
 from .errors import (DSSATCheckError, DSSATError, DSSATInstallError,
                      DSSATNotFoundError, DSSATOutputError, DSSATRunError)
-from .evaluate import evaluate, write_observed_template
+from .evaluate import evaluate
+from .observed import write_observed_template
 from .management_file import write_experiment_template, write_management_template
 from .filex_template import write_filex_template
 from .outputs import (read_plant_growth, read_plant_nitrogen, read_soil_water,

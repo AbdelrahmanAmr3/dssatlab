@@ -1,11 +1,12 @@
 """Plot Plant growth across simulations and Evaluation against observed data."""
 
 from collections.abc import Sequence
+from datetime import timedelta
 from pathlib import Path
 
 from .errors import DSSATError, DSSATOutputError
 from .evaluate import Evaluation
-from .outputs import read_plant_growth, read_summary
+from .outputs import _SUMMARY_DATES, _date_value, read_plant_growth, read_summary
 
 
 _EXCLUDED_COLUMNS = {"YEAR", "DOY", "DATE", "RUNNO", "TRNO"}
@@ -90,7 +91,7 @@ def plot_evaluation(evaluation: Evaluation, variable: str | None = None):
         evaluation: The Evaluation returned by evaluate().
         variable: DSSAT variable name, required when pairs contain multiple variables.
 
-    Values retain their original units, including YYYYDDD date codes. Statistics
+    Values retain their original units; date variables use calendar axes. Statistics
     are not required, so a variable with only one pair can also be plotted.
 
     Returns:
@@ -132,9 +133,12 @@ def plot_evaluation(evaluation: Evaluation, variable: str | None = None):
     pairs = [pair for pair in evaluation.pairs if pair["variable"] == variable]
     observed = [pair["observed"] for pair in pairs]
     simulated = [pair["simulated"] for pair in pairs]
+    if variable in _SUMMARY_DATES:
+        observed = [_date_value(variable, str(value)) for value in observed]
+        simulated = [_date_value(variable, str(value)) for value in simulated]
     low, high = min(observed + simulated), max(observed + simulated)
     if low == high:
-        padding = abs(low) * 0.05 or 0.5
+        padding = timedelta(days=1) if variable in _SUMMARY_DATES else abs(low) * 0.05 or 0.5
         low, high = low - padding, high + padding
 
     fig, ax = plt.subplots()

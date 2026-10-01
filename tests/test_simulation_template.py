@@ -165,6 +165,17 @@ def test_template_start_must_be_covered(data, rows, installed):
     assert any("start" in p and "weather" in p for p in sim.check())
 
 
+def test_invalid_template_start_reports_skipped_planting_check(data, rows, installed, capsys):
+    planting = dict(data["planting"])
+    data["planting"]["date"] = "bad"
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1],
+                     management={"treatments": {1: {"planting": planting}}})
+    assert sim.check()
+    report = capsys.readouterr().out
+    assert "check was skipped" in report
+    assert "simulation start date is unavailable" in report
+
+
 @pytest.mark.parametrize("treatment", [2, "2", True, None])
 def test_template_only_has_treatment_one(data, rows, installed, treatment):
     sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=treatment)
@@ -242,7 +253,8 @@ def test_missing_genotype_files_are_reported_before_writing(data, rows, installe
     assert not list(tmp_path.glob("dssat_sim_*"))
 
 
-def test_simulation_template_run_loads_management_yaml_once(data, rows, installed, monkeypatch, tmp_path):
+@pytest.mark.parametrize("operation", ["check", "run"])
+def test_simulation_template_run_loads_management_yaml_once(data, rows, installed, monkeypatch, tmp_path, operation):
     pytest.importorskip("yaml")
     from dssatlab import management_file
 
@@ -258,10 +270,12 @@ def test_simulation_template_run_loads_management_yaml_once(data, rows, installe
 
     monkeypatch.setattr(management_file, "_load_management", counting_load)
     monkeypatch.setattr("dssatlab.simulation._load_management", counting_load)
-    monkeypatch.setattr("dssatlab.filex_skeleton._load_management", counting_load)
 
     sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], management=yaml_file)
-    result = sim.run()
-    assert result.returncode == 0
+    if operation == "check":
+        assert sim.check(verbose=False) == []
+    else:
+        result = sim.run()
+        assert result.returncode == 0
     assert len(load_calls) == 1
     assert load_calls[0] == yaml_file

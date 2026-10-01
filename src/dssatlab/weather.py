@@ -79,10 +79,11 @@ def write_weather_file(rows: list[dict], path: str | Path) -> Path:
     return path
 
 
-def _read_table(source, label="Weather data"):
+def _read_table(source, label="Weather data", *, comments=False):
     """Read a CSV path, plain rows or DataFrame without importing pandas.
 
     Return (line-numbered raw rows, declared columns or None, problems).
+    comments=True skips blank lines and # comments in observed templates.
     """
     if isinstance(source, list):
         return list(enumerate(source, 2)), None, []
@@ -101,7 +102,8 @@ def _read_table(source, label="Weather data"):
                            "a list of dicts or a DataFrame with template columns.")]
     try:
         with Path(source).open(encoding="utf-8-sig", newline="") as stream:
-            reader = csv.reader(stream, strict=True)
+            lines = (line for line in stream if line.strip() and not line.startswith("#")) if comments else stream
+            reader = csv.reader(lines, strict=True)
             columns = next(reader, [])
             rows, problems = [], []
             while True:

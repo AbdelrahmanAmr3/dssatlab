@@ -425,7 +425,8 @@ def test_simulation_run_with_yaml_management(inputs, fake_dssat, monkeypatch, tm
     assert seen, "DSSAT was called"
 
 
-def test_simulation_run_loads_management_yaml_once(inputs, fake_dssat, monkeypatch, tmp_path):
+@pytest.mark.parametrize("operation", ["check", "run"])
+def test_simulation_run_loads_management_yaml_once(inputs, fake_dssat, monkeypatch, tmp_path, operation):
     pytest.importorskip("yaml")
     from test_planting_run import HEADER, OLD_ROW, TREATMENT
     from dssatlab import management_file
@@ -459,8 +460,11 @@ def test_simulation_run_loads_management_yaml_once(inputs, fake_dssat, monkeypat
     monkeypatch.setattr("dssatlab.simulation._load_management", counting_load)
 
     sim = Simulation(inputs.filex, "02", inputs.rows, management=yaml_file)
-    result = sim.run()
-    assert result.returncode == 0
+    if operation == "check":
+        assert sim.check(verbose=False) == []
+    else:
+        result = sim.run()
+        assert result.returncode == 0
     assert len(load_calls) == 1
     assert load_calls[0] == yaml_file
 

@@ -116,7 +116,6 @@ def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], 
     if "SDATE" in values and not re.fullmatch(r"[0-9]{5}", values["SDATE"]):
         problems.append(f"FileX {source}: SDATE {values['SDATE']!r} is invalid. "
                         "Supply five digits: two-digit year followed by three-digit day of year.")
-        del values["SDATE"]
     return values, problems
 
 

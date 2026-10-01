@@ -301,24 +301,24 @@ def test_parse_sdate_and_simulation_start_date():
     assert _parse_sdate("123456") is None
     assert _parse_sdate(12345) is None
 
-    values = {"START": "S", "SDATE": "82056"}
+    sdate = "82056"
     days_unique = [date(1982, 2, 25)]
-    d, reason = _simulation_start_date(values, days_unique)
+    d, reason = _simulation_start_date(sdate, days_unique)
     assert d == date(1982, 2, 25)
     assert reason is None
 
-    d, reason = _simulation_start_date(values, [])
+    d, reason = _simulation_start_date(sdate, [])
     assert d is None
     assert reason == "weather unreadable"
 
-    d, reason = _simulation_start_date(values, [date(1982, 1, 1), date(2082, 1, 1)])
+    d, reason = _simulation_start_date(sdate, [date(1982, 1, 1), date(2082, 1, 1)])
     assert d is None
-    assert reason == "ambiguous start year"
+    assert "ambiguous start year" in reason and "1982, 2082" in reason
 
-    d, reason = _simulation_start_date(values, [date(1990, 1, 1)])
+    d, reason = _simulation_start_date(sdate, [date(1990, 1, 1)])
     assert d is None
-    assert reason == "ambiguous start year"
+    assert "no weather year matches" in reason
 
-    d, reason = _simulation_start_date({"START": "P", "SDATE": "82056"}, days_unique)
+    d, reason = _simulation_start_date(None, days_unique)
     assert d is None
-    assert reason is None
+    assert "START is not S" in reason
