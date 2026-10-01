@@ -195,7 +195,7 @@ def _listed_cultivars(path, crop):
         raise DSSATCheckError([f"Cannot list cultivars for {crop!r}: {error}"]) from None
 
 
-def list_crops(executable=None) -> list[dict]:
+def list_crops(executable: str | Path | None = None) -> list[dict]:
     """List template crops whose genotype files exist in the installed DSSAT.
 
     Parameters:
@@ -206,7 +206,7 @@ def list_crops(executable=None) -> list[dict]:
         list[dict]: Rows with keys "crop", "code", "model", and "cultivars"
         in table order. Rows can be passed to to_dataframe().
 
-    Example:
+    Examples:
         >>> import dssatlab as dl
         >>> crops = dl.list_crops()
         >>> crops[0]["crop"]
@@ -222,7 +222,7 @@ def list_crops(executable=None) -> list[dict]:
     return rows
 
 
-def list_cultivars(crop: str, executable=None) -> list[dict]:
+def list_cultivars(crop: str, executable: str | Path | None = None) -> list[dict]:
     """List cultivar codes and names for a template crop in file order.
 
     Parameters:
@@ -240,7 +240,7 @@ def list_cultivars(crop: str, executable=None) -> list[dict]:
             file is missing or has no cultivar table.
         DSSATNotFoundError: If DSSAT executable or data directory cannot be found.
 
-    Example:
+    Examples:
         >>> import dssatlab as dl
         >>> cultivars = dl.list_cultivars("maize")
         >>> cultivars[0]["code"]

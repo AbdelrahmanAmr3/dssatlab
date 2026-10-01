@@ -26,6 +26,10 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.write_filex_template
 
+::: dssatlab.list_crops
+
+::: dssatlab.list_cultivars
+
 ## Treatments and scenarios
 
 ::: dssatlab.run_treatments

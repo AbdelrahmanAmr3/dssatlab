@@ -16,6 +16,8 @@ The codebase under `src/dssatlab/` includes these modules:
 - `evaluate.py`: Matches observed data with Summary and Plant growth, collects check problems, and returns an `Evaluation` with pairs, RMSE, mean bias and Willmott's d-index.
 - `experiment.py`: Shared field, date and number checks for the experiment sections, and the `controls` shape check.
 - `filex.py`: Reads a FileX to extract field station codes (`WSTA`), field soil profile IDs (`ID_SOIL`), and simulation controls (`START`, `SDATE`) for a treatment.
+- `filex_skeleton.py`: Formats and writes a minimal FileX from scratch for template simulations.
+- `filex_template.py`: Writes the FileX template YAML (`write_filex_template`), validates template structure and cultivar codes, resolves the DSSAT data directory, and lists installed template crops and cultivars (`list_crops`, `list_cultivars`).
 - `filex_write.py`: Modifies FileX text to append new management levels (planting details, irrigation schedules, fertilizer applications) and repoints treatment entries without altering other sections.
 - `initial_conditions.py`: Checks the experiment `initial_conditions` section (depths, ranges, soil depth) and writes a new `INITIAL CONDITIONS` level in the copied FileX.
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
