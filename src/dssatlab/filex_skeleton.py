@@ -7,7 +7,8 @@ import shutil
 from .controls import _controls_start_date
 from .errors import DSSATCheckError
 from .experiment import _check_date
-from .filex_template import _CROPS, _check_filex_template, _load_filex_template, _template_data_dir
+from .filex_template import (_CROPS, _check_filex_template, _load_filex_template,
+                             _template_data_dir, _template_treatment_names)
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
@@ -30,10 +31,15 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     # Shape/value checks still run when executable discovery fails.
     if data is not None:
         template_problems.extend(_check_filex_template(data, data_dir))
+    count = len(_template_treatment_names(data))
     if (isinstance(sim.treatment, bool) or not isinstance(sim.treatment, (int, str))
             or not str(sim.treatment).isascii() or not str(sim.treatment).isdigit()
-            or int(sim.treatment) != 1):
-        template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+            or not 1 <= int(sim.treatment) <= count):
+        if count == 1:
+            template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+        else:
+            template_problems.append(f"FileX template has treatments 1 to {count}. "
+                                     f"Supply treatment=<k> with 1 <= k <= {count}.")
     start = _controls_start_date(experiment_data, sim.treatment)
     if start is None and isinstance(data, dict) and isinstance(data.get("planting"), dict):
         planting_date = data["planting"].get("date")
@@ -76,12 +82,17 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                 text=text, cultivar_path=cultivar_path)
             problems.extend(found)
             report.extend(lines)
-            if not problems and any(int(k) == 1 and v for k, v in experiment_data["treatments"].items()):
-                try:
-                    _identity_text(text, 1, sim.name, weather[0]["station"], soil[0]["soil_id"])
-                except ValueError as error:
-                    problems.append(f"FileX: {error}")
-                    report.extend(_report_lines("FileX identity", [str(error)]))
+    if not problems and text is not None:
+        selected = int(sim.treatment)
+        has_override = (isinstance(experiment_data, dict)
+                        and isinstance(experiment_data.get("treatments"), dict)
+                        and any(int(k) == selected and v for k, v in experiment_data["treatments"].items()))
+        if has_override or sim.name not in (None, "base"):
+            try:
+                _identity_text(text, selected, sim.name, weather[0]["station"], soil[0]["soil_id"])
+            except ValueError as error:
+                problems.append(f"FileX: {error}")
+                report.extend(_report_lines("FileX identity", [str(error)]))
     return problems, report
 
 
@@ -102,14 +113,17 @@ def _write_template_simulation(sim, experiment_data):
     for suffix in extensions:
         name = f"{prefix}.{suffix}"
         shutil.copy2(data_dir / "Genotype" / name, folder / name)
-    _write_management(filex, sim.treatment, experiment_data, name=sim.name,
-                      station=weather[0]["station"], soil_id=soil[0]["soil_id"])
+    if isinstance(experiment_data, dict) and isinstance(experiment_data.get("treatments"), dict):
+        for key in sorted(experiment_data["treatments"], key=int):
+            _write_management(filex, int(key), experiment_data)
+    if sim.name not in (None, "base"):
+        _write_management(filex, sim.treatment, None, name=sim.name)
     return filex
 
 
 def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
                 directory: str | Path, *, data_dir: str | Path) -> Path:
-    """Check a FileX template and write one field and treatment; return its path.
+    """Check a FileX template and write one field and its treatments; return its path.
 
     source is a template dict or YAML path. weather_rows and soil_rows must be
     nonempty checked rows from _parse_weather/_parse_soil, with no problems.
@@ -118,7 +132,7 @@ def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
     weather and soil file writers. All template checks and rendering happen
     before opening the file; failures raise DSSATCheckError with all problems.
 
-    Treatment 1 references required levels 1; unused operations have level 0
+    Each treatment references required levels 1; unused operations have level 0
     (none). Initial-condition headers allow the v0.6 writer to add a level.
     Start equals planting date, with DSSAT default initial conditions (IC=0).
     """
@@ -147,7 +161,8 @@ def _render_filex(data, weather_rows, soil_rows):
 def _skeleton_text(data, weather, soil, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
     crop, model, _, _, symbi = _CROPS[data["crop"]]
-    name, station = data["treatment_name"], weather["station"]
+    names = _template_treatment_names(data)
+    name, station = names[0], weather["station"]
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
     harvest = []
@@ -163,7 +178,8 @@ def _skeleton_text(data, weather, soil, stem):
         f" {station}", "",
         "*TREATMENTS                        -------------FACTOR LEVELS------------",
         "@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM",
-        f" 1 1 0 0 {name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1", "",
+        *(f"{number:2d} 1 0 0 {treatment_name:<25}  1  1  0  0  1  0  0  0  0  0  0  {int(bool(harvest))}  1"
+          for number, treatment_name in enumerate(names, 1)), "",
         "*CULTIVARS", "@C CR INGENO CNAME",
         f" 1 {crop} {data['cultivar']['code']} -99", "",
         "*FIELDS",

@@ -2,6 +2,27 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.11.0] - 2026-10-01
+
+### Added
+- FileX template key `treatments`: a list of 1 to 99 treatment names, the alternative to `treatment_name` (exactly one of the two is required). Treatments are numbered 1..N in list order, each pointing at the base levels. `EXP.DETAILS` and `SNAME` take the first treatment name.
+- Multi-treatment template `Simulation`: `treatment` accepts 1..N; experiment data keyed by treatment number (`treatments: {2: {...}, 3: {...}}`) varies each treatment with its own new levels.
+- The simulation folder's generated FileX holds the entire experiment with every treatment's experiment data applied, allowing the whole experiment to be opened or run in DSSAT; a scenario name applies to the selected treatment row only.
+- `run_treatments(filex_template=...)` runs all treatments 1..N (when `treatments=None`) or a selected subset of a FileX template across named scenarios, writing each simulation in its own folder beside the template YAML.
+- Guide sections and tutorial Case 6 show writing a three-treatment maize FileX template (rainfed, irrigated, irrigated with 120 kg N), varying treatments with experiment data, and comparing yields with `run_treatments()` and `combine_summaries()`.
+- Proven on real DSSAT 4.8.5 with a three-treatment maize experiment (control, two N applications, irrigation plus cultivar IB0060) run through `run_treatments()` and as a whole experiment via `run()`.
+
+### Changed
+- `run_treatments(filex=None, weather=None, treatments=None, soil=None, management=None, executable=None, scenarios=None, filex_template=None)` accepts exactly one of `filex` and `filex_template`; passing both or neither raises `DSSATCheckError`.
+- `write_filex_template()` comments show the `treatments` list alternative alongside `treatment_name`.
+- `Simulation` treatment out-of-range checks report the valid 1..N range for multi-treatment templates.
+
+### Notes
+- Template treatments are named in the FileX template and varied by experiment data (ADR 0010). Each treatment entry gets its own new level; equal levels are not shared.
+- Several fields from scratch (multiple stations or soil profiles) is planned next (v0.11.1).
+- Experiment-data dates are checked against weather for the selected treatment.
+- Upgrading from 0.10.0 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.10.0] - 2026-09-30
 
 ### Added

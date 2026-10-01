@@ -1,4 +1,4 @@
-"""One field, one treatment and one crop: the fixed FileX template and checks."""
+"""One field, named treatments and one crop: the fixed FileX template and checks."""
 
 from pathlib import Path
 import re
@@ -27,7 +27,7 @@ _CROPS = {
     "dry bean": ("BN", "CRGRO048", "BNGRO048", ("CUL", "ECO", "SPE"), "Y"),
 }
 
-_TEMPLATE = """# DSSATLab FileX template: one field, one treatment, one crop.
+_TEMPLATE = """# DSSATLab FileX template: one field, named treatments, one crop.
 # Station, latitude, longitude and elevation come from checked weather data.
 # The soil profile ID comes from checked soil data. Do not add them here.
 # The simulation starts on the planting date. Use experiment data to add
@@ -38,6 +38,7 @@ _TEMPLATE = """# DSSATLab FileX template: one field, one treatment, one crop.
 # barley, peanut, dry bean; model is fixed per crop.
 crop: "maize"
 treatment_name: "My treatment" # 1-25 printable ASCII characters; not just spaces
+# treatments: ["Control", "Variant"] # Instead of treatment_name; 1-99 names, same rule
 cultivar:
   code: "IB0035"              # Six ASCII characters, no spaces; case-sensitive
   # Must exist in the crop's .CUL in data directory/Genotype: maize MZCER048,
@@ -71,7 +72,21 @@ def write_filex_template(path: str | Path) -> None:
 
 def _load_filex_template(source):
     """Return (data, problems) from a YAML path or dict, without writing."""
-    return _load_yaml(source, "FileX template", "crop, treatment_name, cultivar and planting keys")
+    return _load_yaml(source, "FileX template",
+                      "crop, cultivar, planting and either treatment_name or treatments keys")
+
+
+def _template_treatment_names(data):
+    """Return the template's treatment names, treatment 1 first.
+
+    A treatments list of 1 to 99 entries gives N names; anything else gives one
+    entry, so the checks report a malformed template for treatment 1 only.
+    """
+    if isinstance(data, dict) and "treatments" in data and "treatment_name" not in data:
+        names = data["treatments"]
+        if isinstance(names, list) and 1 <= len(names) <= 99:
+            return names
+    return [data.get("treatment_name") if isinstance(data, dict) else None]
 
 
 def _check_filex_template(data, data_dir) -> list[str]:
@@ -83,18 +98,30 @@ def _check_filex_template(data, data_dir) -> list[str]:
     """
     where = "FileX template"
     if not isinstance(data, dict):
-        return [f"{where}: expected a dict. Supply crop, treatment_name, cultivar and planting."]
-    problems = _check_fields(data, ("crop", "treatment_name", "cultivar", "planting"),
-                             ("harvest_date",), where, "FileX")
+        return [f"{where}: expected a dict. Supply crop, cultivar, planting "
+                "and either treatment_name or treatments."]
+    problems = _check_fields(data, ("crop", "cultivar", "planting"),
+                             ("treatment_name", "treatments", "harvest_date"), where, "FileX")
     crop = data.get("crop")
     supported = isinstance(crop, str) and crop in _CROPS
     if "crop" in data and not supported:
         problems.append(f"{where}: {_show_value(crop)} is not a template crop. "
                         f"Use one of the template crops: {', '.join(_CROPS)}.")
-    if "treatment_name" in data:
-        name = data["treatment_name"]
+    names = []
+    if ("treatment_name" in data) == ("treatments" in data):
+        problems.append(f"{where}: supply exactly one of treatment_name or treatments.")
+    elif "treatment_name" in data:
+        names = [("treatment_name", data["treatment_name"])]
+    else:
+        treatments = data["treatments"]
+        if not isinstance(treatments, list) or not 1 <= len(treatments) <= 99:
+            problems.append(f"{where}, treatments: found {_show_value(treatments)}. "
+                            "Supply a list of 1 to 99 treatment names.")
+        if isinstance(treatments, list):
+            names = [(f"treatments[{i}]", name) for i, name in enumerate(treatments, 1)]
+    for field, name in names:
         if not isinstance(name, str) or not re.fullmatch(r"[ -~]{1,25}", name) or not name.strip():
-            problems.append(f"{where}, treatment_name: found {_show_value(name)}. "
+            problems.append(f"{where}, {field}: found {_show_value(name)}. "
                             "Supply 1-25 printable ASCII characters, not just spaces.")
     if "cultivar" in data:
         problems.extend(_check_template_cultivar(data["cultivar"], crop if supported else None,

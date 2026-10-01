@@ -116,7 +116,9 @@ _Avoid_: management (for the whole dict), FileX input
 
 **FileX template**:
 The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one field, one
-treatment, one crop. Built from the experiment data plus the crop, station and soil profile.
+crop, and one treatment or a list of named treatments. Every treatment starts from the template's
+cultivar, planting and harvest; experiment data keyed by treatment number varies each one. Built
+from the experiment data plus the crop, station and soil profile.
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 

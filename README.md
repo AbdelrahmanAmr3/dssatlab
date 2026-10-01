@@ -29,7 +29,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
-- [x] Write a FileX from a template for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
+- [x] Write a FileX from a template (single- or multi-treatment) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
 
 ```python
 import dssatlab as dl
@@ -75,9 +75,11 @@ result = sim.run()       # checks first, then writes files and runs DSSAT
 No FileX yet? For ten template crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), write one from a **FileX template** instead. Station, coordinates and elevation come from your weather data, and the soil ID from your soil data:
 
 ```python
-dl.write_filex_template("filex.yaml")   # crop, treatment name, cultivar, planting
+dl.write_filex_template("filex.yaml")   # crop, treatment name(s), cultivar, planting
 sim = dl.Simulation(filex_template="filex.yaml", weather="weather.csv", soil="soil.csv")
 ```
+
+Templates also support multi-treatment experiments: supply a `treatments` list instead of `treatment_name`, vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`.
 
 Values are in DSSAT's own units and nothing is converted:
 
@@ -95,7 +97,7 @@ What happens:
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a FileX with more than one field or treatment, or crops outside the ten template crops, and parallel or resumed runs.
+Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a FileX with more than one field, or crops outside the ten template crops, and parallel or resumed runs.
 
 ## Multi-treatment and scenario runs
 
@@ -127,8 +129,9 @@ df = dl.to_dataframe(combined)
 
 How multi-treatment and scenario runs work:
 
-- By default (`treatments=None`), runs all treatments in the FileX; pass a list (e.g. `treatments=[1, 3]`) to select a subset.
-- Each `(scenario, treatment)` simulation runs in its own dated folder beside the FileX (`dssat_sim_<date>`).
+- By default (`treatments=None`), runs all treatments in the FileX or FileX template (1..N); pass a list (e.g. `treatments=[1, 3]`) to select a subset.
+- Exactly one of `filex` or `filex_template` is required; templates require `soil` data.
+- Each `(scenario, treatment)` simulation runs in its own dated folder beside the FileX or template YAML (`dssat_sim_<date>`).
 - Scenarios are defined in a YAML file or plain dictionary. Allowed overrides: `weather`, `soil`, `management`. Overrides replace the whole input without partial merging. The baseline un-overridden run is always included as `"base"`.
 - Every weather input must match the station code of `WSTA` for all selected treatments.
 - All scenario and treatment inputs are verified before any run; a single `DSSATCheckError` lists all problems across all scenarios and treatments.

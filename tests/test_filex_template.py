@@ -110,7 +110,7 @@ def test_unknown_cultivar_has_closest_codes(data, data_dir, crop, filename, near
                and near in p for p in problems)
 
 
-@pytest.mark.parametrize("field", ["crop", "treatment_name", "planting", "cultivar"])
+@pytest.mark.parametrize("field", ["crop", "planting", "cultivar"])
 def test_missing_required_field(data, data_dir, field):
     from dssatlab.filex_template import _check_filex_template
     del data[field]
