@@ -108,6 +108,19 @@ def test_sequence_checks_collect_before_writing(sequence, fake_dssat, failures, 
     assert fake_dssat.calls == []
 
 
+def test_three_fields_are_listed(sequence):
+    change_component(sequence, 1, "FL", "2")
+    change_component(sequence, 2, "FL", "3")
+    assert sequence.check() == [MESSAGES["FL"].replace("fields 1 and 2", "fields 1, 2 and 3")]
+
+
+@pytest.mark.parametrize("nreps", ["01", "-99"])
+def test_nreps_one_or_default_passes(sequence, nreps):
+    text = sequence.filex.read_text().replace(" 1 GE              1     1", f" 1 GE              1 {nreps:>5}")
+    sequence.filex.write_text(text)
+    assert sequence.check() == []
+
+
 @pytest.mark.parametrize("value", ["0", "-1", "x"])
 def test_invalid_rotation_number(sequence, value):
     change_component(sequence, 1, "R", value)
