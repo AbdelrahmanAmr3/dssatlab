@@ -1,0 +1,10 @@
+*EXP. DATA (T): UFGA8201MZ N X IRRIGATION, GAINESVILLE                               
+! Two table slices from the DSSAT sample.
+@TRNO   DATE  CWAD  LAID  GWAD  LWAD  SWAD  VN%D  SLAD  FRLF  FRST  HIAD  CNAD  NUPC  LN%D  SN%D  GN%D  LP%D  SP%D  GP%D  LK%D  SK%D  GK%D  LNAD  SNAD  GNAD  LPAD  SPAD  GPAD  LKAD  SKAD  GKAD
+     1 82057     0  0.00     0   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99   -99
+     1 82089    88  0.17     0    48    39  3.63   354 0.545 0.443 0.000   3.2   3.2   4.3   2.8   0.0   0.7   0.7   0.0   4.5   7.8   0.0   2.1   1.1   0.0   0.3   0.3   0.0   2.2   3.1   0.0
+
+@TRNO   DATE  SW1D  SW2D  SW3D  SW4D  SW5D
+     1 82113 0.000 0.000 0.000 0.000 0.000
+     1 82132 0.000 0.000 0.000 0.000 0.000
+
