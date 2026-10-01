@@ -11,10 +11,17 @@ from .management_file import _load_yaml, _write_template
 from .weather import _show_value
 
 
-# Crop code, fixed model code, genotype file prefix. Adding a crop is one row.
+# Crop code, fixed model, genotype prefix, required extensions, SYMBI.
 _CROPS = {
-    "maize": ("MZ", "MZCER048", "MZCER048"),
-    "wheat": ("WH", "CSCER048", "WHCER048"),
+    "maize": ("MZ", "MZCER048", "MZCER048", ("CUL", "ECO", "SPE"), "N"),
+    "wheat": ("WH", "CSCER048", "WHCER048", ("CUL", "ECO", "SPE"), "N"),
+    "rice": ("RI", "RICER048", "RICER048", ("CUL", "SPE"), "N"),
+    "soybean": ("SB", "CRGRO048", "SBGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    "sorghum": ("SG", "SGCER048", "SGCER048", ("CUL", "ECO", "SPE"), "N"),
+    "pearl millet": ("ML", "MLCER048", "MLCER048", ("CUL", "ECO", "SPE"), "N"),
+    "barley": ("BA", "CSCER048", "BACER048", ("CUL", "ECO", "SPE"), "N"),
+    "peanut": ("PN", "CRGRO048", "PNGRO048", ("CUL", "ECO", "SPE"), "Y"),
+    "dry bean": ("BN", "CRGRO048", "BNGRO048", ("CUL", "ECO", "SPE"), "Y"),
 }
 
 _TEMPLATE = """# DSSATLab FileX template: one field, one treatment, one crop.
@@ -24,12 +31,14 @@ _TEMPLATE = """# DSSATLab FileX template: one field, one treatment, one crop.
 # irrigation, fertilizer, initial conditions or control overrides later.
 # All fields below are required. Dates and cultivar codes must be quoted.
 
-crop: "maize"                 # Supported crops: maize, wheat; model is fixed per crop
+# Template crops: maize, wheat, rice, soybean, sorghum, pearl millet,
+# barley, peanut, dry bean; model is fixed per crop.
+crop: "maize"
 treatment_name: "My treatment" # 1-25 printable ASCII characters; not just spaces
 cultivar:
   code: "IB0035"              # Six ASCII characters, no spaces; case-sensitive
-  # Must exist in data directory/Genotype/MZCER048.CUL for maize,
-  # or WHCER048.CUL for wheat (for example "IB0488").
+  # Must exist in data directory/Genotype/<prefix>.CUL for the crop,
+  # e.g. MZCER048.CUL for maize.
 planting:
   date: "2021-03-01"          # Quoted ISO calendar date, YYYY-MM-DD
   method: "S"                 # One ASCII letter: DSSAT planting code (S=seed)
@@ -118,7 +127,7 @@ def _check_template_cultivar(data, crop, data_dir):
         return problems + [f"{where}, code: found {_show_value(code)}. "
                            "Supply six printable ASCII characters without spaces as a quoted string."]
     if crop is not None:
-        crop_code, _, prefix = _CROPS[crop]
+        crop_code, _, prefix, _, _ = _CROPS[crop]
         try:
             path = Path(data_dir) / "Genotype" / f"{prefix}.CUL"
             codes = _read_cultivar_codes(path)

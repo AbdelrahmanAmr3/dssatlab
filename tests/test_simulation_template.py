@@ -8,7 +8,7 @@ import pytest
 
 from dssatlab import DSSATCheckError, Simulation, core
 from dssatlab.filex import _section_row
-from test_filex_template import data, rows
+from test_filex_template import CROPS, data, rows
 from test_simulation_run import fake_dssat, snapshot
 
 
@@ -16,9 +16,9 @@ from test_simulation_run import fake_dssat, snapshot
 def installed(fake_dssat, monkeypatch, tmp_path):
     folder = fake_dssat.executable.parent / "Genotype"
     folder.mkdir()
-    for prefix, code in (("MZCER048", "IB0035"), ("WHCER048", "IB0488")):
+    for _, code, _, _, prefix, extensions, _ in CROPS:
         (folder / f"{prefix}.CUL").write_text(f"@VAR#  NAME\n{code} Example\nZZ0001 Override\n")
-        for suffix in ("ECO", "SPE"):
+        for suffix in extensions[1:]:
             (folder / f"{prefix}.{suffix}").write_text(f"{prefix} {suffix}")
     (folder / "MZIXM048.CUL").write_text("@VAR# NAME\nXX9999 Other model\n")
     monkeypatch.setattr(core, "_discover", lambda os_name: fake_dssat.executable)
@@ -47,7 +47,7 @@ def test_template_requires_soil(data, rows, installed, tmp_path):
 
 
 @pytest.mark.parametrize("crop,code,word", [
-    ("soybean", "IB0035", "unsupported crop"),
+    ("cotton", "IB0035", "unsupported crop"),
     ("maize", "XX9999", "Closest codes"),
 ])
 def test_template_reports_independent_problems_without_writes(
@@ -74,14 +74,11 @@ def test_template_reports_independent_problems_without_writes(
     assert installed.calls == []
 
 
-@pytest.mark.parametrize("crop,code,prefix,extension", [
-    ("maize", "IB0035", "MZCER048", "MZX"),
-    ("wheat", "IB0488", "WHCER048", "WHX"),
-])
+@pytest.mark.parametrize("crop,code,cr,model,prefix,extensions,symbi", CROPS)
 @pytest.mark.parametrize("source_form", ["dict", "yaml"])
 @pytest.mark.parametrize("explicit", [False, True])
 def test_template_run_generates_inputs_and_uses_bare_filename(
-        data, rows, installed, tmp_path, crop, code, prefix, extension, source_form, explicit):
+        data, rows, installed, tmp_path, crop, code, cr, model, prefix, extensions, symbi, source_form, explicit):
     data.update(crop=crop, cultivar={"code": code})
     source = data
     parent = tmp_path
@@ -98,17 +95,20 @@ def test_template_run_generates_inputs_and_uses_bare_filename(
     assert snapshot(tmp_path) == before
     result = sim.run()
     folder = result.run_dir.parent
-    filename = f"TEST2101.{extension}"
+    filename = f"TEST2101.{cr}X"
     assert folder.parent == parent
     assert {p.name for p in folder.iterdir()} == {
         filename, "TEST2101.WTH", "SOIL.SOL", result.run_dir.name,
-        f"{prefix}.CUL", f"{prefix}.ECO", f"{prefix}.SPE"}
-    for suffix in ("CUL", "ECO", "SPE"):
+        *(f"{prefix}.{suffix}" for suffix in extensions)}
+    for suffix in extensions:
         name = f"{prefix}.{suffix}"
         assert (folder / name).read_bytes() == (installed.executable.parent / "Genotype" / name).read_bytes()
     text = (folder / filename).read_text()
     assert _section_row(text, "FIELDS", "L", 1, ("WSTA",))["WSTA"] == "TEST"
     assert "SOIL123456" in text and code in text
+    assert _section_row(text, "CULTIVARS", "C", 1, ("CR",))["CR"] == cr
+    assert next(line for line in text.splitlines() if line.startswith(" 1 GE"))[71:79] == model
+    assert _section_row(text, "SIMULATION CONTROLS", "N", 1, ("SYMBI",))["SYMBI"] == symbi
     assert "SOIL123456" in (folder / "SOIL.SOL").read_text()
     assert "21060" in (folder / "TEST2101.WTH").read_text()
     command, cwd, _ = installed.calls[0]
@@ -120,11 +120,11 @@ def test_template_run_generates_inputs_and_uses_bare_filename(
 
 
 @pytest.mark.parametrize("crop,code,extension", [
-    ("maize", "IB0035", "MZX"), ("wheat", "IB0488", "WHX")])
+    (crop, code, f"{cr}X") for crop, code, cr, _, _, _, _ in CROPS])
 def test_experiment_overrides_apply_to_template(data, rows, installed, crop, code, extension):
     data.update(crop=crop, cultivar={"code": code})
     entry = dict(planting=dict(data["planting"], population=8),
-                 cultivar={"crop": "MZ" if crop == "maize" else "WH", "code": "ZZ0001"},
+                 cultivar={"crop": extension[:2], "code": "ZZ0001"},
                  initial_conditions=dict(date="2021-03-01", layers=[
                      dict(depth=30, water=0.2, nh4=1, no3=2)]),
                  controls=dict(start_date="2021-03-01", output_interval=2))
@@ -239,14 +239,17 @@ def test_template_construction_only_stores_inputs(data, rows, monkeypatch):
     assert sim.soil is rows[1] and sim.weather is rows[0]
 
 
-def test_missing_genotype_files_are_reported_before_writing(data, rows, installed, tmp_path):
-    for suffix in ("ECO", "SPE"):
-        (installed.executable.parent / "Genotype" / f"MZCER048.{suffix}").unlink()
+@pytest.mark.parametrize("crop,code,cr,model,prefix,extensions,symbi", CROPS)
+def test_missing_genotype_files_are_reported_before_writing(
+        data, rows, installed, tmp_path, crop, code, cr, model, prefix, extensions, symbi):
+    data.update(crop=crop, cultivar={"code": code})
+    for suffix in extensions:
+        (installed.executable.parent / "Genotype" / f"{prefix}.{suffix}").unlink()
     sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1])
     before = snapshot(tmp_path)
     problems = sim.check()
-    for suffix in ("ECO", "SPE"):
-        assert any(f"MZCER048.{suffix}" in p for p in problems)
+    for suffix in extensions:
+        assert any(f"{prefix}.{suffix}" in p for p in problems)
     with pytest.raises(DSSATCheckError):
         sim.run()
     assert snapshot(tmp_path) == before

@@ -57,11 +57,11 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     if not (weather_problems or soil_problems or template_problems):
         _, text = _render_filex(data, weather, soil)
     if cultivar_path is not None:
-        for suffix in (".ECO", ".SPE"):
-            path = cultivar_path.with_suffix(suffix)
+        for suffix in _CROPS[data["crop"]][3]:
+            path = cultivar_path.with_suffix(f".{suffix}")
             if not path.is_file():
                 template_problems.append(f"FileX template: missing genotype file {path}. "
-                                         "Supply the crop's .CUL, .ECO and .SPE in Genotype.")
+                                         "Supply this file in the data directory's Genotype folder.")
     days = [row["date"] for row in weather if "date" in row]
     if start is not None and days and start not in days:
         template_problems.append(f"Simulation start date {start} is not covered by weather "
@@ -103,8 +103,8 @@ def _write_template_simulation(sim, experiment_data):
     start = _controls_start_date(experiment_data, sim.treatment) or date.fromisoformat(data["planting"]["date"])
     write_weather_file(weather, folder / f"{weather[0]['station']}{start.year % 100:02d}01.WTH")
     write_soil_file(soil, folder / "SOIL.SOL")
-    prefix = _CROPS[data["crop"]][2]
-    for suffix in ("CUL", "ECO", "SPE"):
+    _, _, prefix, extensions, _ = _CROPS[data["crop"]]
+    for suffix in extensions:
         name = f"{prefix}.{suffix}"
         shutil.copy2(data_dir / "Genotype" / name, folder / name)
     _write_management(filex, sim.treatment, experiment_data, name=sim.name,
@@ -140,7 +140,7 @@ def write_filex(source, weather_rows: list[dict], soil_rows: list[dict],
 
 def _render_filex(data, weather_rows, soil_rows):
     """Return the filename and skeleton text from checked inputs without writing."""
-    crop, _, _ = _CROPS[data["crop"]]
+    crop = _CROPS[data["crop"]][0]
     day = date.fromisoformat(data["planting"]["date"])
     # Four station characters + YY + 01, then .<crop>X: exactly 8.3 characters.
     # One FileX per station/year/crop in a caller-owned simulation directory.
@@ -151,7 +151,7 @@ def _render_filex(data, weather_rows, soil_rows):
 
 def _skeleton_text(data, weather, soil, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
-    crop, model, _ = _CROPS[data["crop"]]
+    crop, model, _, _, symbi = _CROPS[data["crop"]]
     name, station = data["treatment_name"], weather["station"]
     day = _dssat_date(date.fromisoformat(data["planting"]["date"]))
     planting = _planting_row(_columns(_PLANTING_HEADER), 1, data["planting"])
@@ -179,7 +179,7 @@ def _skeleton_text(data, weather, soil, stem):
         "@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL",
         f" 1 GE              1     1     S {day}  2150 {name:<25} {model}",
         "@N OPTIONS     WATER NITRO SYMBI PHOSP POTAS DISES  CHEM  TILL   CO2",
-        " 1 OP              Y     Y     N     N     N     N     N     N     M",
+        f" 1 OP              Y     Y     {symbi}     N     N     N     N     N     M",
         "@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL",
         " 1 ME              M     M     E     R     S     C     R     1     G     R     2",
         "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS",
