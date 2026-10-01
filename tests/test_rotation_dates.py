@@ -80,6 +80,24 @@ def test_leap_year_cycle_closure(rotation, genotype, rows, tmp_path):
     assert error.value.problems == [expected]
 
 
+def test_unknown_cultivar_does_not_hide_cycle_closure(rotation, genotype):
+    rotation["rotation"][0]["cultivar"]["code"] = "ZZ9999"
+    rotation["rotation"][-1]["end_date"] = "1979-03-20"
+    problems = _check_filex_template(rotation, genotype)
+    assert len(problems) == 2
+    assert any("rotation[1]" in p and "ZZ9999" in p for p in problems)
+    assert any("last component ends on 1979-03-20" in p for p in problems)
+
+
+def test_bad_population_does_not_hide_date_order(rotation, genotype):
+    rotation["rotation"][2]["planting"]["population"] = -1
+    rotation["rotation"][2]["planting"]["date"] = "1978-05-30"
+    problems = _check_filex_template(rotation, genotype)
+    assert len(problems) == 2
+    assert any("rotation[3]" in p and "population" in p for p in problems)
+    assert any("1978-05-30 is not after rotation[2]'s end" in p for p in problems)
+
+
 @pytest.mark.parametrize("year,end", [("1978", "1979-01-02"), ("0001", "0001-12-31")])
 def test_first_planting_day_one_cycle_closure(rotation, genotype, rows, tmp_path, year, end):
     rotation["rotation"][0]["planting"]["date"] = f"{year}-01-01"
