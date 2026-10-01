@@ -4,27 +4,16 @@ from datetime import date
 from pathlib import Path
 import shutil
 
-from . import core
 from .controls import _controls_start_date
 from .errors import DSSATCheckError
 from .experiment import _check_date
-from .filex_template import _CROPS, _check_filex_template, _load_filex_template
+from .filex_template import _CROPS, _check_filex_template, _load_filex_template, _template_data_dir
 from .filex_write import _columns, _identity_text, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
 from .runner import _create_dated_folder
 from .soil import _parse_soil, write_soil_file
 from .weather import _dssat_date, _parse_weather, write_weather_file
-
-
-def _template_data_dir(executable):
-    """Locate Genotype beside the executable, without connect()'s config write."""
-    found = (core._discover(core._os_name()) if executable is None
-             else core.find_dssat_path(Path(executable)))
-    if found is None:
-        raise DSSATCheckError(["FileX template: cannot find the DSSAT data directory. "
-                               "Supply executable pointing to DSSAT beside its Genotype folder."])
-    return found.parent
 
 
 def _check_template_simulation(sim, experiment_data, load_problems):
