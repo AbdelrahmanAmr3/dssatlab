@@ -7,7 +7,9 @@ import re
 from . import core
 from .errors import DSSATCheckError, DSSATNotFoundError
 from .experiment import _check_fields
-from .filex_write import _cultivar_text
+from .filex import _section_row
+from .filex_write import (_append_rows, _event_blocks, _event_row,
+                          _insert_section, _repoint)
 from .weather import _show_value
 
 
@@ -217,3 +219,23 @@ def list_cultivars(crop: str, executable: str | Path | None = None) -> list[dict
         ])
 
     return _listed_cultivars(cul_path, crop)
+
+
+def _cultivar_text(text, treatment, cultivar, *, rotation=None):
+    """Add a CULTIVARS level and repoint CU, using the management edit helpers."""
+    if rotation is None:
+        _section_row(text, "TREATMENTS", "N", treatment, ("CU",))
+    lines = text.splitlines(keepends=True)
+    header = "@C CR INGENO CNAME"
+    blocks, highest = _event_blocks(lines, "CULTIVARS", (header,))
+    columns, index, _ = blocks[0]
+    level = highest + 1
+    # CNAME is descriptive; -99 avoids retaining the previous cultivar's name.
+    row = _event_row(columns, {"C": level, "CR": cultivar["crop"],
+                               "INGENO": cultivar["code"], "CNAME": -99}, "CULTIVARS")
+    _repoint(lines, treatment, "CU", level, rotation=rotation)
+    if index is None:
+        lines = _insert_section(lines, "CULTIVARS", [header, row])
+    else:
+        _append_rows(lines, index, [row])
+    return "".join(lines)
