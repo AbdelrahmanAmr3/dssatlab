@@ -59,8 +59,9 @@ def _read_date(value, path, treatment, anchors):
     if len(value) == 5:
         year, doy = (anchor.year // 100) * 100 + code // 1000, code % 1000
         candidate = date(year, 1, 1) + timedelta(days=doy - 1)
-        # Y4K_DOY: use the anchor's century; add 100 years if before the anchor date.
-        if candidate < anchor:
+        # Y4K_DOY anchors on the first weather date; without weather, use January 1
+        # of the SDATE year (DSSAT weather files run by calendar year).
+        if candidate < date(anchor.year, 1, 1):
             year += 100
     else:
         doy = code
@@ -80,7 +81,8 @@ def read_dssat_observed(path: str | Path) -> list[dict]:
 
     Short dates need the sibling FileX's treatment SDATE. Its two-digit year
     uses DSSAT Y4K's unanchored 2035 crossover. Observed YYDDD dates then use
-    the anchor's century, advancing a century if before SDATE; bare days use
+    the SDATE century, advancing a century if before January 1 of the SDATE
+    year (DSSAT anchors on the first weather date); bare days use
     the anchor year or the next year. Seven-digit dates need no FileX.
     All problems raise one DSSATCheckError with source paths and line numbers.
     """

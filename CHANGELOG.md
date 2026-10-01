@@ -14,7 +14,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Notes
 - DSSAT fills `Evaluate.OUT`'s measured columns only in some runs. Verified on DSSAT 4.8.5: CERES-Maize through `run()` with the FileA beside the FileX fills them; a `Simulation` (one treatment, DSSAT run mode C) and CROPSIM wheat leave them `-99`. Where they are `-99`, compare with `evaluate(results, read_dssat_observed(path))`. The simulation folder therefore does not copy FileA/FileT (ADR 0008).
-- Only FileA/FileT reading and `Evaluate.OUT` reading were added to file support; no FileA/FileT is written. ADR 0008 supersedes the reading half of ADR 0007's note.
+- Only FileA/FileT reading and `Evaluate.OUT` reading were added to file support; no FileA/FileT is written. ADR 0008 amends ADR 0007: dssatlab now reads FileA/FileT and `Evaluate.OUT`.
 - Upgrading from 0.8.0 needs no changes. Runtime dependencies remain zero; plotting still uses optional matplotlib.
 
 ## [0.8.0] - 2026-09-30

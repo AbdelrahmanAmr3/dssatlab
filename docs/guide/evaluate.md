@@ -105,7 +105,8 @@ Short dates are resolved from the treatment's simulation start (`SDATE`), so the
 matching FileX must sit beside the FileA/FileT (for example `UFGA8201.MZX`).
 A bare day of year uses the start year, or the next year when it precedes the
 start day. A five-digit `yyddd` uses the start date's century, advancing a century
-if it falls before the start date. Seven-digit `yyyyddd` dates need no FileX.
+if it falls before January 1 of the start year (DSSAT itself anchors on the first
+weather date, which dssatlab does not read here). Seven-digit `yyyyddd` dates need no FileX.
 
 `plot_observed()` returns a matplotlib Axes, using the optional `plot` extra.
 It draws one Plant growth line per observed scenario and treatment, with measured

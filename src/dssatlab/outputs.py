@@ -267,15 +267,17 @@ def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
     model (TN or TRNO). Values are int, float, or str (EXCODE, CR), with -99
     missing values as None. Date columns remain days after planting. Multiple
     *EVALUATION blocks read each row under its own header. DSSAT fills the
-    measured columns only for run() (all treatments) with the FileA beside the
-    FileX; a Simulation runs one treatment and DSSAT leaves them -99 there.
+    measured columns only in some runs (CERES-Maize through run() with the FileA
+    beside the FileX); a Simulation (one treatment) and CROPSIM wheat leave them
+    -99, so compare with evaluate(results, read_dssat_observed(path)) there.
 
     Raises DSSATOutputError if Evaluate.OUT is missing, empty, or malformed.
     """
     path = Path(run_dir) / "Evaluate.OUT"
     checked = f"Checked {path} in the run directory."
-    next_step = ("Run the FileX with run() and its FileA beside it, so DSSAT writes "
-                 "Evaluate.OUT with measured columns.")
+    next_step = ("Run the FileX with run() and its FileA beside it to get Evaluate.OUT; "
+                 "if DSSAT leaves its measured columns -99, use "
+                 "evaluate(results, read_dssat_observed(path)).")
     try:
         lines = path.read_text(encoding="latin-1").splitlines()
     except OSError as exc:
