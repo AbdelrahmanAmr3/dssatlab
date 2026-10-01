@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 import dssatlab
-from dssatlab import DSSATError, DSSATOutputError, read_plant_growth, read_summary, to_dataframe
+from dssatlab import (DSSATError, DSSATOutputError, read_dssat_evaluation,
+                      read_plant_growth, read_summary, to_dataframe)
 from dssatlab.runner import RunResult
 
 
@@ -17,7 +18,7 @@ from dssatlab.runner import RunResult
 def result(tmp_path):
     fixtures = Path(__file__).parent / "fixtures" / "output_files"
     run_dir = tmp_path / "run directory"
-    for kind in ("summary", "plant_growth", "soil_water", "plant_nitrogen", "weather"):
+    for kind in ("summary", "plant_growth", "soil_water", "plant_nitrogen", "weather", "evaluate"):
         shutil.copytree(fixtures / kind / "maize", run_dir, dirs_exist_ok=True)
     return RunResult(0, run_dir, sorted(run_dir.glob("*.OUT")), "DSSAT finished")
 
@@ -25,6 +26,7 @@ def result(tmp_path):
 def test_result_readers_use_its_run_directory(result):
     assert result.summary() == read_summary(result.run_dir)
     assert result.plant_growth() == read_plant_growth(result.run_dir)
+    assert result.dssat_evaluation() == read_dssat_evaluation(result.run_dir)
 
 
 @pytest.mark.parametrize("kind,filename,column,expected", [

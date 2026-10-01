@@ -235,6 +235,7 @@ class Simulation:
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
         FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
         and generates the weather file (*.WTH).
+        Copies any sibling FileA and FileT named after the FileX into the simulation folder so DSSAT fills Evaluate.OUT.
         For a template, creates the folder beside its YAML (or in cwd for a dict),
         writes the FileX and SOIL.SOL, and copies the crop's genotype files from
         Genotype beside the DSSAT executable. Experiment edits then apply as usual.
@@ -281,10 +282,12 @@ class Simulation:
             _write_management(sim_folder / filex.name, self.treatment, experiment_data,
                               name=self.name, station=station,
                               soil_id=soil_rows[0]["soil_id"] if soil_rows and station is not None else None)
+            file_a_t = {(filex.stem + filex.suffix[:-1] + letter).upper() for letter in "AT"}
             for sibling in filex.parent.iterdir():
                 if self.soil is not None and sibling.suffix.upper() == ".SOL":
                     continue
-                if sibling.is_file() and sibling.suffix.upper() in (".SOL", ".CUL", ".ECO", ".SPE"):
+                if sibling.is_file() and (sibling.suffix.upper() in (".SOL", ".CUL", ".ECO", ".SPE")
+                                          or sibling.name.upper() in file_a_t):
                     shutil.copy2(sibling, sim_folder / sibling.name)
             write_weather_file(rows, sim_folder / weather_name)
             if self.soil is not None:
