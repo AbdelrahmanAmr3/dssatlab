@@ -2,6 +2,27 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.11.1] - UNDATED
+
+### Added
+- FileX template key `treatment_fields`: an optional list of field numbers 1..K (whole numbers without gaps) matching `treatments` in length, placing each treatment on a specific field. When omitted, all treatments grow on field 1.
+- Per-field weather and soil dictionaries: template `Simulation` and `run_treatments(filex_template=...)` accept `weather=` and `soil=` as dicts keyed by field number (`{1: "gainesville.csv", 2: "ames.csv"}`; integer or digit-string keys), accepting CSV paths, lists of dicts, or pandas DataFrames. A plain source still means one field.
+- The written FileX defines each field in both `FIELDS` tables with its own station, coordinates, elevation, soil ID, and depth; the simulation folder holds one weather file per station and one `SOIL.SOL` containing every distinct profile in field order.
+- Guide sections and tutorial Case 7 show writing a two-field maize FileX template, supplying per-field weather and soil data, and comparing sites with `run_treatments()` and `combine_summaries()`.
+- Proven on real DSSAT 4.8.5 with a multi-field maize experiment (`UFGA` and `AMES` weather stations, two soil profiles) run through `run_treatments()` and as a whole experiment via `run()`.
+
+### Changed
+- Fields sharing a station code or soil ID must have identical parsed data; sharing an ID with differing data is rejected with both field numbers before writing anything.
+- Checks report weather and soil problems labelled by field number (`Weather data, field k` / `Soil data, field k`).
+- Selected treatment dates and initial condition depths are validated against that treatment's assigned field weather and soil.
+- `write_filex_template()` comments show `treatment_fields` alongside `treatments`.
+- Passing a per-field dictionary with a copied FileX (`filex=...`) is rejected with a clear message explaining that per-field data requires a FileX template.
+
+### Notes
+- Template fields are numbered per treatment, and weather and soil are keyed by field (ADR 0011).
+- Per-field data for copied FileX experiments remains out of scope.
+- Upgrading from 0.11.0 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.11.0] - 2026-10-01
 
 ### Added

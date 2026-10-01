@@ -89,6 +89,21 @@ results = dl.run_treatments(
 - **Whole experiment written**: Each simulation folder holds the complete generated FileX with all treatments and their experiment data applied. The scenario name is written to the selected treatment row only.
 - **Scenarios**: `scenarios=` works identically with template experiments, allowing you to test weather, soil, or management overrides across all template treatments.
 
+### Two fields in one template experiment
+
+When the FileX template defines multiple fields with `treatment_fields`, supply `weather` and `soil` as dictionaries keyed by field number:
+
+```python
+# A two-field template comparing Site A (field 1) and Site B (field 2):
+results = dl.run_treatments(
+    filex_template="two_fields.yaml",
+    weather={1: "site_a_weather.csv", 2: "site_b_weather.csv"},
+    soil={1: "site_a_soil.csv", 2: "site_b_soil.csv"},
+)
+```
+
+Each treatment runs on its assigned field using the corresponding weather and soil data. Calling `combine_summaries(results)` includes `WSTA` and `SOIL_ID` on every row, making it easy to compare results across sites or soils. Scenario overrides of `weather` or `soil` replace the whole per-field dictionary for that scenario.
+
 ## Define scenarios
 
 A **scenario** is a named set of input overrides. You can override any of the three
@@ -313,13 +328,14 @@ No simulation folders or files are written if checks fail.
 
 ### The station rule (`WSTA`)
 
-Every weather input (both the base weather and any scenario weather override) must
-match the 4-character station code of the field's `WSTA` for **every** treatment
-selected in the run.
+For an existing FileX, every weather input (both the base weather and any scenario
+weather override) must match the 4-character station code of the field's `WSTA` for
+**every** treatment selected in the run. A single `run_treatments()` call on an
+existing FileX cannot mix treatments that require different weather stations.
 
-Per-station weather is out of scope: a single `run_treatments()` call cannot mix
-treatments that require different weather stations. If any treatment's `WSTA` does
-not match the weather data, the check fails before any run.
+For a FileX template with several fields, each field takes its station from that field's
+weather data in the `weather=` dictionary. Fields may share a station code only if their
+weather data is identical.
 
 ### Stop on first run failure
 
