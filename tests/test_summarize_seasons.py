@@ -14,16 +14,61 @@ def test_empty_list_returns_empty():
     assert lab.summarize_seasons([], variables=("HWAM",)) == []
 
 
+@pytest.mark.parametrize("components", [(1, 2, 3), (3, 1, 2)])
+@pytest.mark.parametrize("labels", [
+    [{"TRNO": 1}],
+    [{"scenario": "late", "treatment": 2}, {"scenario": "early", "treatment": 2},
+     {"scenario": "late", "treatment": 1}],
+])
+def test_sequence_statistics_per_rotation_component(components, labels):
+    crops = {1: "BN", 2: "FA", 3: "SB"}
+    yields = {1: [1000, 2000, 3000], 2: [0, 0, 0], 3: [2000, 4000, 6000]}
+    rows = [dict(label, **{"R#": component, "CR": crops[component],
+                          "HWAM": yields[component][season]})
+            for season in range(3) for label in labels for component in components]
+    results = lab.summarize_seasons(rows)
+    expected = []
+    for label in labels:
+        for component in components:
+            values = yields[component]
+            expected.append({
+                "scenario": label.get("scenario", "base"),
+                "treatment": label.get("treatment", label.get("TRNO")),
+                "component": component, "crop": crops[component], "variable": "HWAM",
+                "seasons": 3, "missing": 0, "mean": values[1],
+                "sd": values[1] - values[0], "min": values[0],
+                "p25": (values[0] + values[1]) / 2, "median": values[1],
+                "p75": (values[1] + values[2]) / 2, "max": values[2],
+            })
+    assert results == expected
+    assert list(results[0]) == list(expected[0])
+
+
+@pytest.mark.parametrize("component_fields", [{}, {"R#": None}, {"R#": 1}])
+@pytest.mark.parametrize("crop_fields,crop", [({}, None), ({"CR": "BN"}, "BN")])
+def test_default_component_and_first_row_crop(component_fields, crop_fields, crop):
+    rows = [dict(TRNO=1, HWAM=1000, **component_fields, **crop_fields),
+            {"TRNO": 1, "R#": 1, "CR": "SB", "HWAM": 3000}]
+    assert lab.summarize_seasons(rows) == [{
+        "scenario": "base", "treatment": 1, "component": 1, "crop": crop,
+        "variable": "HWAM", "seasons": 2, "missing": 0, "mean": 2000,
+        "sd": pytest.approx(statistics.stdev([1000, 3000])), "min": 1000,
+        "p25": 1500, "median": 2000, "p75": 2500, "max": 3000,
+    }]
+
+
 def test_single_run_rows_defaults_scenario_to_base_and_treatment_to_trno():
     rows = [{"TRNO": 1, "HWAM": 1000}, {"TRNO": 1, "HWAM": 2000}]
     results = lab.summarize_seasons(rows)
     assert len(results) == 1
-    expected_keys = ["scenario", "treatment", "variable", "seasons", "missing",
+    expected_keys = ["scenario", "treatment", "component", "crop", "variable", "seasons", "missing",
                      "mean", "sd", "min", "p25", "median", "p75", "max"]
     assert list(results[0].keys()) == expected_keys
     row = results[0]
     assert row["scenario"] == "base"
     assert row["treatment"] == 1
+    assert row["component"] == 1
+    assert row["crop"] is None
     assert row["variable"] == "HWAM"
     assert row["seasons"] == 2
     assert row["missing"] == 0
@@ -230,7 +275,7 @@ def test_to_dataframe_round_trip():
     summary = lab.summarize_seasons(rows)
     df = lab.to_dataframe(summary)
     assert isinstance(df, pd.DataFrame)
-    expected_columns = ["scenario", "treatment", "variable", "seasons", "missing",
+    expected_columns = ["scenario", "treatment", "component", "crop", "variable", "seasons", "missing",
                         "mean", "sd", "min", "p25", "median", "p75", "max"]
     assert list(df.columns) == expected_columns
     assert df["scenario"].tolist() == ["base"]

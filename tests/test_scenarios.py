@@ -40,6 +40,28 @@ def test_all_treatments_have_separate_simulation_folders_and_run_directories(
     assert snapshot(batch_inputs.filex.parent) == before
 
 
+@pytest.mark.parametrize("numbers", [(1, 1, 2), (2, 2, 1)])
+def test_all_treatments_selects_repeated_numbers_once_in_file_order(
+        batch_inputs, fake_dssat, numbers):
+    lines = batch_inputs.filex.read_text().splitlines()
+    for index, (number, component) in enumerate(zip(numbers, (1, 2, 1)), 2):
+        lines[index] = f"{number:2} {component}" + lines[index][4:]
+    batch_inputs.filex.write_text("\n".join(lines) + "\n")
+    results = lab.run_treatments(batch_inputs.filex, batch_inputs.weather,
+                                 treatments=None, executable=fake_dssat.executable)
+    assert list(results) == [("base", numbers[0]), ("base", numbers[2])]
+    assert len(fake_dssat.calls) == 2
+    assert len({result.run_dir for result in results.values()}) == 2
+
+
+@pytest.mark.parametrize("treatments", [[1, 1], [1, "01"]])
+def test_explicit_duplicate_treatments_remain_a_check_problem(
+        batch_inputs, fake_dssat, treatments):
+    with pytest.raises(lab.DSSATCheckError, match="Duplicate treatment number"):
+        lab.run_treatments(batch_inputs.filex, batch_inputs.weather, treatments=treatments)
+    assert fake_dssat.calls == []
+
+
 def test_subset_scenarios_replace_whole_inputs_without_mutating_them(
         batch_inputs, fake_dssat, soil_rows):
     weather = [dict(row, rain=9) for row in batch_inputs.rows]
