@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## 0.15.0
+## [0.15.0] - 2026-10-02
 
 ### Added
 - Experiment data `controls` fields: `photosynthesis` (PHOTO), `co2` (CO2), `symbiosis` (SYMBI), `phosphorus` (PHOSP), `potassium` (POTAS), `tillage` (TILL), `evapotranspiration` (EVAPO), `infiltration` (INFIL), `soil_organic_matter` (MESOM), `soil_evaporation` (MESEV), `soil_layers` (MESOL), and `residue` (RESID), with checked DSSAT codes (ADR 0019). Omitted options keep the FileX value.
