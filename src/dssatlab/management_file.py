@@ -148,7 +148,7 @@ def _write_template(path, text, label, filex):
         raise DSSATError(message)
     if filex is not None:
         try:
-            numbers = read_treatment_numbers(filex)
+            numbers = list(dict.fromkeys(read_treatment_numbers(filex)))
         except ValueError as error:
             raise DSSATError(str(error)) from error
         header, example = text.split("  1:\n", 1)
