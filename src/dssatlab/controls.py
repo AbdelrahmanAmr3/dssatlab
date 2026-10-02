@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 import re
 
-from .experiment import _check_date
+from .experiment import _check_date, _CONTROL_OPTIONS
 from .filex import _section_row
 from .weather import _dssat_date
 from .filex_write import _append_rows, _cell, _columns, _repoint, _section_bounds
@@ -89,9 +89,10 @@ def _controls_text(text, treatment, controls):
         day = date.fromisoformat(controls["start_date"])
         changes["GENERAL", "SDATE"] = _dssat_date(day)
     for field, block, column in (("years", "GENERAL", "NYERS"),
-                                 ("water", "OPTIONS", "WATER"),
-                                 ("nitrogen", "OPTIONS", "NITRO"),
                                  ("output_interval", "OUTPUTS", "FROPT")):
+        if field in controls:
+            changes[block, column] = controls[field]
+    for field, (block, column, _) in _CONTROL_OPTIONS.items():
         if field in controls:
             changes[block, column] = controls[field]
 

@@ -7,6 +7,24 @@ import re
 from .weather import _show_value
 
 
+_CONTROL_OPTIONS = {
+    "water": ("OPTIONS", "WATER", ("Y", "N")),
+    "nitrogen": ("OPTIONS", "NITRO", ("Y", "N")),
+    "photosynthesis": ("METHODS", "PHOTO", ("C", "R", "L", "V")),
+    "co2": ("OPTIONS", "CO2", ("M", "W", "D", "R")),
+    "symbiosis": ("OPTIONS", "SYMBI", ("Y", "N", "U")),
+    "phosphorus": ("OPTIONS", "PHOSP", ("Y", "N")),
+    "potassium": ("OPTIONS", "POTAS", ("Y", "N")),
+    "tillage": ("OPTIONS", "TILL", ("Y", "N")),
+    "evapotranspiration": ("METHODS", "EVAPO", ("F", "R", "S", "T")),
+    "infiltration": ("METHODS", "INFIL", ("R", "S", "N")),
+    "soil_organic_matter": ("METHODS", "MESOM", ("G", "P")),
+    "soil_evaporation": ("METHODS", "MESEV", ("R", "S")),
+    "soil_layers": ("METHODS", "MESOL", (1, 2, 3)),
+    "residue": ("MANAGEMENT", "RESID", ("N", "R", "D")),
+}
+
+
 def _unknown_keys(data, allowed, where, template="Management"):
     return [f"{where}: unknown key {_show_value(key)}. Use only "
             f"{', '.join(allowed)} from the {template} template."
@@ -53,7 +71,7 @@ def _check_controls(data, where):
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply fields from the Experiment "
                 "template or omit the section to keep the FileX level."]
-    problems = _check_fields(data, (), ("start_date", "water", "nitrogen", "output_interval", "years"),
+    problems = _check_fields(data, (), ("start_date", *_CONTROL_OPTIONS, "output_interval", "years"),
                              where, "Experiment")
     for field, value in data.items():
         location = f"{where}, field {field!r}"
@@ -70,8 +88,15 @@ def _check_controls(data, where):
             else:
                 # _check_number also rejects integers too large to convert to a float.
                 problems.extend(_check_number(value, location))
-        elif field in ("water", "nitrogen"):
-            if value not in ("Y", "N"):
+        elif field in _CONTROL_OPTIONS:
+            _, column, codes = _CONTROL_OPTIONS[field]
+            if type(value) is not type(codes[0]) or value not in codes:
+                if field in ("water", "nitrogen"):
+                    instruction = 'Supply the quoted string "Y" or "N".'
+                else:
+                    choices = ", ".join(f'"{code}"' if isinstance(code, str) else str(code)
+                                        for code in codes)
+                    instruction = f"Supply one of {choices} (DSSAT {column})."
                 problems.append(f"{location}: found {_show_value(value)}. "
-                                'Supply the quoted string "Y" or "N".')
+                                f"{instruction}")
     return problems

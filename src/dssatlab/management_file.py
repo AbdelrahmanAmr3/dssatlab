@@ -98,6 +98,19 @@ _EXPERIMENT_SECTIONS_TEXT = """
       nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
       output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column
       # years: 9                 # Number of seasons (DSSAT NYERS), positive integer
+      # Simulation options: quoted, case-sensitive letter codes; soil_layers is an integer.
+      # photosynthesis: "C"       # DSSAT PHOTO: "C", "R", "L", "V"
+      # co2: "M"                  # DSSAT CO2: "M", "W", "D", "R"
+      # symbiosis: "N"            # DSSAT SYMBI: "Y", "N", "U"
+      # phosphorus: "N"           # DSSAT PHOSP: "Y", "N"
+      # potassium: "N"            # DSSAT POTAS: "Y", "N"
+      # tillage: "N"              # DSSAT TILL: "Y", "N"
+      # evapotranspiration: "R"    # DSSAT EVAPO: "F", "R", "S", "T"
+      # infiltration: "S"         # DSSAT INFIL: "R", "S", "N"
+      # soil_organic_matter: "G"   # DSSAT MESOM: "G", "P"
+      # soil_evaporation: "R"      # DSSAT MESEV: "R", "S"
+      # soil_layers: 2            # DSSAT MESOL: 1, 2, 3 (not a string or boolean)
+      # residue: "N"              # DSSAT RESID: "N", "R", "D"
 """
 
 
