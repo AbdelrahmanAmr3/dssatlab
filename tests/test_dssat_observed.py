@@ -28,6 +28,61 @@ def filex(tmp_path, sdate="81279"):
     return path
 
 
+@pytest.mark.parametrize("header", [
+    "*EXP. DATA ({kind}):", "*EXP.DATA ({kind}):", "*EXP.DATA({kind}):",
+    "*EXPT.DATA  ({kind}):", "*EXPT.DATA ({kind}):", "*EXP.DATA ({kind})  NAME",
+])
+@pytest.mark.parametrize("kind", ["A", "T"])
+def test_stock_header_spellings(tmp_path, header, kind):
+    table_text = ("@TRNO HWAM\n1 5\n" if kind == "A"
+                  else "@TRNO DATE LAID\n1 2024001 2\n")
+    path = observed_file(tmp_path, "  " + header.format(kind=kind) + "\n" + table_text,
+                         "trial.SBT" if kind == "A" else "trial.SBA")
+    expected = (dict(date=None, HWAM=5.) if kind == "A"
+                else dict(date="2024-01-01", LAID=2.))
+    assert dl.read_dssat_observed(path) == [dict(scenario="base", treatment=1, **expected)]
+
+
+@pytest.mark.parametrize("extension", ["SBA", "sba", "SBT", "sbt"])
+def test_header_kind_from_extension(tmp_path, extension):
+    kind = extension[-1].upper()
+    table_text = ("@TRNO HWAM\n1 5\n" if kind == "A"
+                  else "@TRNO DATE LAID\n1 2024001 2\n")
+    rows = dl.read_dssat_observed(observed_file(tmp_path, "*EXP:\n" + table_text,
+                                               "trial." + extension))
+    expected = (dict(date=None, HWAM=5.) if kind == "A"
+                else dict(date="2024-01-01", LAID=2.))
+    assert rows == [dict(scenario="base", treatment=1, **expected)]
+
+
+@pytest.mark.parametrize("text,name,lines", [
+    ("*EXP:\n", "trial.txt", "line 1"),
+    ("! no experiment header\n", "trial.SBA", "line 1"),
+    ("*EXP.DATA(A):\n*EXP.DATA (T) NAME\n", "trial.SBA", "line 1, 2"),
+    ("*EXP.DATA(A):\n*EXP:\n", "trial.SBT", "line 1, 2"),
+    ("*EXP.DATA(A):\n*EXP:\n", "trial.txt", "line 1, 2"),
+])
+def test_invalid_header_kind_is_one_problem(tmp_path, text, name, lines):
+    path = observed_file(tmp_path, text, name)
+    with pytest.raises(dl.DSSATCheckError) as caught:
+        dl.read_dssat_observed(path)
+    assert len(caught.value.problems) == 1
+    problem = caught.value.problems[0]
+    assert all(part in problem for part in
+               (str(path), lines, "FileA/FileT", "Checked", "(A)", "(T)", ".??A/.??T"))
+
+
+@pytest.mark.parametrize("kind", ["A", "T"])
+def test_repeated_headers_of_one_kind(tmp_path, kind):
+    table_text = ("@TRNO HWAM\n1 5\n" if kind == "A"
+                  else "@TRNO DATE LAID\n1 2024001 2\n")
+    text = f"*EXP.DATA({kind}):\n" + table_text + "*EXP:\n" + table_text
+    path = observed_file(tmp_path, text, "trial.SB" + kind)
+    expected = (dict(date=None, HWAM=5.) if kind == "A"
+                else dict(date="2024-01-01", LAID=2.))
+    assert dl.read_dssat_observed(path) == [dict(scenario="base", treatment=1, **expected)]
+
+
 @pytest.mark.parametrize("filename,yield_value,anthesis", [
     ("UFGA8201.MZA", 2929., "1982-05-12"),
     ("KSAS8101.WHA", 2317., "1982-05-21"),

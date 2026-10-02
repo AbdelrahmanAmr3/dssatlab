@@ -70,7 +70,12 @@ def _read_date(value, path, treatment, anchors):
 
 
 def read_dssat_observed(path: str | Path) -> list[dict]:
-    """Read FileA/FileT by its *EXP. DATA (A)/(T) header, for any crop.
+    """Read FileA/FileT by headers starting with *EXP, for any crop.
+
+    Each header names (A) or (T), with any spacing before the kind; otherwise
+    the extension's last letter supplies A/T (case-insensitive). Repeated
+    headers must all name or imply the same kind. At least one is required.
+    A generic .txt extension does not identify FileT.
 
     Rows contain scenario='base', integer treatment, date (ISO yyyy-mm-dd for
     FileT, None for FileA), and float measurements; Summary dates are ISO strings.
@@ -92,12 +97,22 @@ def read_dssat_observed(path: str | Path) -> list[dict]:
     except (OSError, ValueError) as error:
         raise DSSATCheckError([f"{path}, line 1: cannot read FileA/FileT: {error}. "
                                "Supply a readable FileA/FileT path."]) from error
-    kinds = {match[1] for line in lines
-             if (match := re.match(r"\s*\*EXP\. DATA \(([AT])\)", line))}
+    # .txt ends in t, but it is no FileT extension.
+    extension_kind = "" if path.suffix.lower() == ".txt" else path.suffix[-1:].upper()
+    kinds, header_lines = set(), []
+    for number, line in enumerate(lines, 1):
+        if line.strip().startswith("*EXP"):
+            header_lines.append(number)
+            named_kinds = set(re.findall(r"\(([AT])\)", line))
+            kinds.update(named_kinds or {extension_kind if extension_kind in {"A", "T"}
+                                        else None})
     problems = []
-    if len(kinds) != 1:
-        problems.append(f"{path}, line 1: not a FileA/FileT with one unambiguous "
-                        "*EXP. DATA (A)/(T) header. Supply the correct header.")
+    if len(kinds) != 1 or None in kinds:
+        numbers = ", ".join(map(str, header_lines)) or "1"
+        problems.append(f"{path}, line {numbers}: not a FileA/FileT with one unambiguous "
+                        "kind. Checked *EXP header lines for (A)/(T) and the extension's "
+                        "last letter. Add (A) or (T) to the *EXP header or use a "
+                        ".??A/.??T extension; keep all headers the same kind.")
     kind = next(iter(kinds)) if len(kinds) == 1 else None
     allowed = (_PLANT_COLUMNS if kind == "T" else _SUMMARY_COLUMNS) - _METADATA
     rows, anchors, names = {}, {}, None
