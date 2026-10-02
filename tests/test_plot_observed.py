@@ -103,7 +103,7 @@ def test_all_observed_and_output_problems_are_collected_before_drawing(pyplot, r
         dl.plot_observed(results, observed, "LAID")
     assert len(caught.value.problems) == 5
     for text in ("non-numeric", "no matching result", "variable absent from PlantGro.OUT",
-                 "no Plant growth rows", "PlantGro.OUT is missing or unreadable"):
+                 "no Plant growth rows", "PlantGro.OUT or <experiment>.OPG is missing or unreadable"):
         assert text in str(caught.value)
     assert pyplot.get_fignums() == []
 

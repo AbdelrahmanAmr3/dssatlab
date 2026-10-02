@@ -191,7 +191,7 @@ def _weather_filename(station: str, start_date: str) -> str:
 
 
 def _check_filex_controls(source, treatment, levels) -> list[str]:
-    """Report WTHER other than M and FNAME other than N in the controls levels (SM) a run uses."""
+    """Report WTHER other than M in the controls levels (SM) a run uses."""
     sm_levels = list(dict.fromkeys(int(level) for level in levels if level.isdigit()))
     if not sm_levels:
         return []
@@ -203,7 +203,6 @@ def _check_filex_controls(source, treatment, levels) -> list[str]:
         return []
 
     problems = []
-    stem = path.stem
     for level in sm_levels:
         try:
             methods = _section_row(text, "SIMULATION CONTROLS", "N", level, ("WTHER",))
@@ -213,18 +212,6 @@ def _check_filex_controls(source, treatment, levels) -> list[str]:
                     f"FileX WTHER '{wther}' in controls level {level} (treatment {treatment_num}): "
                     "DSSAT would generate weather and ignore the weather data supplied. "
                     "Set WTHER to M."
-                )
-        except ValueError:
-            pass
-
-        try:
-            outputs = _section_row(text, "SIMULATION CONTROLS", "N", level, ("FNAME",))
-            fname = outputs.get("FNAME", "").strip()
-            if fname and fname != "-99" and fname != "N":
-                problems.append(
-                    f"FileX FNAME '{fname}' in controls level {level} (treatment {treatment_num}): "
-                    f"DSSAT would name its output files after the experiment ({stem}.OSU) "
-                    "instead of Summary.OUT, which dssatlab reads. Set FNAME to N."
                 )
         except ValueError:
             pass
