@@ -133,6 +133,15 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # auto_irrigation_amount: 10      # DSSAT IRAMT, mm: a number above 0
       # auto_irrigation_efficiency: 1   # DSSAT IREFF: a number above 0 and at most 1
       # EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
+      # Automatic planting: omitted values stay unchanged; numbers are finite, not booleans.
+      # auto_planting_first: "1982-02-25" # DSSAT PFRST: a valid ISO calendar date as a quoted YYYY-MM-DD string
+      # auto_planting_last: "1982-03-10"  # DSSAT PLAST: a valid ISO calendar date as a quoted YYYY-MM-DD string
+      # auto_planting_soil_water_low: 40   # DSSAT PH2OL, %: a number from 0 to 100 inclusive
+      # auto_planting_soil_water_high: 100 # DSSAT PH2OU, %: a number from 0 to 100 inclusive
+      # auto_planting_soil_water_depth: 30 # DSSAT PH2OD, cm: a number above 0
+      # auto_planting_max_temperature: 40 # DSSAT PSTMX, degrees C: a finite number
+      # auto_planting_min_temperature: 10 # DSSAT PSTMN, degrees C: a finite number
+      # With PLANT A/F, first <= last and first >= start_date; given dates need weather coverage.
 """
 
 

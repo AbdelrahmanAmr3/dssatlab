@@ -8,7 +8,7 @@ from .weather import _show_value
 
 
 # Field -> block, column, codes. Automatic values also carry a correction:
-# a method pattern, or (minimum, maximum, exclusive minimum) for numbers.
+# a method pattern, "date", or (minimum, maximum, exclusive minimum) for numbers.
 _CONTROL_OPTIONS = {
     "water": ("OPTIONS", "WATER", ("Y", "N")),
     "nitrogen": ("OPTIONS", "NITRO", ("Y", "N")),
@@ -34,6 +34,15 @@ _CONTROL_OPTIONS = {
     "auto_irrigation_amount": ("IRRIGATION", "IRAMT", (0, None, True), "a number above 0"),
     "auto_irrigation_efficiency": ("IRRIGATION", "IREFF", (0, 1, True),
                                    "a number above 0 and at most 1"),
+    "auto_planting_first": ("PLANTING", "PFRST", "date",
+                            "a valid ISO calendar date as a quoted YYYY-MM-DD string"),
+    "auto_planting_last": ("PLANTING", "PLAST", "date",
+                           "a valid ISO calendar date as a quoted YYYY-MM-DD string"),
+    "auto_planting_soil_water_low": ("PLANTING", "PH2OL", (0, 100, False), "a number from 0 to 100"),
+    "auto_planting_soil_water_high": ("PLANTING", "PH2OU", (0, 100, False), "a number from 0 to 100"),
+    "auto_planting_soil_water_depth": ("PLANTING", "PH2OD", (0, None, True), "a number above 0"),
+    "auto_planting_max_temperature": ("PLANTING", "PSTMX", (None, None, False), "a finite number"),
+    "auto_planting_min_temperature": ("PLANTING", "PSTMN", (None, None, False), "a finite number"),
 }
 
 
@@ -104,12 +113,14 @@ def _check_controls(data, where):
             spec = _CONTROL_OPTIONS[field]
             _, column, rule = spec[:3]
             if len(spec) == 4:
-                if isinstance(rule, str):
+                if rule == "date":
+                    valid = not _check_date(value, location)
+                elif isinstance(rule, str):
                     valid = isinstance(value, str) and re.fullmatch(rule, value)
                 else:
                     minimum, maximum, exclusive = rule
                     valid = (not _check_number(value, location)
-                             and (value > minimum if exclusive else value >= minimum)
+                             and (minimum is None or (value > minimum if exclusive else value >= minimum))
                              and (maximum is None or value <= maximum))
                 if not valid:
                     problems.append(f"{location}: found {_show_value(value)}. "
