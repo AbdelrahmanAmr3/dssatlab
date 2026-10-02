@@ -11,7 +11,7 @@ from .experiment import (_check_controls, _check_date, _check_fields,
                          _check_number, _unknown_keys)
 from .weather import _show_value
 from .initial_conditions import _check_initial_conditions, _initial_conditions_text
-from .controls import _controls_text
+from .controls import _check_planting_window, _controls_text
 
 
 _REQUIRED = ("date", "method", "distribution", "population", "row_spacing", "depth")
@@ -230,6 +230,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                 if not section_problems and not entry_problems and text is not None:
                     try:
                         _controls_text(text, number, entry[section])
+                        section_problems.extend(_check_planting_window(
+                            text, number, entry[section], where, start_date, weather_range))
                     except ValueError as error:
                         section_problems.append(f"{where}, controls: FileX {filex}: {error}")
             problems.extend(section_problems)
