@@ -92,8 +92,9 @@ def _controls_text(text, treatment, controls):
                                  ("output_interval", "OUTPUTS", "FROPT")):
         if field in controls:
             changes[block, column] = controls[field]
-    for field, (block, column, _) in _CONTROL_OPTIONS.items():
+    for field, spec in _CONTROL_OPTIONS.items():
         if field in controls:
+            block, column = spec[:2]
             changes[block, column] = controls[field]
 
     lines = text.splitlines(keepends=True)

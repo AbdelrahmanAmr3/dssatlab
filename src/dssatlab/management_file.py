@@ -122,6 +122,17 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # soil_evaporation: "R"      # DSSAT MESEV: "R", "S"
       # soil_layers: 2            # DSSAT MESOL: 1, 2, 3 (not a string or boolean)
       # residue: "N"              # DSSAT RESID: "N", "R", "D"
+      # Management codes are quoted, case-sensitive strings, not booleans or numbers.
+      # irrigation_management: "R" # DSSAT IRRIG: "A", "N", "F", "R", "D", "P", "W"
+      # planting_management: "R"   # DSSAT PLANT: "A", "F", "R"
+      # Automatic irrigation numbers are finite, not booleans; omitted values stay unchanged.
+      # auto_irrigation_depth: 30       # DSSAT IMDEP, cm: a number above 0
+      # auto_irrigation_threshold: 50   # DSSAT ITHRL, %: a number from 0 to 100 inclusive
+      # auto_irrigation_refill: 100     # DSSAT ITHRU, %: a number from 0 to 100 inclusive
+      # auto_irrigation_method: "IR001" # DSSAT IMETH: two ASCII letters followed by three digits for the DSSAT code
+      # auto_irrigation_amount: 10      # DSSAT IRAMT, mm: a number above 0
+      # auto_irrigation_efficiency: 1   # DSSAT IREFF: a number above 0 and at most 1
+      # EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
 """
 
 
@@ -147,6 +158,8 @@ def write_experiment_template(path: str | Path, filex: str | Path | None = None)
     """Write commented YAML for management, cultivar, initial conditions and controls.
 
     Cultivar, initial conditions and controls are checked and applied to the FileX copy.
+    EFIR applies to the irrigation level's events; controls auto_irrigation_efficiency
+    (IREFF) applies to automatic irrigation.
     Dates are quoted ISO calendar strings; units and codes are DSSAT's.
     With filex, use its treatment numbers in file order, keeping example values.
     Without filex, write one example treatment numbered 1. No PyYAML is needed.
