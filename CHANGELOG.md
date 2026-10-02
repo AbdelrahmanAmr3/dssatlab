@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.16.0] - Unreleased
+## [0.16.0] - 2026-10-02
 
 ### Added
 - Experiment data `controls` fields for irrigation management (IRRIG), planting management (PLANT), automatic irrigation (IMDEP, ITHRL, ITHRU, IMETH, IRAMT, IREFF) and automatic planting windows, soil water and temperature limits (PFRST, PLAST, PH2OL, PH2OU, PH2OD, PSTMX, PSTMN). Omitted fields keep the copied FileX values ([ADR 0020](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0020-automatic-management-as-controls-fields.md)).
