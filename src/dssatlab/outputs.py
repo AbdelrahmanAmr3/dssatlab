@@ -88,8 +88,24 @@ def _numeric_value(name: str, value: str):
             raise ValueError(f"invalid numeric column {name}: {value!r}") from exc
 
 
+def _output_path(run_dir: str | Path, filename: str, code: str) -> Path:
+    """Prefer the standard name, else one experiment-named OUTPUT.CDE file."""
+    path = Path(run_dir) / filename
+    if path.exists():
+        return path
+    candidates = sorted(p for p in Path(run_dir).glob("*")
+                        if p.is_file() and p.suffix.upper() == f".O{code}")
+    if len(candidates) > 1:
+        raise DSSATOutputError(
+            f"Ambiguous {filename}: found {', '.join(p.name for p in candidates)}. "
+            f"Checked {path} or <experiment>.O{code} in the run directory. "
+            "Keep one experiment's output files in the run directory and try again."
+        )
+    return candidates[0] if candidates else path
+
+
 def read_summary(run_dir: str | Path) -> list[dict]:
-    """Return one Summary row per simulation from ``run_dir/Summary.OUT``.
+    """Return one Summary row per simulation from Summary.OUT or <experiment>.OSU.
 
     Keys retain DSSAT column names, without header padding dots. Numeric values
     become int or float, text stays text, and the six YYYYDDD date columns become
@@ -98,14 +114,14 @@ def read_summary(run_dir: str | Path) -> list[dict]:
     Raises DSSATOutputError for a missing, empty or malformed output file;
     malformed rows never produce partial results.
     """
-    path = Path(run_dir) / "Summary.OUT"
+    path = _output_path(run_dir, "Summary.OUT", "SU")
     checked = f"Checked {path} in the run directory for a Summary @ header and complete data rows."
     next_step = "Check the run directory and output file, or rerun DSSAT to produce a complete Summary.OUT."
     try:
         lines = path.read_text(encoding="latin-1").splitlines()
     except OSError as exc:
         raise DSSATOutputError(
-            f"Summary.OUT is missing or unreadable ({exc}). {checked} {next_step}"
+            f"Summary.OUT or <experiment>.OSU is missing or unreadable ({exc}). {checked} {next_step}"
         ) from exc
 
     header_index = next((i for i, line in enumerate(lines) if line.startswith("@")), None)
@@ -141,7 +157,7 @@ def read_summary(run_dir: str | Path) -> list[dict]:
 
 
 def read_plant_growth(run_dir: str | Path) -> list[dict]:
-    """Return one Plant growth row per simulation day from ``PlantGro.OUT``.
+    """Return one Plant growth row per simulation day from PlantGro.OUT or <experiment>.OPG.
 
     Each *RUN block supplies its own RUNNO, TREATMENT (TRNO), and column header.
     DSSAT column names and YEAR/DOY are retained; DATE is a datetime.date, or
@@ -149,37 +165,37 @@ def read_plant_growth(run_dir: str | Path) -> list[dict]:
     Raises DSSATOutputError for missing or malformed output, never returning
     partial rows from a damaged file.
     """
-    return _read_daily(run_dir, "PlantGro.OUT")
+    return _read_daily(run_dir, "PlantGro.OUT", "PG")
 
 
 def read_soil_water(run_dir: str | Path) -> list[dict]:
-    """Read SoilWat.OUT by day, retaining DSSAT's per-layer column names.
+    """Read SoilWat.OUT or <experiment>.OSW by day, retaining DSSAT's per-layer column names.
 
     Uses read_plant_growth's dates, missing values and DSSATOutputError rules.
     """
-    return _read_daily(run_dir, "SoilWat.OUT")
+    return _read_daily(run_dir, "SoilWat.OUT", "SW")
 
 
 def read_plant_nitrogen(run_dir: str | Path) -> list[dict]:
-    """Read PlantN.OUT by day with DSSAT's own column names.
+    """Read PlantN.OUT or <experiment>.OPN by day with DSSAT's own column names.
 
     Uses read_plant_growth's dates, missing values and DSSATOutputError rules.
     """
-    return _read_daily(run_dir, "PlantN.OUT")
+    return _read_daily(run_dir, "PlantN.OUT", "PN")
 
 
 def read_weather(run_dir: str | Path) -> list[dict]:
-    """Read Weather.OUT by day with DSSAT's own column names.
+    """Read Weather.OUT or <experiment>.OWE by day with DSSAT's own column names.
 
     Uses read_plant_growth's dates, missing values and DSSATOutputError rules.
     The additional YYYYDDD column WDATE also becomes datetime.date or None.
     """
-    return _read_daily(run_dir, "Weather.OUT")
+    return _read_daily(run_dir, "Weather.OUT", "WE")
 
 
-def _read_daily(run_dir: str | Path, filename: str) -> list[dict]:
+def _read_daily(run_dir: str | Path, filename: str, code: str) -> list[dict]:
     """Read numeric daily columns and dates from each run's fixed-width header."""
-    path = Path(run_dir) / filename
+    path = _output_path(run_dir, filename, code)
     checked = (f"Checked {path} in the run directory for *RUN and TREATMENT lines, "
                "an @YEAR header in each run block, and complete data rows.")
     next_step = f"Check the run directory and output file, or rerun DSSAT to produce a complete {filename}."
@@ -187,7 +203,7 @@ def _read_daily(run_dir: str | Path, filename: str) -> list[dict]:
         lines = path.read_text(encoding="latin-1").splitlines()
     except OSError as exc:
         raise DSSATOutputError(
-            f"{filename} is missing or unreadable ({exc}). {checked} {next_step}"
+            f"{filename} or <experiment>.O{code} is missing or unreadable ({exc}). {checked} {next_step}"
         ) from exc
 
     starts = [i for i, line in enumerate(lines) if re.match(r"\*RUN\b", line)]
@@ -261,7 +277,7 @@ def _evaluate_value(name: str, value: str):
 
 
 def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
-    """Return DSSAT's simulated-versus-measured evaluation table from Evaluate.OUT.
+    """Return DSSAT's simulated-versus-measured table from Evaluate.OUT or <experiment>.OEV.
 
     Header line starts with @; columns keep DSSAT's names, which differ by crop
     model (TN or TRNO). Values are int, float, or str (EXCODE, CR), with -99
@@ -273,7 +289,7 @@ def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
 
     Raises DSSATOutputError if Evaluate.OUT is missing, empty, or malformed.
     """
-    path = Path(run_dir) / "Evaluate.OUT"
+    path = _output_path(run_dir, "Evaluate.OUT", "EV")
     checked = f"Checked {path} in the run directory."
     next_step = ("Run the FileX with run() and its FileA beside it to get Evaluate.OUT; "
                  "if DSSAT leaves its measured columns -99, use "
@@ -282,7 +298,7 @@ def read_dssat_evaluation(run_dir: str | Path) -> list[dict]:
         lines = path.read_text(encoding="latin-1").splitlines()
     except OSError as exc:
         raise DSSATOutputError(
-            f"Evaluate.OUT is missing or unreadable ({exc}). {checked} {next_step}"
+            f"Evaluate.OUT or <experiment>.OEV is missing or unreadable ({exc}). {checked} {next_step}"
         ) from exc
 
     columns = None
