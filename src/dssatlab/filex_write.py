@@ -6,6 +6,7 @@ import re
 
 from .filex import _section_row, _treatment_rows
 from .weather import _dssat_date
+from .operations import _operation_values
 
 
 _PLANTING_HEADER = (
@@ -24,6 +25,7 @@ _IRRIGATION_HEADERS = (
     "@I IDATE  IROP IRVAL",
 )
 _FERTILIZER_HEADER = "@F FDATE  FMCD  FACD  FDEP  FAMN  FAMP  FAMK  FAMC  FAMO  FOCD FERNAME"
+_RESIDUES_HEADER = "@R RDATE  RCOD  RAMT  RESN  RESP  RESK  RINP  RDEP  RMET RENAME"
 
 
 def _section_bounds(lines, section):
@@ -243,6 +245,8 @@ def _event_text(text, treatment, events, section="irrigation", *, rotation=None)
         has_level = True  # An empty dict schedule still writes its EFIR level.
     if section == "fertilizer":
         name, column, headers = "FERTILIZERS (INORGANIC)", "MF", (_FERTILIZER_HEADER,)
+    elif section == "residues":
+        name, column, headers = "RESIDUES AND ORGANIC FERTILIZER", "MR", (_RESIDUES_HEADER,)
     if rotation is None:
         _section_row(text, "TREATMENTS", "N", treatment, (column,))
     lines = text.splitlines(keepends=True)
@@ -259,6 +263,8 @@ def _event_text(text, treatment, events, section="irrigation", *, rotation=None)
                     _dssat_date(date.fromisoformat(event["date"])))
         if section == "irrigation":
             values = {"I": level, "IDATE": day_code, "IROP": event["method"], "IRVAL": event["amount"]}
+        elif section == "residues":
+            values = _operation_values(section, event, level)
         else:
             values = {"F": level, "FDATE": day_code, "FMCD": event["material"],
                       "FACD": event["application"], "FDEP": event["depth"], "FAMN": event["n"],
@@ -311,7 +317,7 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
                 text = _cultivar_text(text, int(treatment), _changed_cultivar(path, entry["cultivar"]))
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])
-            for section in ("irrigation", "fertilizer"):
+            for section in ("irrigation", "fertilizer", "residues"):
                 if section in entry:
                     text = _event_text(text, int(treatment), entry[section], section)
             if "initial_conditions" in entry:

@@ -171,8 +171,9 @@ def _check_treatment_key(key, seen_numbers, text, filex):
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
                  soil_depth, cultivar_path, *, start_date_note=None):
     from .irrigation import _check_irrigation
+    from .operations import _check_operation_events
 
-    sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
+    sections = ("planting", "irrigation", "fertilizer", "residues", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
                               f"with optional {', '.join(sections)}, "
@@ -180,7 +181,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         return entry_problems, []
     entry_problems.extend(_unknown_keys(entry, sections, where, "Experiment"))
     problems, report = list(entry_problems), []
-    for section in ("planting", "irrigation", "fertilizer"):
+    for section in ("planting", "irrigation", "fertilizer", "residues"):
         label = f"    {section}"
         if section not in entry and section != "irrigation":
             report.append(f"{label}: OK (omitted; keeps the FileX Level)")
@@ -190,6 +191,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         elif section == "planting":
             section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
             lines = _report_lines(label, section_problems)
+        elif section == "residues":
+            section_problems, lines = _check_operation_events(entry[section], section, where, weather_range)
         else:
             section_problems, lines = _check_events(entry[section], section, where, weather_range)
         if section in entry and not section_problems and not entry_problems and text is not None:

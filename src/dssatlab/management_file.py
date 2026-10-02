@@ -80,6 +80,15 @@ treatments:
 
 _EXPERIMENT_SECTIONS_TEXT = """
     # Omit a section to keep the FileX's own level.
+    # Residues: list of events; omit to keep MR, or [] for none for this treatment.
+    # Required date (RDATE): quoted ISO string, non-descending order; same date allowed.
+    # Required material (RCOD): two ASCII letters + three digits; amount (RAMT): kg/ha > 0.
+    # Optional n (RESN), p (RESP), k (RESK), incorporation (RINP): % from 0 to 100.
+    # Optional depth (RDEP): cm >= 0; method (RMET): two ASCII letters + three digits.
+    # Numbers are finite, not booleans. Unknown keys are rejected.
+    # Omitted optional fields and RENAME write -99 in the new MR level.
+    # residues:
+    #   - {date: "1982-02-25", material: "RE001", amount: 1500}
     # Cultivar adds a new CULTIVARS level in the copy and repoints this treatment.
     cultivar:
       crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
@@ -173,7 +182,7 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
 
 
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
-    """Write commented YAML for management, cultivar, initial conditions and controls.
+    """Write commented YAML for management, residues, cultivar, initial conditions and controls.
 
     Cultivar, initial conditions and controls are checked and applied to the FileX copy.
     EFIR applies to the irrigation level's events; controls auto_irrigation_efficiency
@@ -191,7 +200,7 @@ def write_experiment_template(path: str | Path, filex: str | Path | None = None)
     text = text.replace(
         intro,
         "# Experiment data by treatment number: planting, irrigation, fertilizer,\n"
-        "# cultivar, initial_conditions and controls.", 1)
+        "# residues, cultivar, initial_conditions and controls.", 1)
     _write_template(path, text + _EXPERIMENT_SECTIONS_TEXT, "Experiment", filex)
 
 
