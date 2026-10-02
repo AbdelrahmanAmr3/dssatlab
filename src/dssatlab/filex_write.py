@@ -190,7 +190,7 @@ def _append_rows(lines, index, rows):
     lines[index:index] = [prefix + newline.join(rows) + newline]
 
 
-def _event_blocks(lines, section, headers):
+def _event_blocks(lines, section, headers, *, optional_columns=()):
     """Check every header and find the last insertion point for each block."""
     expected = [_columns(header) for header in headers]
     blocks, highest = {}, 0
@@ -203,7 +203,7 @@ def _event_blocks(lines, section, headers):
         if line.startswith("@"):
             columns = _columns(line)
             active = max(range(len(expected)), key=lambda n: len(expected[n].keys() & columns.keys()))
-            missing = expected[active].keys() - columns.keys()
+            missing = expected[active].keys() - columns.keys() - set(optional_columns)
             if missing:
                 raise ValueError(f"{section} header is missing columns {', '.join(sorted(missing))}. "
                                  "Supply the needed columns.")
