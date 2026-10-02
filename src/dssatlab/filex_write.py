@@ -64,12 +64,7 @@ def _newline(lines):
 
 
 def _insert_section(lines, section, body):
-    """Insert missing management before harvest or SIMULATION CONTROLS.
-
-    Return new lines, leaving every existing line unchanged. Body contains
-    header/row strings without line endings; future writers can pass multiple
-    header blocks (for example irrigation controls and events).
-    """
+    """Insert header/row strings before harvest or controls, preserving existing lines."""
     bounds = _section_bounds(lines, "SIMULATION CONTROLS")
     if bounds is None:
         raise ValueError("missing SIMULATION CONTROLS section. Supply that section "
@@ -161,7 +156,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
         line = lines[index]
         if line.startswith("@"):
             columns = _columns(line)
-        elif key in columns and column in columns:
+        elif key in columns and (rotation is not None or column in columns):
             left, right = columns[key]
             try:
                 number = int(line[left:right])
@@ -172,6 +167,9 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
             except (ValueError, KeyError):
                 continue
             if number == treatment:
+                if column not in columns:
+                    raise ValueError(f"{section} header is missing columns {column}. "
+                                     "Supply the needed columns together.")
                 left, right = columns[column]
                 if line[left:right].strip() == str(level):
                     return

@@ -1,8 +1,6 @@
 """Check and run one Simulation with a copied or generated FileX and user data."""
 
-from datetime import date, timedelta
 from pathlib import Path
-import re
 import shutil
 
 from .errors import DSSATCheckError
@@ -15,40 +13,13 @@ from .management_file import _load_management
 from .rotation_data import _write_rotation_data
 from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
 from .sequence import (_check_sequence, _rotation_components, _run_sequence,
-                       _sequence_coverage, _sequence_experiment_data)
+                       _sequence_coverage, _sequence_experiment_data,
+                       _parse_sdate, _simulation_start_date)
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
 
-def _parse_sdate(sdate):
-    """Parse a FileX SDATE (YYDDD) string into (yy, doy) integers, or None."""
-    if isinstance(sdate, str) and re.fullmatch(r"[0-9]{5}", sdate):
-        return int(sdate[:2]), int(sdate[2:])
-    return None
-
-
-def _simulation_start_date(sdate, days):
-    """Resolve SDATE using weather years, or return the reason it cannot be checked."""
-    if sdate is None:
-        return None, "START is not S or SDATE is unavailable; check the FileX start controls"
-    parsed = _parse_sdate(sdate)
-    if parsed is None:
-        return None, f"SDATE {sdate!r} is not a DSSAT date (yyddd); correct SDATE"
-    if not days:
-        return None, "weather unreadable"
-    yy, doy = parsed
-    years = [y for y in range(min(d.year for d in days), max(d.year for d in days) + 1) if y % 100 == yy]
-    if not years:
-        return None, f"no weather year matches SDATE year {yy:02d}; supply weather for the start year"
-    if len(years) > 1:
-        return None, f"ambiguous start year (candidate years: {', '.join(map(str, years))}); supply controls.start_date"
-    year = years[0]
-    if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
-        return None, f"day {doy} does not exist in {year}; correct SDATE"
-    return date(year, 1, 1) + timedelta(days=doy - 1), None
-
-
-def _overrides_section(experiment_data, treatment, section=None):
+def _overrides_section(experiment_data, treatment, section=None, *, rotation=None):
     """True for a supplied section, or any experiment overrides when omitted."""
     treatments = experiment_data.get("treatments") if isinstance(experiment_data, dict) else None
     if not isinstance(treatments, dict):
@@ -59,6 +30,14 @@ def _overrides_section(experiment_data, treatment, section=None):
         except (TypeError, ValueError, OverflowError):
             continue
         if selected and isinstance(entry, dict):
+            if rotation is not None:
+                edits = entry.get("rotation", {})
+                if isinstance(edits, dict):
+                    for number, component in edits.items():
+                        if (str(number).isascii() and str(number).isdigit()
+                                and int(number) == int(rotation) and isinstance(component, dict)):
+                            return section in component
+                return False
             return bool(entry) if section is None else section in entry
     return False
 
@@ -173,7 +152,8 @@ class Simulation:
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate, days))
         coverage = _sequence_coverage if len(components) > 1 else _season_coverage
-        filex_problems.extend(coverage(experiment_data, self.treatment, start_date, days, values.get("NYERS")))
+        filex_problems.extend(coverage(
+            experiment_data, self.treatment, start_date, days, values.get("NYERS")))
         if override_start is not None and days:
             if override_start not in days:
                 filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "
@@ -181,13 +161,15 @@ class Simulation:
                                      "Supply weather for the simulation's start date.")
         elif sdate is not None and days:
             parsed = _parse_sdate(sdate)
-            if parsed is not None and not any((day.year % 100, day.timetuple().tm_yday) == parsed for day in days):
+            if parsed is not None and not any(
+                    (day.year % 100, day.timetuple().tm_yday) == parsed for day in days):
                 start = values["SDATE"]
                 filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
         if override_start is not None and days and not _overrides_section(
-                experiment_data, self.treatment, "irrigation"):
+                experiment_data, self.treatment, "irrigation",
+                rotation=components[0]['R'] if len(components) > 1 else None):
             irrigation = [_simulation_start_date(text, days)[0]
                           for text in _irrigation_dates(self.filex, self.treatment)]
             irrigation = [day for day in irrigation if day is not None]
@@ -238,7 +220,8 @@ class Simulation:
         name = None if len(components) > 1 else self.name
         if (edit_identity or name not in (None, "base")) and not problems:
             try:
-                _identity_text(Path(self.filex).read_bytes().decode("latin-1"), int(self.treatment), name,
+                _identity_text(Path(self.filex).read_bytes().decode("latin-1"),
+                               int(self.treatment), name,
                                rows[0]["station"] if edit_identity else None,
                                template_id if edit_identity else None)
             except ValueError as error:
@@ -299,7 +282,8 @@ class Simulation:
             shutil.copy2(filex, sim_folder / filex.name)
             soil_id = soil_rows[0]["soil_id"] if soil_rows and station is not None else None
             _write_management(sim_folder / filex.name, self.treatment, experiment_data,
-                              name=None if len(components) > 1 else self.name, station=station, soil_id=soil_id)
+                              name=None if len(components) > 1 else self.name,
+                              station=station, soil_id=soil_id)
             _write_rotation_data(sim_folder / filex.name, self.treatment, experiment_data)
             for sibling in filex.parent.iterdir():
                 if self.soil is not None and sibling.suffix.upper() == ".SOL":

@@ -37,6 +37,12 @@ def test_run_sequence_inputs(sim, installed, name, controls):
     sim.management = {"treatments": {1: {"controls": controls}}} if controls else None
     sim.weather = weather("1978-03-15", "1981-03-15")
     original = deepcopy(sim.filex_template)
+    if "start_date" in controls:
+        with pytest.raises(DSSATCheckError, match="rotation component 1.*before simulation start"):
+            sim.run()
+        assert installed.calls == []
+        assert sim.filex_template == original
+        return
     result = sim.run()
     folder = result.run_dir.parent
     command, cwd, _ = installed.calls[0]
@@ -54,7 +60,7 @@ def test_run_sequence_inputs(sim, installed, name, controls):
     text = (folder / "UFGA7801.SQX").read_text()
     general = _section_row(text, "SIMULATION CONTROLS", "N", 1, ("NYERS",))
     assert int(general["NYERS"]) == controls.get("years", 1)
-    assert general["SDATE"] == ("78075" if "start_date" in controls else "78074")
+    assert general["SDATE"] == "78074"
     for level in range(2, 5):
         assert _section_row(text, "SIMULATION CONTROLS", "N", level, ("NYERS",))["NYERS"] == "1"
     assert name is None or name not in text

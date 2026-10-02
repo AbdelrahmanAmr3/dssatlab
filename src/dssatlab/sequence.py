@@ -153,3 +153,31 @@ def _run_sequence(filex, treatment, components, executable):
     (filex.parent / "DSSBatch.v48").write_bytes(
         _batch_text(filex.name, treatment, components).encode("latin-1"))
     return _run_command(filex.parent, ["Q", "DSSBatch.v48"], executable)
+
+
+def _parse_sdate(sdate):
+    """Parse a FileX SDATE (YYDDD) string into (yy, doy) integers, or None."""
+    if isinstance(sdate, str) and re.fullmatch(r"[0-9]{5}", sdate):
+        return int(sdate[:2]), int(sdate[2:])
+    return None
+
+
+def _simulation_start_date(sdate, days):
+    """Resolve SDATE using weather years, or return the reason it cannot be checked."""
+    if sdate is None:
+        return None, "START is not S or SDATE is unavailable; check the FileX start controls"
+    parsed = _parse_sdate(sdate)
+    if parsed is None:
+        return None, f"SDATE {sdate!r} is not a DSSAT date (yyddd); correct SDATE"
+    if not days:
+        return None, "weather unreadable"
+    yy, doy = parsed
+    years = [y for y in range(min(d.year for d in days), max(d.year for d in days) + 1) if y % 100 == yy]
+    if not years:
+        return None, f"no weather year matches SDATE year {yy:02d}; supply weather for the start year"
+    if len(years) > 1:
+        return None, f"ambiguous start year (candidate years: {', '.join(map(str, years))}); supply controls.start_date"
+    year = years[0]
+    if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
+        return None, f"day {doy} does not exist in {year}; correct SDATE"
+    return date(year, 1, 1) + timedelta(days=doy - 1), None
