@@ -79,10 +79,21 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # coefficients: {P1: 300}  # Optional: exact .CUL header names to numbers.
       # Writes a changed cultivar in the simulation folder's .CUL copy only.
 
+    # Or replace the whole dict with initial_conditions: "off" (must be quoted).
+    # "off" sets IC to 0 in the copy; DSSAT supplies initial soil water and nitrogen.
     initial_conditions:          # Checked and written as a new level in the FileX copy
       date: "1982-02-25"          # Required initial-conditions date (quoted "YYYY-MM-DD")
       previous_crop: "MZ"         # Optional two-letter DSSAT crop code; omitted writes -99
       residue_mass: 0.0           # Optional surface residue mass, kg/ha (>= 0); omitted writes -99
+      # Optional surface details; omitted fields write -99. Numbers, not booleans.
+      # root_mass: 0             # ICRT, kg/ha (>= 0)
+      # nodule_mass: 0           # ICND, kg/ha (>= 0)
+      # rhizobia_number: 1       # ICRN (0 to 1 inclusive)
+      # rhizobia_effectiveness: 1 # ICRE (0 to 1 inclusive)
+      # residue_n: 0             # ICREN, % (0 to 100 inclusive)
+      # residue_p: 0             # ICREP, % (0 to 100 inclusive)
+      # residue_incorporation: 0 # ICRIP, % (0 to 100 inclusive)
+      # residue_depth: 0         # ICRID, cm (>= 0)
       layers:                    # Required non-empty list; all four fields required per layer
         - depth: 15.0            # Bottom of layer, cm (> 0); strictly ascending; within soil= depth
           water: 0.2             # Volumetric soil water, cm3/cm3 (0 to 1 inclusive)
