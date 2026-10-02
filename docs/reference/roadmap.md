@@ -24,6 +24,13 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.13 | Sequence analysis: multi-year crop rotations from a sequence FileX, batch file and mode Q (`Simulation.run()`), pre-run sequence checks, controls `years` and `start_date`, and `summarize_seasons()` per rotation component. |
 | 0.13.1 | A rotation from the FileX template: 2 to 9 components (crops and fallows), DSSAT day-of-year date checks, cycle NYERS by default, controls `years`, write `.SQX`, and genotype file copying. |
 | 0.13.2 | Experiment data per rotation component keyed by R: planting, cultivar, fertilizer and irrigation for copied and template sequences, component period checks, and edits applied in every cycle through Simulation, run_treatments and scenarios. |
+| 0.14 | Sweeps: `run_sweep()` runs every combination of labelled experiment data sections as scenarios, with the unchanged base first, checks before any run, and Summary rows carrying factor labels and run directories (ADR 0016). |
+
+## Planned
+
+| Version | What it will add |
+|---|---|
+| 0.14.1 | Cultivar coefficient sweeps: a changed copy of one cultivar's `.CUL` line. |
 
 ## Deliberately not built yet
 

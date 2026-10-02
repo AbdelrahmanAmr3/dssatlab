@@ -25,6 +25,10 @@ match the source FileX. Without soil data, the source soil ID is retained.
 Omitted or empty treatment entries keep the source field IDs and the existing
 station/soil matching checks; the scenario name is still written.
 
+For every combination of experiment data sections, use
+[`run_sweep()`](sweeps.md) to generate scenarios and return Summary rows with
+a column for each factor label.
+
 ## Run all treatments or a subset
 
 To run every treatment defined in a FileX using your weather data:
