@@ -116,10 +116,31 @@ For a [seasonal analysis](seasonal.md), set `controls.years` in the base experim
 data and provide weather covering the seasons. Statistics group by scenario,
 treatment and rotation component; the statistics table does not add factor columns.
 
+## Cultivar coefficient sweep
+
+Vary `P1` over three values by supplying a `cultivar` factor of complete cultivar
+sections, including crop and source code:
+
+```python
+rows = dl.run_sweep(
+    "UFGA8201.MZX", "weather.csv", treatments=[1],
+    factors={"cultivar": {p1: {"crop": "MZ", "code": "IB0035",
+                             "coefficients": {"P1": p1}}
+                          for p1 in (200, 259, 320)}},
+)
+dl.to_dataframe(rows)[["scenario", "cultivar", "ADAT", "MDAT", "HWAM"]]
+```
+
+The unchanged base runs first, followed by the three coefficient values. Each run
+has its own simulation folder with a `.CUL` copy; each coefficient scenario has a changed cultivar
+line with a new `DLnnnn` code, and its copied FileX points at that code. The source
+`.CUL` stays unchanged. The `cultivar` result column holds the numeric P1 label
+(`None` for base). See [coefficient checks](experiment.md#cultivar-coefficients) and
+[ADR 0017](../adr/0017-cultivar-coefficients-as-a-changed-cul-line.md).
+
 ## Scope
 
-Sweeping `cultivar` selects existing cultivar codes. Cultivar coefficient sweeps
-(a changed copy of one cultivar's `.CUL` line) are planned for v0.14.1.
+Sweeping `cultivar` can select existing cultivar codes or change their coefficients.
 Use [scenarios](scenarios.md) to vary weather or soil. Sweeps do not vary single
 fields inside sections, sample random combinations, compute sensitivity indices,
 or add plotting helpers. Runs are sequential, with no resume or partial skipping.

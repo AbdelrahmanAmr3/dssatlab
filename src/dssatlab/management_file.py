@@ -76,7 +76,8 @@ _EXPERIMENT_SECTIONS_TEXT = """
       crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
       code: "IB0035"             # Required INGENO: six printable ASCII characters, no spaces; case-sensitive
       # Code must exist in the one crop-matching .CUL beside the FileX (e.g., MZCER048.CUL).
-      # That .CUL is copied into the simulation folder; no coefficients are edited.
+      # coefficients: {P1: 300}  # Optional: exact .CUL header names to numbers.
+      # Writes a changed cultivar in the simulation folder's .CUL copy only.
 
     initial_conditions:          # Checked and written as a new level in the FileX copy
       date: "1982-02-25"          # Required initial-conditions date (quoted "YYYY-MM-DD")

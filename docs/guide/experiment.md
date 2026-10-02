@@ -37,6 +37,7 @@ treatments:
     cultivar:
       crop: "MZ"                 # CR code
       code: "IB0035"             # INGENO code, as listed in the .CUL file
+      coefficients: {P1: 300}    # optional changed cultivar coefficients
     initial_conditions:
       date: "1982-02-25"
       previous_crop: "MZ"        # optional
@@ -66,6 +67,25 @@ at run time.
 
 A changed `controls` `start_date` replaces the FileX `SDATE` in the weather-coverage and
 planting-date checks. The FileX `START` setting is left as it is.
+
+## Cultivar coefficients
+
+The optional `cultivar.coefficients` field is a non-empty dict of exact, case-sensitive
+`.CUL` header names after `ECO#` (for example `P1` or `G2`) to finite numbers in DSSAT's
+own units. Strings, booleans, NaN and infinity are rejected, as are unknown headers.
+
+DSSATLab writes a **changed cultivar**: a copy of the source cultivar's line with the
+specified coefficients and the first free `DLnnnn` code (`DL0001`, `DL0002`, ...).
+It inserts the changed line immediately after the source line in the simulation folder's
+`.CUL` copy and points the copied FileX treatment's `CULTIVARS` level at the new code.
+The source `.CUL` is never changed; coefficients you omit keep their source values.
+
+Values are written as given, with no rounding: an integer stays as is, and an integral
+float keeps one decimal (`300` versus `300.0`). Each value must fit its fixed-width
+column without exponent notation; checks reject values that cannot be written this way.
+`coefficients` is not allowed per rotation component. See [cultivar coefficient
+sweeps](sweeps.md#cultivar-coefficient-sweep) and
+[ADR 0017](../adr/0017-cultivar-coefficients-as-a-changed-cul-line.md).
 
 ## Run it
 
@@ -110,6 +130,7 @@ Each section was overridden on a copy of DSSAT's own sample FileX (maize `UFGA82
 
 ## Not included
 
-Building a FileX from nothing, writing `.CUL`, `.ECO` or `.SPE` parameters, simulation controls
-beyond the five above, and other initial-condition detail such as per-layer roots. See the
+Editing `.ECO` or `.SPE` files, cultivar coefficients per rotation component, simulation
+controls beyond the five above, and other initial-condition detail such as per-layer roots.
+To build a FileX from nothing, use a [FileX template](simulation.md). See the
 [roadmap](../reference/roadmap.md) and [ADR 0005](../adr/0005-experiment-data-edits-an-existing-filex.md).

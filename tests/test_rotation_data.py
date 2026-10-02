@@ -81,6 +81,19 @@ def test_first_planting_before_start(sim):
                                     population=7, row_spacing=75, depth=5)}})
     assert any('before simulation start date' in p for p in sim.check(False))
 
+
+def test_component_coefficients_rejected(sim):
+    edits(sim, {3: {'cultivar': {'crop': 'WH', 'code': 'ZZ0001',
+                                'coefficients': {'P1': 300}}}})
+    message = ("Management data treatment 1, rotation component 3, cultivar: coefficients "
+               "are supported in a treatment's cultivar section only, not per rotation "
+               "component. Remove 'coefficients'.")
+    assert message in sim.check(False)
+    from dssatlab import DSSATCheckError
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+    assert message in error.value.problems
+
 @pytest.mark.parametrize('value', ['-99', 'XXXXX', '78367'])
 def test_unreadable_bound_note(sim, value, capsys):
     if sim.filex is None:

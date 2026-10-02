@@ -216,6 +216,8 @@ FileA beside the FileX); a `Simulation` leaves them `None`. No FileA/FileT is wr
 
 ## Which crops and cultivars can I use?
 
+Experiment data accepts optional `cultivar.coefficients` for coefficient sweeps with `run_sweep()`; each simulation gets its own changed `.CUL` copy and the source stays unchanged. See the [sweep guide](docs/guide/sweeps.md#cultivar-coefficient-sweep).
+
 Inspect which template crops and cultivars are installed before writing a FileX:
 
 ```python

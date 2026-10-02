@@ -35,6 +35,10 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
     Base runs first. Each Summary row gains scenario, treatment, factor labels
     (None for base), and run_dir (Path). Missing or malformed Summary.OUT raises
     DSSATOutputError, as for combine_summaries.
+
+    For a cultivar coefficient sweep, supply complete cultivar sections:
+        factors={"cultivar": {p1: {"crop": "MZ", "code": "IB0035",
+                 "coefficients": {"P1": p1}} for p1 in (200, 259, 320)}}
     """
     base, problems = _load_management(management)
     if management is None:
