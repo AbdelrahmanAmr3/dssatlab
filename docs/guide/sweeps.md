@@ -132,7 +132,7 @@ dl.to_dataframe(rows)[["scenario", "cultivar", "ADAT", "MDAT", "HWAM"]]
 ```
 
 The unchanged base runs first, followed by the three coefficient values. Each run
-folder holds its own `.CUL` copy; each coefficient scenario has a changed cultivar
+has its own simulation folder with a `.CUL` copy; each coefficient scenario has a changed cultivar
 line with a new `DLnnnn` code, and its copied FileX points at that code. The source
 `.CUL` stays unchanged. The `cultivar` result column holds the numeric P1 label
 (`None` for base). See [coefficient checks](experiment.md#cultivar-coefficients) and

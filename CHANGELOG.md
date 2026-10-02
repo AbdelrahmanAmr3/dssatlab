@@ -7,7 +7,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Added
 - Optional `cultivar.coefficients` in experiment data: exact `.CUL` header names after `ECO#` mapped to finite numbers, checked before any run (ADR 0017).
 - A changed cultivar line with the first free `DLnnnn` code, inserted immediately after the source line in the simulation folder's `.CUL` copy; the copied FileX's CULTIVARS level points at the new code and the source `.CUL` stays unchanged.
-- Cultivar coefficient sweeps through complete `cultivar` factor sections in `run_sweep()`, with each run folder holding its own changed `.CUL` copy.
+- Cultivar coefficient sweeps through complete `cultivar` factor sections in `run_sweep()`, with each run getting its own simulation folder and changed `.CUL` copy.
 - Experiment data and sweep guide examples, tutorial Case 13, roadmap and decisions entries, and Architecture Decision Record 0017.
 
 ### Notes

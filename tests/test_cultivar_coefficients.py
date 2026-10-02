@@ -67,11 +67,15 @@ def test_unknown_coefficient(cultivar_inputs, name):
             f"{path}. Use one of: P1, P2, P5, G2, G3, PHINT.") in sim.check(False)
 
 
-@pytest.mark.parametrize("value,text", [(1234567.5, "1234567.5"), (1e-7, "1e-07")])
-def test_unrepresentable_coefficient(cultivar_inputs, value, text):
+@pytest.mark.parametrize("value,message", [
+    (1234567.5, "1234567.5 needs 9 characters; the P1 column in MZCER048.CUL holds 5. "
+                "Supply a value with fewer digits."),
+    (1e-7, "1e-07 is written in exponent notation, which the P1 column in MZCER048.CUL "
+           "cannot hold. Supply a plain decimal value."),
+])
+def test_unrepresentable_coefficient(cultivar_inputs, value, message):
     sim = simulation(cultivar_inputs, dict(crop="MZ", code="IB0035", coefficients={"P1": value}))
-    assert (f"Management data treatment 1, cultivar, coefficient 'P1': {text} needs {len(text)} "
-            "characters; the P1 column in MZCER048.CUL holds 5. Supply a value with fewer digits.") in sim.check(False)
+    assert f"Management data treatment 1, cultivar, coefficient 'P1': {message}" in sim.check(False)
 
 
 def test_missing_eco(cultivar_inputs):
@@ -89,7 +93,7 @@ def test_multiple_fields_first_source_and_padding(cultivar_inputs, fake_dssat, s
     lines = path.read_bytes().splitlines(keepends=True)
     index = next(i for i, line in enumerate(lines) if line.startswith(b"IB0035"))
     source = lines[index].rstrip(b"\r\n")
-    source = source[:36] if short else source + b" trailing \xe9"
+    source = source[:36] if short else source + b" trailing \xe9\x85tail"
     lines[index] = source + b"\n"
     lines.insert(index + 1, b"IB0035 Duplicate must stay unchanged\n")
     original = b"".join(lines)

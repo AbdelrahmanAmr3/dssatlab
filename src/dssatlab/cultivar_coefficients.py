@@ -8,7 +8,7 @@ from .weather import _show_value
 
 def _coefficient_line(path, code):
     """Locate the first listed cultivar and its own table's header spans."""
-    lines = path.read_bytes().decode("latin-1").splitlines(keepends=True)
+    lines = [line.decode("latin-1") for line in path.read_bytes().splitlines(keepends=True)]
     tokens = []
     for index, line in enumerate(lines):
         if line.startswith("@"):
@@ -47,7 +47,11 @@ def _check_coefficients(path, code, coefficients, where):
         if not found:
             text = _coefficient_text(value)
             start, end = spans[name]
-            if len(text) > end - start - 1 or "e" in text.lower():
+            if "e" in text.lower():
+                problems.append(f"{location}: {text} is written in exponent notation, which the "
+                                f"{name} column in {path.name} cannot hold. "
+                                "Supply a plain decimal value.")
+            elif len(text) > end - start - 1:
                 problems.append(f"{location}: {text} needs {len(text)} characters; the {name} "
                                 f"column in {path.name} holds {end - start - 1}. "
                                 "Supply a value with fewer digits.")
