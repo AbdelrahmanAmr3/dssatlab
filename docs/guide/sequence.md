@@ -77,20 +77,22 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
 6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
-## The WTHER and FNAME traps in DSSAT sample sequence files
+## Weather and replicate settings in DSSAT sample sequence files
 
 DSSAT ships sample sequence files (such as `UFGA7804.SQX`) that contain configuration settings that silently break automated runs with your own data:
 
 - **`WTHER W` in `*SIMULATION CONTROLS -> METHODS`**: Sets weather generation mode to `W` (weather generator), causing DSSAT to generate artificial weather from climate files (`UFGA.CLI`) and silently ignore your supplied weather data.
-- **`FNAME Y` in `*SIMULATION CONTROLS -> OUTPUTS`**: Tells DSSAT to name output files after the experiment name (such as `UFGA7804.OSU`) instead of standard names like `Summary.OUT`, leaving no summary file for `dssatlab` to read.
 - **`NREPS 5` in `*SIMULATION CONTROLS -> GENERAL`**: Runs 5 replicates of identical simulated rows.
 
-`dssatlab` checks for these settings in every copied FileX (whether a sequence or not) and raises a `DSSATCheckError`:
+`dssatlab` checks WTHER in every copied FileX and requires NREPS 1 for sequences.
+Problems raise a `DSSATCheckError`:
 
 ```text
 FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather and ignore the weather data supplied. Set WTHER to M.
-FileX FNAME 'Y' in controls level 1 (treatment 1): DSSAT would name its output files after the experiment (UFGA7804.OSU) instead of Summary.OUT, which dssatlab reads. Set FNAME to N.
 ```
+
+`FNAME Y` is accepted for sequences as well: readers find experiment-named files
+such as `UFGA7804.OSU`. See [output naming rules](reading-results.md#standard-and-experiment-named-output-files).
 
 ### How to fix a copied FileX
 
@@ -105,10 +107,7 @@ text = path.read_text(encoding="latin-1")
 # 1. Set measured weather in all METHODS rows: W -> M
 text = text.replace(" ME              W ", " ME              M ")
 
-# 2. Set standard output filenames in all OUTPUTS rows: Y -> N
-text = text.replace(" OU              Y ", " OU              N ")
-
-# 3. Set NREPS to 1 in level 1's GENERAL row: 5 -> 1
+# 2. Set NREPS to 1 in level 1's GENERAL row: 5 -> 1
 text = text.replace(" 1 GE             10     5 ", " 1 GE             10     1 ")
 
 path.write_text(text, encoding="latin-1")

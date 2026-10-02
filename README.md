@@ -19,6 +19,12 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.14.2 fixes treatment numbers in DSSAT sensitivity-tool and sequence rows,
+accepts stock FileA/FileT header spellings and soil text codes (including optional
+`scom`), and reads experiment-named outputs from FNAME=Y runs. Upgrading from
+0.14.1 needs no changes; zero runtime dependencies are preserved. See the
+[changelog](CHANGELOG.md) and [output naming rules](docs/guide/reading-results.md#standard-and-experiment-named-output-files).
+
 The project can get a working DSSAT into Python, run an existing experiment file, run a simulation from your own weather, soil, and management data, and read and plot the results. This part is done:
 
 - [x] Find an existing DSSAT-CSM installation on Windows and Linux (including Google Colab)

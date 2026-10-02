@@ -14,7 +14,10 @@ import dssatlab as dl
 dl.write_experiment_template("experiment.yaml", filex="UFGA8201.MZX")
 ```
 
-The commented file lists the treatment numbers found in the FileX (and nothing else from it).
+The commented file lists each treatment number found in the FileX once (and nothing
+else from it), even when a sequence has several rotation component rows. Treatment
+numbers follow DSSAT's fixed columns, including sensitivity-tool rows; see
+[ADR 0018](../adr/0018-treatment-rows-read-with-dssats-fixed-columns.md).
 It refuses to overwrite an existing path. `write_management_template` is unchanged, and a
 management-only YAML is still valid: add a section only when you want to change it. Omit a
 section and the treatment keeps the FileX's own level.
