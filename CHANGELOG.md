@@ -12,6 +12,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Fixed
 - A one-row treatment whose number collides with a sequence number is reported before any run, naming both rows and asking the user to renumber them (#168).
+- Every written FileX cell after the first column keeps one leading blank, as DSSAT's `1X` formats need. A whole-number float such as `residue_mass: 1000.0` is written as `1000` when the decimal would fill the field; values that still do not fit are rejected. Scenario names are therefore at most 25 characters, the width DSSAT reads.
 
 ### Notes
 - The same options and initial conditions work with a copied FileX or a FileX template. dssatlab checks codes; DSSAT decides what each option does. Zero runtime dependencies are preserved.
