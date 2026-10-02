@@ -6,11 +6,12 @@ import re
 from .weather import _dssat_date
 
 
-def _treatment_rows(text):
+def _treatment_rows(text, problems=None):
     """Read N/R once per text; valid repeated component rows select mode Q's layout.
 
     In a sequence FileX only the rows of a repeated N use the sequence columns: a one-row
     treatment runs in a normal mode, where DSSAT reads it with the normal columns.
+    When supplied, problems collects collisions between those two readings.
     """
     rows, active, header = [], False, False
     for line in text.splitlines():
@@ -33,6 +34,13 @@ def _treatment_rows(text):
         width = 2 if sequence and int(line[:2]) in repeated else 3
         n = line[:width].strip()
         result[line] = (n if n.isascii() and n.isdigit() else "", line[width:4].strip())
+        if problems is not None and width == 3 and result[line][0] and int(n) in repeated:
+            sequence_row = next(row for row in rows if int(row[:2]) == int(n))
+            problems.append(
+                f"TREATMENTS rows {line!r} (one-row treatment {int(n)}) and "
+                f"{sequence_row!r} (sequence {int(n)}) collide: DSSAT reads the treatment "
+                "number from columns 1-3 (1-2 in a sequence FileX). "
+                "Renumber the one-row treatment or the sequence.")
     return result
 
 
@@ -120,12 +128,15 @@ def _read_filex(source, treatment, *, start_date=None) -> tuple[dict[str, str], 
         text = Path(source).read_text(encoding="latin-1")
     except (OSError, ValueError) as error:
         return {}, [f"Cannot read FileX {source}: {error}. Supply a readable FileX path."]
+    problems = []
+    _treatment_rows(text, problems)
+    problems = [f"FileX {source}: {problem}" for problem in problems]
     try:
         row = _section_row(text, "TREATMENTS", "N", treatment, ("FL", "SM"))
     except ValueError as error:
-        return {}, [f"FileX {source}: {error}"]
+        return {}, [*problems, f"FileX {source}: {error}"]
 
-    values, problems = {}, []
+    values = {}
     for reference, section, key, required in (
         ("FL", "FIELDS", "L", ("WSTA",)),
         ("SM", "SIMULATION CONTROLS", "N", ("START", "SDATE")),

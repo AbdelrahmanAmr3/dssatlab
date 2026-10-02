@@ -20,7 +20,12 @@ def _rotation_components(source, treatment, *, text=None):
             text = Path(source).read_text(encoding="latin-1")
     except (OSError, ValueError, TypeError):
         return []
-    treatments = _treatment_rows(text)
+    collision_problems = []
+    treatments = _treatment_rows(text, collision_problems)
+    # Keep a colliding normal row out of the selected sequence's components.
+    sequence_rows = {line for line, (number, _) in treatments.items()
+                     if collision_problems and number and int(number) == treatment
+                     and line[:2].strip().isdigit() and int(line[:2]) == treatment}
     components, columns, in_section = [], {}, False
     for line in text.splitlines():
         if line.startswith("*"):
@@ -29,6 +34,8 @@ def _rotation_components(source, treatment, *, text=None):
         elif in_section and line.startswith("@"):
             columns = _columns(line)
         elif in_section and "N" in columns and line.strip() and not line.startswith("!"):
+            if len(sequence_rows) > 1 and line not in sequence_rows:
+                continue
             row = {key: line[left:right].strip() for key, (left, right) in columns.items()}
             row["N"], row["R"] = treatments.get(line, ("", ""))
             try:
