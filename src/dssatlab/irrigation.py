@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from .experiment import _check_date, _check_fields
+from .experiment import _check_date, _check_fields, _check_number
 from .filex import _section_row
 from .management import _check_event, _check_event_field, _report_lines
 from .weather import _show_value
@@ -73,6 +73,24 @@ def _check_day_event(event, where, number, seen, previous, planting_date, weathe
 def _check_irrigation_events(events, where, weather_range=None, *, code=None,
                              planting_date=None, skip_reason=None, date_only=False):
     label, where = '    irrigation', f'{where}, irrigation'
+    if isinstance(events, dict) and events:
+        if date_only:
+            problems = [f'{where}: dict form is not supported per rotation component; '
+                        'irrigation management belongs to the treatment. Use dated events in a list.']
+            return problems, _report_lines(label, problems)
+        problems = _check_fields(events, ('efficiency', 'events'), (), where, 'Experiment')
+        if 'efficiency' in events:
+            value = events['efficiency']
+            location = f"{where}, field 'efficiency'"
+            if _check_number(value, location) or not 0 < value <= 1:
+                problems.append(f'{location}: found {_show_value(value)}. '
+                                'Supply a number above 0 and at most 1 (DSSAT EFIR).')
+        if 'events' in events and not isinstance(events['events'], list):
+            problems.append(f"{where}, field 'events': found {_show_value(events['events'])}. "
+                            'Supply a list of event dicts, or an empty list for none.')
+        if problems:
+            return problems, _report_lines(label, problems)
+        events = events['events']
     if not isinstance(events, list):
         problems = [f"{where}, field 'irrigation': expected a list of event dicts. "
                     'Supply a list, an empty list for none, or omit the section '

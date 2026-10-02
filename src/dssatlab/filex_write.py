@@ -237,19 +237,23 @@ def _event_row(columns, values, section):
 def _event_text(text, treatment, events, section="irrigation", *, rotation=None):
     """Render checked events in memory, also used by pre-write checks."""
     name, column, headers = "IRRIGATION AND WATER MANAGEMENT", "MI", _IRRIGATION_HEADERS
+    efficiency, has_level = 1, bool(events)
+    if section == "irrigation" and isinstance(events, dict):
+        efficiency, events = events["efficiency"], events["events"]
+        has_level = True  # An empty dict schedule still writes its EFIR level.
     if section == "fertilizer":
         name, column, headers = "FERTILIZERS (INORGANIC)", "MF", (_FERTILIZER_HEADER,)
     if rotation is None:
         _section_row(text, "TREATMENTS", "N", treatment, (column,))
     lines = text.splitlines(keepends=True)
     blocks, highest = _event_blocks(lines, name, headers)
-    level = highest + 1 if events else 0
+    level = highest + 1 if has_level else 0
     _repoint(lines, treatment, column, level, rotation=rotation)
-    if not events:
+    if not has_level:
         return "".join(lines)
     rows = [[]]
     if section == "irrigation":
-        rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": 1}, name)])
+        rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": efficiency}, name)])
     for event in events:
         day_code = (event["days_after_planting"] if "days_after_planting" in event else
                     _dssat_date(date.fromisoformat(event["date"])))

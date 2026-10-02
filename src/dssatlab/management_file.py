@@ -40,6 +40,11 @@ treatments:
     # days_after_planting: integer >= 0, not a boolean; ascending and unique.
     # Use one timing kind per list: IRRIG D needs days; R/P/W need dates; A/F/N need [].
     # Set controls.irrigation_management for day events; rotation components use dates only.
+    # Or use exactly efficiency and events: irrigation: {efficiency: 0.75, events: []}
+    # efficiency: a number above 0 and at most 1, not a boolean (DSSAT EFIR).
+    # events: the same event list as below; [] writes an EFIR level with no events.
+    # List form writes EFIR 1; rotation components take dated events in list form only.
+    # EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
     irrigation:
       - date: "1982-03-15"        # Event date (quoted "YYYY-MM-DD"); must be ascending and unique
         amount: 30.0              # Water applied, mm (must be > 0)
