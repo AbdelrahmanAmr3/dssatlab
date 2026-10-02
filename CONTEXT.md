@@ -105,6 +105,13 @@ One experiment data section (planting, fertilizer, irrigation, ...) varied in a 
 labelled values, each a complete section. The same idea as a treatment factor in XBuild.
 _Avoid_: level (a level is one entry of a FileX section), parameter
 
+**Cultivar coefficient**:
+One number on a cultivar's line in a .CUL file, named by its column header after `ECO#` (P1, G2,
+PHINT ...). Experiment data may change some of them: dssatlab writes a **changed cultivar**, a
+copy of the cultivar's line with those values and a new VAR# (DL0001, DL0002 ...), into the
+simulation folder's .CUL copy and points the treatment at it. The source .CUL never changes.
+_Avoid_: parameter, genetic coefficient file edit, calibration (GLUE is not planned)
+
 **Weather data**:
 A user's own daily weather, as they hold it (a table), before it is converted into a
 DSSAT weather file.
