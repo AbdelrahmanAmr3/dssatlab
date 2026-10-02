@@ -100,9 +100,12 @@ Values use DSSAT's native units without automatic conversion:
 | `planting` | `transplant_environment`| No | °C | Transplant environment temperature |
 | `planting` | `plants_per_hill` | No | count | Number of plants per hill |
 | `planting` | `sprout_length` | No | cm | Sprout length |
-| `irrigation` | `date` | Yes | `"YYYY-MM-DD"` | Event date; must be ascending, unique, and within weather range |
-| `irrigation` | `amount` | Yes | mm | Water applied; must be strictly positive (`> 0`) |
-| `irrigation` | `method` | Yes | `[A-Za-z]{2}[0-9]{3}` | DSSAT irrigation code: 2 ASCII letters + 3 digits (e.g., `IR001`) |
+| `irrigation` event | `date` | One timing field | `"YYYY-MM-DD"` | DSSAT IDATE: event date; ascending, unique, and within weather range |
+| `irrigation` event | `days_after_planting` | One timing field | integer >= 0 | DSSAT IDATE: days counted from planting; not a boolean; ascending and unique |
+| `irrigation` event | `amount` | Yes | mm | DSSAT IRVAL: finite number strictly above 0, not a string or boolean |
+| `irrigation` event | `method` | Yes | `[A-Za-z]{2}[0-9]{3}` | DSSAT IROP: 2 ASCII letters + 3 digits (e.g., `"IR001"`) |
+| `irrigation` dict | `efficiency` | Yes in dict form | above 0 and at most 1 | DSSAT EFIR: finite number, not a string or boolean; applies to this level's events |
+| `irrigation` dict | `events` | Yes in dict form | list of event dicts | Same event fields as above; may be empty; no DSSAT column of its own |
 | `fertilizer` | `date` | Yes | `"YYYY-MM-DD"` | Event date; must be ascending, unique, and within weather range |
 | `fertilizer` | `material` | Yes | `[A-Za-z]{2}[0-9]{3}` | DSSAT fertilizer material code (e.g., `FE001`) |
 | `fertilizer` | `application` | Yes | `[A-Za-z]{2}[0-9]{3}` | DSSAT application method code (e.g., `AP001`) |
@@ -110,6 +113,58 @@ Values use DSSAT's native units without automatic conversion:
 | `fertilizer` | `n` | Yes | kg/ha | Elemental nitrogen applied; must be nonnegative (`>= 0`) |
 | `fertilizer` | `p` | No | kg/ha | Elemental phosphorus applied; must be nonnegative (`>= 0`, defaults to 0) |
 | `fertilizer` | `k` | No | kg/ha | Elemental potassium applied; must be nonnegative (`>= 0`, defaults to 0) |
+
+## Irrigation timing and efficiency
+
+An event gives exactly one of `date` or `days_after_planting` (DSSAT IDATE).
+Every event in a list must use the same timing kind, in ascending order without
+duplicates. Under IRRIG D, the writer puts the day count itself in IDATE.
+The dict form has exactly `efficiency` and `events`:
+
+```yaml
+treatments:
+  1:
+    controls: {irrigation_management: "D"}
+    irrigation:
+      efficiency: 0.75
+      events:
+        - {days_after_planting: 20, amount: 30, method: "IR001"}
+        - {days_after_planting: 40, amount: 30, method: "IR001"}
+```
+
+The list form remains valid and writes EFIR 1. A dict with `events: []` writes
+an irrigation level header with EFIR and no events; `irrigation: []` points MI
+at level 0. EFIR applies to the irrigation level's **reported events**.
+`controls.auto_irrigation_efficiency` (IREFF) applies to **automatic irrigation**.
+All automatic irrigation and planting fields, their DSSAT columns and exact
+ranges are listed in [automatic management](experiment.md#automatic-management).
+
+`check()` uses `controls.irrigation_management` if supplied, otherwise IRRIG
+from the treatment's SIMULATION CONTROLS level. It rejects events DSSAT would
+ignore or misread and asks you to change the events or the code; it never changes
+the code itself. Empty event lists are accepted with every code.
+
+| Effective IRRIG | Allowed events when supplied | Real-DSSAT proof |
+|---|---|---|
+| `"A"` | No events; automatic refill | Proven |
+| `"F"` | No events; automatic fixed amount | Proven |
+| `"D"` | `days_after_planting` events only | Proven |
+| `"R"` | Dated events only | Proven |
+| `"N"` | No events; irrigation off | Proven |
+| `"P"`, `"W"` | Dated events only | Written and checked, not proven on DSSAT |
+
+If you supply `irrigation_management` and omit `irrigation` while the treatment
+inherits a nonzero MI level, the checks ask for the section: give events matching
+the code, or `[]`. An inherited MI 0 needs no section. This prevents old FileX
+events being silently ignored under a new code.
+
+For day events, planting date from your experiment-data `planting` section plus
+the day count must fall inside the weather range. If that planting date is
+unknown or invalid, effective PLANT is A/F, or weather coverage is unavailable,
+the report prints a skipped-check note. It does not infer a planting date from
+the FileX. Rotation components accept dated events in list form only; day events
+and the efficiency dict are rejected. Values must also fit their FileX columns.
+See [ADR 0020](../adr/0020-automatic-management-as-controls-fields.md).
 
 ## The check() report and rules
 
@@ -150,7 +205,7 @@ raising an exception.
 1. **Unknown keys are rejected**: Only documented template fields are accepted. Misspelled or extra keys fail immediately without guessing.
 2. **Dates within weather range**: Every event date (planting, irrigation, fertilizer) for the selected treatment must fall within the range of dates provided in your weather data.
 3. **Planting on or after simulation start date**: Planting date cannot precede the simulation start date (`SDATE` when `START == "S"` in the FileX).
-4. **Ascending and unique event dates**: Irrigation and fertilizer event lists must be strictly ordered by ascending date without duplicates on the same day.
+4. **Ascending and unique event timing**: Irrigation and fertilizer event lists must be strictly ordered without duplicates. Irrigation uses either dates or days after planting throughout the list, matching the effective IRRIG code above.
 5. **Empty list versus omitted section**:
    - **Omitted section**: If `planting`, `irrigation`, or `fertilizer` is omitted for a treatment, the FileX's original Level for that section is kept unchanged.
    - **Empty list (`[]`)**: If `irrigation: []` or `fertilizer: []` is supplied, it explicitly requests **no events** for that treatment (repointed to Level 0).

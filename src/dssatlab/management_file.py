@@ -36,6 +36,15 @@ treatments:
       sprout_length: 0.0          # Sprout length, cm
 
     # Irrigation schedule (optional section; omit to keep the FileX level, or [] for none)
+    # Each event uses exactly one of date or days_after_planting (DSSAT IDATE).
+    # days_after_planting: integer >= 0, not a boolean; ascending and unique.
+    # Use one timing kind per list: IRRIG D needs days; R/P/W need dates; A/F/N need [].
+    # Set controls.irrigation_management for day events; rotation components use dates only.
+    # Or use exactly efficiency and events: irrigation: {efficiency: 0.75, events: []}
+    # efficiency: a number above 0 and at most 1, not a boolean (DSSAT EFIR).
+    # events: the same event list as below; [] writes an EFIR level with no events.
+    # List form writes EFIR 1; rotation components take dated events in list form only.
+    # EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
     irrigation:
       - date: "1982-03-15"        # Event date (quoted "YYYY-MM-DD"); must be ascending and unique
         amount: 30.0              # Water applied, mm (must be > 0)
@@ -122,6 +131,26 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # soil_evaporation: "R"      # DSSAT MESEV: "R", "S"
       # soil_layers: 2            # DSSAT MESOL: 1, 2, 3 (not a string or boolean)
       # residue: "N"              # DSSAT RESID: "N", "R", "D"
+      # Management codes are quoted, case-sensitive strings, not booleans or numbers.
+      # irrigation_management: "R" # DSSAT IRRIG: "A", "N", "F", "R", "D", "P", "W"
+      # planting_management: "R"   # DSSAT PLANT: "A", "F", "R"
+      # Automatic irrigation numbers are finite, not booleans; omitted values stay unchanged.
+      # auto_irrigation_depth: 30       # DSSAT IMDEP, cm: a number above 0
+      # auto_irrigation_threshold: 50   # DSSAT ITHRL, %: a number from 0 to 100 inclusive
+      # auto_irrigation_refill: 100     # DSSAT ITHRU, %: a number from 0 to 100 inclusive
+      # auto_irrigation_method: "IR001" # DSSAT IMETH: two ASCII letters followed by three digits for the DSSAT code
+      # auto_irrigation_amount: 10      # DSSAT IRAMT, mm: a number above 0
+      # auto_irrigation_efficiency: 1   # DSSAT IREFF: a number above 0 and at most 1
+      # EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
+      # Automatic planting: omitted values stay unchanged; numbers are finite, not booleans.
+      # auto_planting_first: "1982-02-25" # DSSAT PFRST: a valid ISO calendar date as a quoted YYYY-MM-DD string
+      # auto_planting_last: "1982-03-10"  # DSSAT PLAST: a valid ISO calendar date as a quoted YYYY-MM-DD string
+      # auto_planting_soil_water_low: 40   # DSSAT PH2OL, %: a number from 0 to 100 inclusive
+      # auto_planting_soil_water_high: 100 # DSSAT PH2OU, %: a number from 0 to 100 inclusive
+      # auto_planting_soil_water_depth: 30 # DSSAT PH2OD, cm: a number above 0
+      # auto_planting_max_temperature: 40 # DSSAT PSTMX, degrees C: a finite number
+      # auto_planting_min_temperature: 10 # DSSAT PSTMN, degrees C: a finite number
+      # With PLANT A/F, first <= last and first >= start_date; given dates need weather coverage.
 """
 
 
@@ -147,6 +176,8 @@ def write_experiment_template(path: str | Path, filex: str | Path | None = None)
     """Write commented YAML for management, cultivar, initial conditions and controls.
 
     Cultivar, initial conditions and controls are checked and applied to the FileX copy.
+    EFIR applies to the irrigation level's events; controls auto_irrigation_efficiency
+    (IREFF) applies to automatic irrigation.
     Dates are quoted ISO calendar strings; units and codes are DSSAT's.
     With filex, use its treatment numbers in file order, keeping example values.
     Without filex, write one example treatment numbered 1. No PyYAML is needed.

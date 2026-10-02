@@ -7,6 +7,8 @@ import re
 from .weather import _show_value
 
 
+# Field -> block, column, codes. Automatic values also carry a correction:
+# a method pattern, "date", or (minimum, maximum, exclusive minimum) for numbers.
 _CONTROL_OPTIONS = {
     "water": ("OPTIONS", "WATER", ("Y", "N")),
     "nitrogen": ("OPTIONS", "NITRO", ("Y", "N")),
@@ -22,6 +24,25 @@ _CONTROL_OPTIONS = {
     "soil_evaporation": ("METHODS", "MESEV", ("R", "S")),
     "soil_layers": ("METHODS", "MESOL", (1, 2, 3)),
     "residue": ("MANAGEMENT", "RESID", ("N", "R", "D")),
+    "irrigation_management": ("MANAGEMENT", "IRRIG", ("A", "N", "F", "R", "D", "P", "W")),
+    "planting_management": ("MANAGEMENT", "PLANT", ("A", "F", "R")),
+    "auto_irrigation_depth": ("IRRIGATION", "IMDEP", (0, None, True), "a number above 0"),
+    "auto_irrigation_threshold": ("IRRIGATION", "ITHRL", (0, 100, False), "a number from 0 to 100"),
+    "auto_irrigation_refill": ("IRRIGATION", "ITHRU", (0, 100, False), "a number from 0 to 100"),
+    "auto_irrigation_method": ("IRRIGATION", "IMETH", r"[A-Za-z]{2}[0-9]{3}",
+                               "two ASCII letters followed by three digits for the DSSAT code"),
+    "auto_irrigation_amount": ("IRRIGATION", "IRAMT", (0, None, True), "a number above 0"),
+    "auto_irrigation_efficiency": ("IRRIGATION", "IREFF", (0, 1, True),
+                                   "a number above 0 and at most 1"),
+    "auto_planting_first": ("PLANTING", "PFRST", "date",
+                            "a valid ISO calendar date as a quoted YYYY-MM-DD string"),
+    "auto_planting_last": ("PLANTING", "PLAST", "date",
+                           "a valid ISO calendar date as a quoted YYYY-MM-DD string"),
+    "auto_planting_soil_water_low": ("PLANTING", "PH2OL", (0, 100, False), "a number from 0 to 100"),
+    "auto_planting_soil_water_high": ("PLANTING", "PH2OU", (0, 100, False), "a number from 0 to 100"),
+    "auto_planting_soil_water_depth": ("PLANTING", "PH2OD", (0, None, True), "a number above 0"),
+    "auto_planting_max_temperature": ("PLANTING", "PSTMX", (None, None, False), "a finite number"),
+    "auto_planting_min_temperature": ("PLANTING", "PSTMN", (None, None, False), "a finite number"),
 }
 
 
@@ -89,13 +110,27 @@ def _check_controls(data, where):
                 # _check_number also rejects integers too large to convert to a float.
                 problems.extend(_check_number(value, location))
         elif field in _CONTROL_OPTIONS:
-            _, column, codes = _CONTROL_OPTIONS[field]
-            if type(value) is not type(codes[0]) or value not in codes:
+            spec = _CONTROL_OPTIONS[field]
+            _, column, rule = spec[:3]
+            if len(spec) == 4:
+                if rule == "date":
+                    valid = not _check_date(value, location)
+                elif isinstance(rule, str):
+                    valid = isinstance(value, str) and re.fullmatch(rule, value)
+                else:
+                    minimum, maximum, exclusive = rule
+                    valid = (not _check_number(value, location)
+                             and (minimum is None or (value > minimum if exclusive else value >= minimum))
+                             and (maximum is None or value <= maximum))
+                if not valid:
+                    problems.append(f"{location}: found {_show_value(value)}. "
+                                    f"Supply {spec[3]} (DSSAT {column}).")
+            elif type(value) is not type(rule[0]) or value not in rule:
                 if field in ("water", "nitrogen"):
                     instruction = 'Supply the quoted string "Y" or "N".'
                 else:
                     choices = ", ".join(f'"{code}"' if isinstance(code, str) else str(code)
-                                        for code in codes)
+                                        for code in rule)
                     instruction = f"Supply one of {choices} (DSSAT {column})."
                 problems.append(f"{location}: found {_show_value(value)}. "
                                 f"{instruction}")

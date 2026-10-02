@@ -67,6 +67,69 @@ def _season_coverage(source, treatment, start, days, nyers=None):
             "Supply weather for every season, or fewer years."]
 
 
+def _check_planting_window(text, treatment, controls, where, start_date=None, weather_range=None):
+    """Check a changed automatic window against inherited dates and selected weather."""
+    from .management import _check_weather_date
+    from .sequence import _parse_sdate, _simulation_start_date
+
+    fields = ("auto_planting_first", "auto_planting_last")
+    if not any(field in controls for field in (*fields, "planting_management", "start_date")):
+        return []
+    plant = controls.get("planting_management")
+    if plant == "R":
+        return []
+    level = int(_section_row(text, "TREATMENTS", "N", treatment, ("SM",))["SM"])
+    if plant is None:
+        try:
+            plant = _section_row(text, "SIMULATION CONTROLS", "N", level,
+                                 ("MANAGEMENT", "PLANT"))["PLANT"]
+        except ValueError:
+            return []  # No effective A/F code; preserve checks for older FileX layouts.
+    if plant not in ("A", "F"):
+        return []
+    days = list(weather_range or ())
+    if "start_date" in controls:
+        start_date = date.fromisoformat(controls["start_date"])
+    if start_date is not None:
+        days.append(start_date)
+    days.extend(date.fromisoformat(controls[field]) for field in fields if field in controls)
+
+    def inherited_date(code):
+        day, _ = _simulation_start_date(code, days)
+        if day is None and days and (parsed := _parse_sdate(code)) is not None:
+            # An inherited window may lie outside the weather years. Choose the
+            # nearest matching year; a tie belongs to the later century.
+            reference = (start_date or days[0]).year
+            base = reference // 100 * 100 + parsed[0]
+            year = min((y for y in (base - 100, base, base + 100) if 1 <= y <= 9999),
+                       key=lambda y: (abs(y - reference), -y))
+            day, _ = _simulation_start_date(code, [date(year, 1, 1)])
+        return day
+
+    if start_date is None:
+        general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
+        if general["START"] == "S":  # DSSAT ignores SDATE for other START codes.
+            start_date = inherited_date(general["SDATE"])
+    row = _section_row(text, "SIMULATION CONTROLS", "N", level, ("PLANTING", "PFRST", "PLAST"))
+    first, last = (date.fromisoformat(controls[field]) if field in controls else inherited_date(row[column])
+                   for field, column in zip(fields, ("PFRST", "PLAST")))
+    where = f"{where}, controls"
+    location = f"{where}, field 'auto_planting_first'"
+    problems = []
+    if first is not None and last is not None and first > last:
+        problems.append(f"{location}: date {first.isoformat()!r} is after auto_planting_last "
+                        f"{last.isoformat()!r}. Supply an automatic planting first date on or "
+                        "before the last date (DSSAT PFRST/PLAST).")
+    if first is not None and start_date is not None and first < start_date:
+        problems.append(f"{location}: date {first.isoformat()!r} is before simulation start date "
+                        f"{start_date.isoformat()!r}. Supply an automatic planting first date on or "
+                        "after the simulation start date, or an earlier controls start_date.")
+    for field in fields:
+        if field in controls:
+            problems.extend(_check_weather_date(controls[field], f"{where}, field {field!r}", weather_range))
+    return problems
+
+
 def _controls_text(text, treatment, controls):
     """Dry-run the same copy operation used by run(), preserving other cells.
 
@@ -92,9 +155,11 @@ def _controls_text(text, treatment, controls):
                                  ("output_interval", "OUTPUTS", "FROPT")):
         if field in controls:
             changes[block, column] = controls[field]
-    for field, (block, column, _) in _CONTROL_OPTIONS.items():
+    for field, spec in _CONTROL_OPTIONS.items():
         if field in controls:
-            changes[block, column] = controls[field]
+            block, column = spec[:2]
+            value = controls[field]
+            changes[block, column] = _dssat_date(date.fromisoformat(value)) if spec[2] == "date" else value
 
     lines = text.splitlines(keepends=True)
     start, end = _section_bounds(lines, section)

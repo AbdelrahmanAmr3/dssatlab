@@ -38,6 +38,11 @@ section values, using the same fields and checks as
 [experiment data](experiment.md). For `rotation`, supply the whole section keyed
 by rotation component R number, as in [sequence analysis](sequence.md).
 
+`controls` factors can vary the [automatic irrigation and planting fields](experiment.md#automatic-management).
+`irrigation` factors accept [day events and the efficiency dict](management.md#irrigation-timing-and-efficiency).
+Every combination must match its effective IRRIG code; for automatic irrigation
+threshold sweeps, put `irrigation: []` in the base experiment data.
+
 A label must be a non-empty printable string or a finite integer or float;
 booleans, `None`, NaN and infinity are rejected. Labels describe the values in
 the results: numeric labels stay numbers, so nitrogen rate can be plotted directly.

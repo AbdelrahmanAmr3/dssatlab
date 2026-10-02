@@ -7,6 +7,7 @@ from .cultivar import _CROPS, _check_cultivar, _cultivar_text
 from .experiment import _check_date, _unknown_keys
 from .filex import _section_row
 from .filex_write import _event_text, _planting_text
+from .irrigation import _check_irrigation_events
 from .management import (_check_events, _check_planting, _check_weather_date,
                          _report_lines)
 from .sequence import _rotation_components
@@ -171,6 +172,16 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
                              f"crop {row['CR']!r}. Keep the component's crop and choose one of its cultivars.")
         elif section == 'planting':
             found = _check_planting(value, f'{where}, planting', weather_range=weather_range)
+        elif section == 'irrigation':
+            code = None
+            if text is not None:
+                try:
+                    code = _section_row(text, 'SIMULATION CONTROLS', 'N', int(row['SM']),
+                                        ('MANAGEMENT', 'IRRIG'))['IRRIG']
+                except (ValueError, TypeError, KeyError):
+                    pass  # Existing FileX checks report unavailable layouts.
+            found, _ = _check_irrigation_events(value, where, weather_range,
+                                                code=code, date_only=True)
         else:
             found, _ = _check_events(value, section, where, weather_range)
         events = [value] if section == 'planting' else value

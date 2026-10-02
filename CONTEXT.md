@@ -182,6 +182,30 @@ are DSSAT's active SIMULATION.CDE codes plus those stock DSSAT FileX use (ADR 00
 option keeps the copied level's code.
 _Avoid_: method flag, switch
 
+**Automatic management**:
+DSSAT deciding an operation itself during the run instead of on reported dates: automatic
+irrigation (when soil water in the management depth falls below a threshold, refill it) and
+automatic planting (the first day in a planting window when soil water and temperature allow).
+Set in experiment data `controls` with `irrigation_management` / `planting_management` codes and
+`auto_irrigation_*` / `auto_planting_*` fields (ADR 0020).
+_Avoid_: auto mode, smart irrigation
+
+**Irrigation management**:
+The treatment's DSSAT IRRIG code: how its irrigation events are read. "R" (and "P", "W") read
+event dates, "D" reads days after planting, "A", "F" and "N" take no events. The checks reject
+events that DSSAT would ignore or misread under the code.
+_Avoid_: irrigation mode (a run mode is something else)
+
+**Days after planting**:
+An irrigation event's timing given as whole days counted from the treatment's planting date, used
+under irrigation management "D". An event has a date or days after planting, never both.
+_Avoid_: DAP (in messages), relative date
+
+**Irrigation efficiency**:
+The share of applied irrigation water that reaches the soil (DSSAT EFIR, 0 to 1) for the
+treatment's reported irrigation events. Automatic irrigation has its own efficiency (IREFF).
+_Avoid_: application efficiency
+
 **Initial conditions off**:
 Experiment data `initial_conditions: "off"`: the treatment's IC factor level is set to 0 in the
 FileX copy, so DSSAT uses its own initial soil water and nitrogen. Not the same as omitting the

@@ -238,7 +238,11 @@ All management operations must occur on dates covered by your daily weather data
 Management data treatment 1, irrigation, event 2, field 'date': duplicate date '1982-03-15' in events 1 and 2. Keep one event per date.
 ```
 
-Event lists for irrigation and fertilizer must have unique and strictly ascending dates.
+Event lists for irrigation and fertilizer must have unique and strictly ascending timing.
+Irrigation can use `days_after_planting` (IDATE) instead of dates, but one list must
+use one timing kind and match the effective IRRIG code. See
+[irrigation timing and efficiency](management.md#irrigation-timing-and-efficiency)
+for the code rules, efficiency dict (EFIR) and skipped day-event coverage checks.
 
 ```text
 Scenario 'base', treatment selection: supply a non-empty list or tuple of treatment numbers, or None for all FileX treatments.

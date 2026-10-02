@@ -59,7 +59,7 @@ def option_sim(sim_inputs):
 
 
 def test_option_table_matches_spec():
-    assert experiment._CONTROL_OPTIONS == OPTIONS
+    assert {field: experiment._CONTROL_OPTIONS[field] for field in OPTIONS} == OPTIONS
 
 
 @pytest.mark.parametrize("field,value", [
