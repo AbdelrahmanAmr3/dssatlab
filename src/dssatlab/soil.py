@@ -14,9 +14,10 @@ from .weather import _read_table, _show_value
 REQUIRED = ("soil_id", "salb", "slro", "sldr", "slpf", "slb",
             "slll", "sdul", "ssat", "srgf")
 OPTIONAL = ("slnf", "ssks", "sbdm", "sloc", "slmh", "slcl", "slsi", "slcf",
-            "slni", "slhw", "slhb", "scec", "sadc", "slu1", "smhb", "smpx", "smke")
+            "slni", "slhw", "slhb", "scec", "sadc", "slu1", "smhb", "smpx", "smke", "scom")
 PROFILE_COLUMNS = ("soil_id", "salb", "slro", "sldr", "slnf", "slpf",
-                   "slu1", "smhb", "smpx", "smke")
+                   "slu1", "smhb", "smpx", "smke", "scom")
+_CODE_COLUMNS = ("slmh", "smhb", "smpx", "smke", "scom")
 SOIL_ID_MAX_LENGTH = 10  # DSSAT truncates longer soil profile IDs, characters.
 WATER_RANGE = (0, 1)  # Soil water content, cm3/cm3; both limits excluded.
 SBDM_RANGE = (0.5, 2.5)  # Bulk density, g/cm3.
@@ -35,7 +36,8 @@ def write_soil_template(path: str | Path) -> None:
 
     Units are DSSAT's own: slb in cm; slll/sdul/ssat in cm3/cm3; ssks in
     cm/h; sbdm in g/cm3; sloc in %. Profile and other layer values use
-    DSSAT's units without conversion. Optional values default to -99.
+    DSSAT's units without conversion. slmh/smhb/smpx/smke/scom are codes:
+    1-5 ASCII letters, digits or _ . + -. Optional values default to -99.
     An existing destination raises DSSATError, preserving the user's data.
     """
     path = Path(path)
@@ -58,7 +60,7 @@ def write_soil_template(path: str | Path) -> None:
         raise DSSATError(message) from error
 
 
-_PROFILE_FIELDS = (("salb", 2), ("slu1", 1), ("sldr", 2), ("slro", 1),
+_PROFILE_FIELDS = (("scom", None), ("salb", 2), ("slu1", 1), ("sldr", 2), ("slro", 1),
                   ("slnf", 2), ("slpf", 2), ("smhb", None), ("smpx", None), ("smke", None))
 _LAYER_FIELDS = (("slb", None), ("slmh", None), ("slll", 3), ("sdul", 3),
                 ("ssat", 3), ("srgf", 3), ("ssks", 2), ("sbdm", 2),
@@ -66,10 +68,12 @@ _LAYER_FIELDS = (("slb", None), ("slmh", None), ("slll", 3), ("sdul", 3),
                 ("slni", 3), ("slhw", 1), ("slhb", 1), ("scec", 1), ("sadc", 1))
 
 
-def _cell(value, decimals):
+def _cell(value, decimals, code=False):
+    if code:
+        return f"{_code_text(value):>6}"
     if value is None or value == -99 or value == "-99":
         return "   -99"
-    if decimals is None:  # Depths and codes are written as given, not rounded.
+    if decimals is None:  # Depths are written as given, not rounded.
         return f"{float(value) + 0.0:>6g}"
     num = round(float(value), decimals) + 0.0
     if round(num) == -99:
@@ -85,11 +89,11 @@ def _profile_text(rows: list[dict]) -> str:
         "@SITE        COUNTRY          LAT     LONG SCS FAMILY",
         " -99         -99              -99      -99 -99",
         "@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE",
-        "   -99" + "".join(_cell(first.get(n, -99), d) for n, d in _PROFILE_FIELDS),
+        "".join(_cell(first.get(n, -99), d, n in _CODE_COLUMNS) for n, d in _PROFILE_FIELDS),
         "@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC",
     ]
     for row in rows:
-        out.append("".join(_cell(row.get(n, -99), d) for n, d in _LAYER_FIELDS))
+        out.append("".join(_cell(row.get(n, -99), d, n in _CODE_COLUMNS) for n, d in _LAYER_FIELDS))
     return "\n".join(out) + "\n"
 
 
@@ -141,11 +145,25 @@ def _dataframe_cell(value):
         return value  # Let the checks report even unrepresentable numbers.
 
 
+def _code_text(value):
+    if value is None or isinstance(value, str) and not value.strip():
+        return "-99"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return value
+    if math.isnan(number) or number == -99:
+        return "-99"
+    if not math.isfinite(number):
+        return None
+    return f"{number + 0.0:g}"
+
+
 def _parse_soil(source) -> tuple[list[dict], list[str]]:
     """Read soil data and return parsed rows and all problems without writing.
 
     DataFrame cells use CSV text and blank-cell semantics, keeping IDs as text.
-    Numbers become floats; absent or empty optional values become -99.
+    Numeric columns become floats; code columns become text; missing values become -99.
     Invalid fields are omitted. Consumers must require no problems before
     using parsed rows. The source is never mutated, sorted or repaired.
     """
@@ -189,6 +207,18 @@ def _parse_soil(source) -> tuple[list[dict], list[str]]:
             if is_dataframe:
                 value = _dataframe_cell(value)
             where = f"Soil data row {line}, column {name!r}"
+            if name in _CODE_COLUMNS:
+                try:
+                    code = _code_text(value)
+                except (ValueError, OverflowError):
+                    code = None
+                if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9_.+-]{1,5}", code):
+                    problems.append(f"{where}: found {_show_value(value)}. Use 1-5 ASCII "
+                                    "letters, digits or _ . + -; DSSAT reads it into a "
+                                    "5-character code.")
+                    continue
+                result[name] = code
+                continue
             if name == "soil_id":
                 if not isinstance(value, str) or not re.fullmatch(
                         rf"[A-Za-z0-9]{{1,{SOIL_ID_MAX_LENGTH}}}", value):
