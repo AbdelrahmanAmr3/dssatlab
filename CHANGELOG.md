@@ -2,6 +2,19 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.14.1] - UNDATED
+
+### Added
+- Optional `cultivar.coefficients` in experiment data: exact `.CUL` header names after `ECO#` mapped to finite numbers, checked before any run (ADR 0017).
+- A changed cultivar line with the first free `DLnnnn` code, inserted immediately after the source line in the simulation folder's `.CUL` copy; the copied FileX's CULTIVARS level points at the new code and the source `.CUL` stays unchanged.
+- Cultivar coefficient sweeps through complete `cultivar` factor sections in `run_sweep()`, with each run folder holding its own changed `.CUL` copy.
+- Experiment data and sweep guide examples, tutorial Case 13, roadmap and decisions entries, and Architecture Decision Record 0017.
+
+### Notes
+- Coefficient names are case-sensitive; values are written as given without rounding or exponent notation and must fit their fixed-width columns. Integers stay as is; integral floats keep one decimal.
+- Cultivar coefficients per rotation component are not supported; `.ECO` and `.SPE` files stay unchanged.
+- Upgrading from 0.14.0 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.14.0] - 2026-10-01
 
 ### Added
