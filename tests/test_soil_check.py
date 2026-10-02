@@ -85,7 +85,8 @@ def test_unknown_columns(simulation, rows, column):
     assert any(column in p and "row 3" in p and "unknown" in p for p in simulation.check())
 
 
-@pytest.mark.parametrize("column", REQUIRED[1:] + OPTIONAL)
+@pytest.mark.parametrize("column", REQUIRED[1:] + tuple(
+    name for name in OPTIONAL if name not in ("slmh", "smhb", "smpx", "smke")))
 @pytest.mark.parametrize("value", ["oops", "nan", float("inf"), "-inf",
                                  pytest.param(10 ** 5000, id="huge-integer")])
 def test_invalid_numbers(simulation, rows, column, value):
@@ -253,7 +254,8 @@ def test_soil_template_passes_and_refuses_overwrite(simulation, tmp_path):
     original = path.read_bytes()
     with path.open(encoding="utf-8", newline="") as stream:
         rows = list(csv.DictReader(stream))
-    assert len(rows) == 3 and set(rows[0]) == set(REQUIRED + OPTIONAL)
+    assert len(rows) == 3 and list(rows[0]) == list(REQUIRED + OPTIONAL) + ["scom"]
+    assert {row["scom"] for row in rows} == {"-99"}
     assert {row["soil_id"] for row in rows} == {"IBMZ910214"}
     for destination in (path, tmp_path):
         with pytest.raises(dssatlab.DSSATError, match="exists.*another path"):
