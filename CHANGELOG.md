@@ -2,6 +2,20 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.14.0] - 2026-10-01
+
+### Added
+- `run_sweep()` runs every combination of labelled experiment data sections (planting, irrigation, fertilizer, cultivar, initial_conditions, controls and rotation) as scenarios through `run_treatments()` (ADR 0016).
+- Whole-section replacement in a deep copy of the base experiment data for every selected treatment, preserving other sections and treatments; accepts an existing FileX or a FileX template.
+- One table of Summary rows with scenario, treatment, numeric or string factor labels and run directory, ready for `to_dataframe()` and `summarize_seasons()`. The unchanged base runs first with `None` factor labels.
+- Sweep guide with a planting-by-nitrogen example, tutorial Case 12, API reference and roadmap entries, and Architecture Decision Record 0016.
+
+### Notes
+- All combinations are checked before anything runs; one `DSSATCheckError` collects problems. The first DSSAT run failure stops the sweep and reports the kept run directories.
+- Scenario names are factor labels joined by spaces and written as the copied FileX treatment name; keep labels short enough to fit its TNAME column.
+- Cultivar coefficient sweeps are planned for v0.14.1; weather and soil variation uses scenarios. Factors are complete sections supplied as a Python dict, with no factors YAML or sweep template.
+- Upgrading from 0.13.2 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.13.2] - 2026-10-01
 
 ### Added

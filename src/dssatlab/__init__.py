@@ -17,6 +17,7 @@ from .runner import run
 from .scenarios import (combine_summaries, run_treatments, summarize_seasons,
                         write_scenario_template)
 from .simulation import Simulation
+from .sweep import run_sweep
 from .soil import write_soil_template
 from .weather import write_weather_template
 
@@ -29,7 +30,7 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "list_crops", "list_cultivars",
            "read_summary", "read_plant_growth", "to_dataframe", "plot_plant_growth", "DSSATOutputError",
            "read_soil_water", "read_plant_nitrogen", "read_weather", "read_dssat_evaluation",
-           "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template",
+           "run_sweep", "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template",
            ]
 
-__version__ = "0.13.2"
+__version__ = "0.14.0"

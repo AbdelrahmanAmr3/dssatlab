@@ -14,7 +14,7 @@ def test_public_api_is_importable():
     assert "run" in dssatlab.__all__
     assert "summarize_seasons" in dssatlab.__all__
     assert "DSSATRunError" in dssatlab.__all__
-    assert dssatlab.__version__ == "0.13.2"
+    assert dssatlab.__version__ == "0.14.0"
 
 
 def test_summary_public_api_is_exported():
@@ -36,7 +36,7 @@ def test_daily_output_public_api_is_exported():
 
 
 def test_scenario_public_api_is_exported():
-    for name in ("run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template"):
+    for name in ("run_sweep", "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template"):
         assert name in dssatlab.__all__
         assert callable(getattr(dssatlab, name))
 

@@ -95,6 +95,16 @@ A named set of input overrides applied to a base Simulation's inputs (weather, s
 experiment data), run as its own simulation. Results are labelled with the scenario's name.
 _Avoid_: treatment (a treatment is a row of the FileX, a scenario is not), variant
 
+**Sweep**:
+Running every combination of a few factors' values (a grid) as scenarios over the base inputs,
+and getting one table of Summary rows labelled with each factor's value.
+_Avoid_: batch (DSSAT's batch file is something else), grid search
+
+**Factor**:
+One experiment data section (planting, fertilizer, irrigation, ...) varied in a sweep over a few
+labelled values, each a complete section. The same idea as a treatment factor in XBuild.
+_Avoid_: level (a level is one entry of a FileX section), parameter
+
 **Weather data**:
 A user's own daily weather, as they hold it (a table), before it is converted into a
 DSSAT weather file.

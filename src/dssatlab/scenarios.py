@@ -46,6 +46,28 @@ def _scenario_inputs(source):
     return entries
 
 
+def _select_treatments(filex, filex_template, treatments):
+    """Select treatment numbers without changing their order or validation."""
+    if (filex is None) == (filex_template is None):
+        raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
+    if treatments is None and filex_template is not None:
+        data, _ = _load_filex_template(filex_template)
+        # Simulation reports malformed or unreadable templates through its checks.
+        treatments = list(range(1, len(_template_treatment_names(data)) + 1))
+    elif treatments is None:
+        try:
+            treatments = list(dict.fromkeys(read_treatment_numbers(filex)))
+        except ValueError as error:
+            raise DSSATCheckError([f"Scenario 'base', treatment all: {error}"]) from error
+    if not isinstance(treatments, (list, tuple)) or not treatments:
+        raise DSSATCheckError([
+            "Scenario 'base', treatment selection: supply a non-empty list or tuple of "
+            "treatment numbers, or None for all treatments."
+        ])
+
+    return treatments
+
+
 def run_treatments(filex=None, weather=None, treatments=None, soil=None, management=None,
                    executable=None, scenarios=None, filex_template=None) -> dict[tuple[str, int], RunResult]:
     """Check every scenario/treatment, then run each in its own simulation folder.
@@ -78,22 +100,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     The first DSSATRunError stops the batch and names earlier kept run
     directories. ``executable`` selects the DSSAT executable as for Simulation.
     """
-    if (filex is None) == (filex_template is None):
-        raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
-    if treatments is None and filex_template is not None:
-        data, _ = _load_filex_template(filex_template)
-        # Simulation reports malformed or unreadable templates through its checks.
-        treatments = list(range(1, len(_template_treatment_names(data)) + 1))
-    elif treatments is None:
-        try:
-            treatments = list(dict.fromkeys(read_treatment_numbers(filex)))
-        except ValueError as error:
-            raise DSSATCheckError([f"Scenario 'base', treatment all: {error}"]) from error
-    if not isinstance(treatments, (list, tuple)) or not treatments:
-        raise DSSATCheckError([
-            "Scenario 'base', treatment selection: supply a non-empty list or tuple of "
-            "treatment numbers, or None for all treatments."
-        ])
+    treatments = _select_treatments(filex, filex_template, treatments)
 
     base = dict(weather=weather, soil=soil, management=management)
     simulations, problems = [], []
