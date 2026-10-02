@@ -6,6 +6,7 @@ import pytest
 
 from dssatlab import DSSATCheckError, Simulation, write_experiment_template
 from dssatlab.filex import _section_row
+from test_controls_automatic_irrigation import AUTOMATIC_ROWS
 from test_controls_options import option_sim
 from test_filex_template import data, rows
 from test_management_file import sim_inputs
@@ -199,6 +200,8 @@ def test_unknown_planting_prints_skip_note_without_problem(day_sim, capsys, plan
     elif in_filex:
         _code(day_sim, 'PLANT', plant)
     else:
+        # Setting PLANT A/F checks the automatic planting window, so give the level one.
+        day_sim.filex.write_bytes(day_sim.filex.read_bytes() + AUTOMATIC_ROWS.encode('ascii'))
         _entry(day_sim)['controls']['planting_management'] = plant
     _entry(day_sim)['irrigation'][0]['days_after_planting'] = 35
     assert day_sim.check(True) == []
