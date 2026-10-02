@@ -2,6 +2,20 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## 0.15.0
+
+### Added
+- Experiment data `controls` fields: `photosynthesis` (PHOTO), `co2` (CO2), `symbiosis` (SYMBI), `phosphorus` (PHOSP), `potassium` (POTAS), `tillage` (TILL), `evapotranspiration` (EVAPO), `infiltration` (INFIL), `soil_organic_matter` (MESOM), `soil_evaporation` (MESEV), `soil_layers` (MESOL), and `residue` (RESID), with checked DSSAT codes (ADR 0019). Omitted options keep the FileX value.
+- Initial-condition details: `root_mass` (ICRT), `nodule_mass` (ICND), `rhizobia_number` (ICRN), `rhizobia_effectiveness` (ICRE), `residue_n` (ICREN), `residue_p` (ICREP), `residue_incorporation` (ICRIP), and `residue_depth` (ICRID). Omitted detail fields write -99.
+- Quoted `initial_conditions: "off"` sets the treatment's IC to 0 in the FileX copy; DSSAT supplies initial soil water and nitrogen.
+- Guide tables, a photosynthesis comparison, and tutorial Case 14 for simulation options and initial conditions off.
+
+### Fixed
+- A one-row treatment whose number collides with a sequence number is reported before any run, naming both rows and asking the user to renumber them (#168).
+
+### Notes
+- The same options and initial conditions work with a copied FileX or a FileX template. dssatlab checks codes; DSSAT decides what each option does. Zero runtime dependencies are preserved.
+
 ## [0.14.2] - 2026-10-02
 
 ### Fixed

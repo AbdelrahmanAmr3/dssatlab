@@ -26,7 +26,8 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.13.2 | Experiment data per rotation component keyed by R: planting, cultivar, fertilizer and irrigation for copied and template sequences, component period checks, and edits applied in every cycle through Simulation, run_treatments and scenarios. |
 | 0.14 | Sweeps: `run_sweep()` runs every combination of labelled experiment data sections as scenarios, with the unchanged base first, checks before any run, and Summary rows carrying factor labels and run directories (ADR 0016). |
 | 0.14.1 | Cultivar coefficient sweeps: optional `cultivar.coefficients`, a changed cultivar line with a new `DLnnnn` code in each simulation folder's `.CUL` copy, and unchanged source files (ADR 0017). |
-| 0.14.2 (current) | Bug fixes for DSSAT course files: fixed-column treatment rows (ADR 0018), stock FileA/FileT headers, soil text codes and optional `scom`, and experiment-named outputs with FNAME=Y. |
+| 0.14.2 | Bug fixes for DSSAT course files: fixed-column treatment rows (ADR 0018), stock FileA/FileT headers, soil text codes and optional `scom`, and experiment-named outputs with FNAME=Y. |
+| 0.15.0 (current) | Checked simulation options in experiment data controls, eight initial-condition detail fields, initial conditions off (ADR 0019), and a check for one-row treatment numbers colliding with a sequence number (#168). |
 
 ## Deliberately not built yet
 

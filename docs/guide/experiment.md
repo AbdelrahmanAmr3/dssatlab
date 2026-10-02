@@ -61,8 +61,8 @@ Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO s
 | Section | What `check()` rejects |
 |---|---|
 | `cultivar` | A code that is not in the one `.CUL` file for that crop beside the FileX; the message lists the codes that do exist. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. |
-| `initial_conditions` | Layer depths that do not ascend, water outside 0 to 1, negative ammonium, nitrate or residue, and, when you pass `soil=`, a layer deeper than the soil profile. |
-| `controls` | `water` or `nitrogen` other than `"Y"`/`"N"`, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
+| `initial_conditions` | Layer depths that do not ascend, water outside 0 to 1, negative ammonium, nitrate or residue, detail values outside the ranges below, and, when you pass `soil=`, a layer deeper than the soil profile. Values other than a dict or the quoted string `"off"` are rejected. |
+| `controls` | Simulation option codes outside the table below, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
 
 A misspelled field or a misnamed section is reported by name with the allowed list, and every
 problem of every treatment is reported at once. Crop-specific rules are still DSSAT's to check
@@ -70,6 +70,74 @@ at run time.
 
 A changed `controls` `start_date` replaces the FileX `SDATE` in the weather-coverage and
 planting-date checks. The FileX `START` setting is left as it is.
+
+## Simulation options
+
+Set these optional fields under `controls`. Omitted options keep the FileX value.
+dssatlab checks the codes and writes them into a copied controls level; DSSAT decides
+what each option does. The same fields apply when using a FileX template.
+
+| YAML field | DSSAT column | Allowed codes | Type |
+|---|---|---|---|
+| `water` | WATER | `"Y"`, `"N"` | Quoted, case-sensitive letter |
+| `nitrogen` | NITRO | `"Y"`, `"N"` | Quoted, case-sensitive letter |
+| `photosynthesis` | PHOTO | `"C"`, `"R"`, `"L"`, `"V"` | Quoted, case-sensitive letter |
+| `co2` | CO2 | `"M"`, `"W"`, `"D"`, `"R"` | Quoted, case-sensitive letter |
+| `symbiosis` | SYMBI | `"Y"`, `"N"`, `"U"` | Quoted, case-sensitive letter |
+| `phosphorus` | PHOSP | `"Y"`, `"N"` | Quoted, case-sensitive letter |
+| `potassium` | POTAS | `"Y"`, `"N"` | Quoted, case-sensitive letter |
+| `tillage` | TILL | `"Y"`, `"N"` | Quoted, case-sensitive letter |
+| `evapotranspiration` | EVAPO | `"F"`, `"R"`, `"S"`, `"T"` | Quoted, case-sensitive letter |
+| `infiltration` | INFIL | `"R"`, `"S"`, `"N"` | Quoted, case-sensitive letter |
+| `soil_organic_matter` | MESOM | `"G"`, `"P"` | Quoted, case-sensitive letter |
+| `soil_evaporation` | MESEV | `"R"`, `"S"` | Quoted, case-sensitive letter |
+| `soil_layers` | MESOL | `1`, `2`, `3` | Integer, not a string or boolean |
+| `residue` | RESID | `"N"`, `"R"`, `"D"` | Quoted, case-sensitive letter |
+
+## Initial-condition details
+
+Add these optional numeric fields beside `date` and `layers` in `initial_conditions`.
+All ranges include their endpoints. Values must be finite numbers, not strings or
+booleans. Omitted detail fields write DSSAT's missing-value marker `-99`.
+
+| Field | DSSAT column | Allowed range | Unit |
+|---|---|---|---|
+| `root_mass` | ICRT | 0 or greater (no upper limit) | kg/ha |
+| `nodule_mass` | ICND | 0 or greater (no upper limit) | kg/ha |
+| `rhizobia_number` | ICRN | 0 to 1 | Unitless |
+| `rhizobia_effectiveness` | ICRE | 0 to 1 | Unitless |
+| `residue_n` | ICREN | 0 to 100 | % |
+| `residue_p` | ICREP | 0 to 100 | % |
+| `residue_incorporation` | ICRIP | 0 to 100 | % |
+| `residue_depth` | ICRID | 0 or greater (no upper limit) | cm |
+
+To let DSSAT supply initial soil water and nitrogen, replace the whole section
+with `initial_conditions: "off"`. This sets the treatment's IC to 0 in the FileX
+copy and adds no IC level. Keep `"off"` quoted: unquoted `off` can become a YAML
+boolean, and an empty key (`null`) is rejected. Omitting the section keeps the
+FileX's initial conditions. Weather coverage and management date checks still apply.
+
+## Compare photosynthesis options
+
+Use treatment 1 of `UFGA8201.MZX` and weather covering its 1982 season. This sweep
+compares PHOTO `"C"` and `"L"`, with initial conditions off for every run:
+
+```python
+rows = dl.run_sweep(
+    "UFGA8201.MZX", "weather.csv", treatments=[1],
+    management={"treatments": {1: {"initial_conditions": "off"}}},
+    factors={"controls": {
+        "C": {"photosynthesis": "C"},
+        "L": {"photosynthesis": "L"},
+    }},
+)
+dl.to_dataframe(rows)[["scenario", "controls", "HWAM"]]
+```
+
+The base runs first, followed by C and L. Each factor value replaces the whole
+`controls` section; `initial_conditions` stays off. Compare grain yield (`HWAM`,
+kg/ha) in the returned rows. `to_dataframe()` requires optional pandas. See
+[sweeps](sweeps.md) and the [tutorial notebook](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_tutorial.ipynb), Case 14.
 
 ## Cultivar coefficients
 
@@ -100,7 +168,8 @@ result = sim.run()
 ```
 
 The copied FileX gets a new `CULTIVARS`, `INITIAL CONDITIONS` or `SIMULATION CONTROLS` level for
-each section you gave, and only the selected treatment is repointed. The `.CUL`, `.ECO` and
+each dict section you gave, and only the selected treatment is repointed. With
+`initial_conditions: "off"`, it points at IC 0 instead. The `.CUL`, `.ECO` and
 `.SPE` files are copied to the simulation folder as before.
 
 ## Use it in scenarios
@@ -133,7 +202,7 @@ Each section was overridden on a copy of DSSAT's own sample FileX (maize `UFGA82
 
 ## Not included
 
-Editing `.ECO` or `.SPE` files, cultivar coefficients per rotation component, simulation
-controls beyond the five above, and other initial-condition detail such as per-layer roots.
+Editing `.ECO` or `.SPE` files, cultivar coefficients per rotation component,
+generated weather and replicates, automatic management, and per-layer roots.
 To build a FileX from nothing, use a [FileX template](simulation.md). See the
 [roadmap](../reference/roadmap.md) and [ADR 0005](../adr/0005-experiment-data-edits-an-existing-filex.md).
