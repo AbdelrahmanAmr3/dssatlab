@@ -15,6 +15,16 @@ _HEADERS = (
     "@C   PCR ICDAT  ICRT  ICND  ICRN  ICRE  ICWD ICRES ICREN ICREP ICRIP ICRID ICNAME",
     "@C  ICBL  SH2O  SNH4  SNO3",
 )
+_DETAIL_FIELDS = {
+    "root_mass": ("ICRT", None, "kg/ha"),
+    "nodule_mass": ("ICND", None, "kg/ha"),
+    "rhizobia_number": ("ICRN", 1, ""),
+    "rhizobia_effectiveness": ("ICRE", 1, ""),
+    "residue_n": ("ICREN", 100, "%"),
+    "residue_p": ("ICREP", 100, "%"),
+    "residue_incorporation": ("ICRIP", 100, "%"),
+    "residue_depth": ("ICRID", None, "cm"),
+}
 
 
 def _check_layers(layers, where, soil_depth):
@@ -61,10 +71,12 @@ def _check_layers(layers, where, soil_depth):
 
 def _check_initial_conditions(data, where, soil_depth=None):
     where = f"{where}, initial_conditions"
+    if isinstance(data, str) and data == "off":
+        return []
     if not isinstance(data, dict):
-        return [f"{where}: expected a dict. Supply fields from the Experiment "
+        return [f'{where}: expected a dict or the quoted string "off". Supply fields from the Experiment '
                 "template or omit the section to keep the FileX level."]
-    problems = _check_fields(data, ("date", "layers"), ("previous_crop", "residue_mass"),
+    problems = _check_fields(data, ("date", "layers"), ("previous_crop", "residue_mass", *_DETAIL_FIELDS),
                              where, "Experiment")
     if "date" in data:
         problems.extend(_check_date(data["date"], f"{where}, field 'date'"))
@@ -80,6 +92,19 @@ def _check_initial_conditions(data, where, soil_depth=None):
         if not numeric_problems and value < 0:
             problems.append(f"{location}: found {_show_value(value)}. "
                             "Supply a nonnegative surface residue mass in kg/ha.")
+    for field, (_, upper, unit) in _DETAIL_FIELDS.items():
+        if field not in data:
+            continue
+        location, value = f"{where}, field {field!r}", data[field]
+        unit = f" {unit}" if unit else ""
+        span = (f"0 or greater{unit} (no upper limit)" if upper is None
+                else f"0 to {upper}{unit} inclusive")
+        numeric_problems = _check_number(value, location)
+        if numeric_problems:
+            problems.extend(f"{problem} Allowed range is {span}." for problem in numeric_problems)
+        elif value < 0 or (upper is not None and value > upper):
+            problems.append(f"{location}: found {_show_value(value)}. "
+                            f"Supply a number in the allowed range: {span}.")
     if "layers" in data:
         problems.extend(_check_layers(data["layers"], f"{where}, layers", soil_depth))
     return problems
@@ -90,12 +115,17 @@ def _initial_conditions_text(text, treatment, data):
     name = "INITIAL CONDITIONS"
     _section_row(text, "TREATMENTS", "N", treatment, ("IC",))
     lines = text.splitlines(keepends=True)
-    blocks, highest = _event_blocks(lines, name, _HEADERS)
+    if isinstance(data, str) and data == "off":
+        _repoint(lines, treatment, "IC", 0)
+        return "".join(lines)
+    optional = {column for field, (column, _, _) in _DETAIL_FIELDS.items() if field not in data}
+    blocks, highest = _event_blocks(lines, name, _HEADERS, optional_columns=optional)
     level = highest + 1
     day = date.fromisoformat(data["date"])
     values = {"C": level, "PCR": data.get("previous_crop", -99),
               "ICDAT": _dssat_date(day),
               "ICRES": data.get("residue_mass", -99)}
+    values.update({column: data.get(field, -99) for field, (column, _, _) in _DETAIL_FIELDS.items()})
     body = [blocks[0][2], _event_row(blocks[0][0], values, name), blocks[1][2]]
     for layer in data["layers"]:
         values = {"C": level, "ICBL": layer["depth"], "SH2O": layer["water"],

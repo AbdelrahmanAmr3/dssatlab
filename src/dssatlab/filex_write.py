@@ -77,12 +77,16 @@ def _insert_section(lines, section, body):
     return lines[:bounds[0]] + block + lines[bounds[0]:]
 
 
-def _cell(value, width, section, column):
+def _cell(value, width, section, column, *, first_column=False):
     text = str(value)
-    if len(text) > width:
-        raise ValueError(f"{section} column {column}: value {text!r} does not fit "
-                         f"its {width}-character field. Supply a value that fits "
-                         "the FileX column without rounding or truncation.")
+    limit = width if first_column else width - 1
+    if len(text) > limit and isinstance(value, float) and value.is_integer():
+        text = str(int(value))
+    if len(text) > limit:
+        blank = "" if first_column else " The field needs one leading blank."
+        raise ValueError(f"{section} column {column}: value {str(value)!r} does not fit "
+                         f"its {width}-character field.{blank} Supply a shorter value "
+                         "that fits the FileX column without rounding or truncation.")
     return text.rjust(width)
 
 
@@ -96,7 +100,7 @@ def _planting_row(columns, level, planting):
             day = date.fromisoformat(values[column])
             values[column] = _dssat_date(day)
     return "".join(_cell(values.get(column, -99), end - start,
-                         "PLANTING DETAILS", column)
+                         "PLANTING DETAILS", column, first_column=start == 0)
                    for column, (start, end) in columns.items())
 
 
@@ -174,7 +178,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
                 left, right = columns[column]
                 if line[left:right].strip() == str(level):
                     return
-                cell = _cell(level, right - left, section, column)
+                cell = _cell(level, right - left, section, column, first_column=left == 0)
                 if column == "WSTA":  # DSSAT's sequence mode reads WSTA left-justified (A8).
                     cell = " " + cell.strip().ljust(right - left - 1)
                 lines[index] = line[:left] + cell + line[right:]
@@ -190,7 +194,7 @@ def _append_rows(lines, index, rows):
     lines[index:index] = [prefix + newline.join(rows) + newline]
 
 
-def _event_blocks(lines, section, headers):
+def _event_blocks(lines, section, headers, *, optional_columns=()):
     """Check every header and find the last insertion point for each block."""
     expected = [_columns(header) for header in headers]
     blocks, highest = {}, 0
@@ -203,7 +207,7 @@ def _event_blocks(lines, section, headers):
         if line.startswith("@"):
             columns = _columns(line)
             active = max(range(len(expected)), key=lambda n: len(expected[n].keys() & columns.keys()))
-            missing = expected[active].keys() - columns.keys()
+            missing = expected[active].keys() - columns.keys() - set(optional_columns)
             if missing:
                 raise ValueError(f"{section} header is missing columns {', '.join(sorted(missing))}. "
                                  "Supply the needed columns.")
@@ -225,7 +229,8 @@ def _event_blocks(lines, section, headers):
 
 
 def _event_row(columns, values, section):
-    return "".join(_cell(values.get(column, -99), end - start, section, column)
+    return "".join(_cell(values.get(column, -99), end - start, section, column,
+                         first_column=start == 0)
                    for column, (start, end) in columns.items())
 
 

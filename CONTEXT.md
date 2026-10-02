@@ -175,6 +175,19 @@ date, and `rotation`: planting, cultivar, fertilizer and irrigation per rotation
 keyed by the component's R number.
 _Avoid_: management (for the whole dict), FileX input
 
+**Simulation option**:
+One DSSAT OPTIONS, METHODS or MANAGEMENT code a user sets in experiment data `controls` under a
+plain name (`photosynthesis` for PHOTO, `symbiosis` for SYMBI, `residue` for RESID). Allowed codes
+are DSSAT's active SIMULATION.CDE codes plus those stock DSSAT FileX use (ADR 0019). An omitted
+option keeps the copied level's code.
+_Avoid_: method flag, switch
+
+**Initial conditions off**:
+Experiment data `initial_conditions: "off"`: the treatment's IC factor level is set to 0 in the
+FileX copy, so DSSAT uses its own initial soil water and nitrogen. Not the same as omitting the
+section, which keeps the FileX's own level.
+_Avoid_: no IC, disabled IC (in code and messages)
+
 **FileX template**:
 The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one crop, one or
 more fields, and one treatment or a list of named treatments, each on one field. Every treatment starts from the template's

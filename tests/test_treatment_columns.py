@@ -103,3 +103,45 @@ def test_sequence_batch_uses_fixed_component_numbers(tmp_path, fake_dssat, compo
     assert [int(row[end-3:end]) for row in copied] == [0 if r == 10 else 1 for r in components] + ([1] if extra else [])
     if extra:
         assert lab.Simulation(filex, 2, days).check() == []
+
+
+@pytest.mark.parametrize("components", [[2, 3], [1, 2]])
+def test_check_reports_one_row_treatment_colliding_with_sequence(tmp_path, components):
+    filex = inline_filex(tmp_path, [" 211 0 0", *[f"21{r:2} 0 0" for r in components]])
+    problems = lab.Simulation(filex, 21, weather("1982-02-25", "1983-02-24")).check()
+    assert len(problems) == 1
+    message = problems[0]
+    rows = filex.read_text().splitlines()[2:5]
+    assert str(filex) in message
+    assert repr(rows[0]) in message and repr(rows[1]) in message
+    assert "one-row treatment 21" in message and "sequence 21" in message
+    assert "columns 1-3 (1-2 in a sequence FileX)" in message
+    assert message.endswith("Renumber the one-row treatment or the sequence.")
+
+
+@pytest.mark.parametrize("treatment", [21, 22])
+def test_check_accepts_one_row_treatment_without_sequence_collision(tmp_path, treatment):
+    filex = inline_filex(tmp_path, [" 221 0 0", "21 2 0 0", "21 3 0 0"])
+    assert lab.Simulation(filex, treatment, weather("1982-02-25", "1983-02-24")).check() == []
+
+
+def test_normal_layout_keeps_all_matching_rows_for_component_checks(tmp_path):
+    # Treatment 100 rules out sequence columns for the whole FileX.
+    filex = inline_filex(tmp_path, [" 211 0 0", "21 1 0 0", "21 2 0 0", "1001 0 0"])
+    assert lab.Simulation(filex, 21, weather("1982-02-25", "1983-02-24")).check() == [
+        "Treatment 21 has rotation components R 1, 1, 2: "
+        "give each row of a sequence its own R number."]
+
+
+@pytest.mark.parametrize("treatments", [None, [21]])
+def test_run_treatments_rejects_collision_before_dssat(tmp_path, fake_dssat, treatments):
+    filex = inline_filex(tmp_path, [" 211 0 0", "21 2 0 0", "21 3 0 0"])
+    days = weather("1982-02-25", "1983-02-24")
+    problems = lab.Simulation(filex, 21, days).check()
+    before = set(tmp_path.iterdir())
+    with pytest.raises(lab.DSSATCheckError) as error:
+        lab.run_treatments(filex, days, treatments=treatments,
+                           executable=fake_dssat.executable)
+    assert error.value.problems == [f"Scenario 'base', treatment 21: {problems[0]}"]
+    assert fake_dssat.calls == []
+    assert set(tmp_path.iterdir()) == before
