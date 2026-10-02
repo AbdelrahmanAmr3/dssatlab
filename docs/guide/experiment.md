@@ -62,7 +62,7 @@ Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO s
 |---|---|
 | `cultivar` | A code that is not in the one `.CUL` file for that crop beside the FileX; the message lists the codes that do exist. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. |
 | `initial_conditions` | Layer depths that do not ascend, water outside 0 to 1, negative ammonium, nitrate or residue, detail values outside the ranges below, and, when you pass `soil=`, a layer deeper than the soil profile. Values other than a dict or the quoted string `"off"` are rejected. |
-| `controls` | Simulation option codes outside the table below, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
+| `controls` | Simulation or management codes outside the tables below, automatic values outside their ranges, an invalid automatic planting window, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
 
 A misspelled field or a misnamed section is reported by name with the allowed list, and every
 problem of every treatment is reported at once. Crop-specific rules are still DSSAT's to check
@@ -93,6 +93,68 @@ what each option does. The same fields apply when using a FileX template.
 | `soil_evaporation` | MESEV | `"R"`, `"S"` | Quoted, case-sensitive letter |
 | `soil_layers` | MESOL | `1`, `2`, `3` | Integer, not a string or boolean |
 | `residue` | RESID | `"N"`, `"R"`, `"D"` | Quoted, case-sensitive letter |
+
+## Automatic management
+
+Set these optional fields under `controls`, for a copied FileX or a FileX template.
+Only named columns change in the copied controls level; omitted fields keep its values.
+Management codes are quoted, case-sensitive strings. Numeric values must be finite
+Python integers or floats, not strings or booleans. Ranges include both endpoints
+unless stated otherwise; each value must also fit its FileX column.
+
+| Field | DSSAT column | Allowed codes / range | Unit / format |
+|---|---|---|---|
+| `irrigation_management` | IRRIG | `"A"`, `"N"`, `"F"`, `"R"`, `"D"`, `"P"`, `"W"` | Quoted, case-sensitive letter |
+| `planting_management` | PLANT | `"A"`, `"F"`, `"R"` | Quoted, case-sensitive letter |
+| `auto_irrigation_depth` | IMDEP | Above 0 | cm |
+| `auto_irrigation_threshold` | ITHRL | 0 to 100 | % |
+| `auto_irrigation_refill` | ITHRU | 0 to 100 | % |
+| `auto_irrigation_method` | IMETH | `[A-Za-z]{2}[0-9]{3}` | Two ASCII letters followed by three digits, e.g. `"IR001"` |
+| `auto_irrigation_amount` | IRAMT | Above 0 | mm |
+| `auto_irrigation_efficiency` | IREFF | Above 0 and at most 1 | Unitless |
+| `auto_planting_first` | PFRST | Valid calendar date | Quoted `"YYYY-MM-DD"` string |
+| `auto_planting_last` | PLAST | Valid calendar date | Quoted `"YYYY-MM-DD"` string |
+| `auto_planting_soil_water_low` | PH2OL | 0 to 100 | % |
+| `auto_planting_soil_water_high` | PH2OU | 0 to 100 | % |
+| `auto_planting_soil_water_depth` | PH2OD | Above 0 | cm |
+| `auto_planting_max_temperature` | PSTMX | Any finite number | degrees C |
+| `auto_planting_min_temperature` | PSTMN | Any finite number | degrees C |
+
+IRRIG `"A"` lets DSSAT refill soil water when it falls below the threshold;
+`"F"` uses the fixed amount (IRAMT). Give `irrigation: []` to remove reported
+events under either code. IREFF applies to **automatic irrigation**; the
+`irrigation` dict's `efficiency` (EFIR) applies to **that irrigation level's events**.
+See [irrigation timing and efficiency](management.md#irrigation-timing-and-efficiency)
+for day events (`days_after_planting`, IDATE), the dict form and the IRRIG checks.
+
+```yaml
+treatments:
+  1:
+    irrigation: []
+    controls:
+      irrigation_management: "A"
+      auto_irrigation_depth: 30
+      auto_irrigation_threshold: 50
+      auto_irrigation_refill: 100
+      auto_irrigation_method: "IR001"
+      auto_irrigation_efficiency: 1
+```
+
+For automatic planting, set `planting_management` to `"A"` or `"F"` and give
+window dates and any soil water or temperature limits to change. The effective
+window uses your dates, otherwise the copied controls level's PFRST/PLAST.
+Its first date must be on or before its last and on or after the effective
+simulation start (`controls.start_date`, otherwise SDATE). Given window dates
+must lie inside the weather range. These window checks run only under PLANT
+A/F when you supply a window date, `planting_management`, or `start_date`;
+an unused window under PLANT R is not checked. The checks do not predict
+whether DSSAT will find a suitable planting day.
+
+The FileX template still starts with IRRIG R, PLANT R and its automatic defaults;
+experiment data applies your changes afterwards. Sequences keep their existing
+controls restriction (`years` and `start_date` only). See
+[ADR 0020](../adr/0020-automatic-management-as-controls-fields.md) and the
+[tutorial notebook](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_tutorial.ipynb), Case 15.
 
 ## Initial-condition details
 
@@ -200,9 +262,16 @@ Each section was overridden on a copy of DSSAT's own sample FileX (maize `UFGA82
 
 `output_interval: 7` cut the `PlantGro.OUT` rows from 129 to 20 (maize) and from 251 to 38 (wheat).
 
+The v0.16 real-DSSAT proof covered IRRIG A, F, D (days after planting), R (dated)
+and N. P and W can be written and checked for dated events, but have not been
+proven on DSSAT. On UFGA8201 treatment 1, automatic irrigation with IREFF 1
+versus 0.5 gave IRCM 214 versus 330 mm. The EFIR 0.75 dict form matched a
+hand-edited FileX exactly: IRCM 110 mm and HWAM 2335 kg/ha.
+
 ## Not included
 
 Editing `.ECO` or `.SPE` files, cultivar coefficients per rotation component,
-generated weather and replicates, automatic management, and per-layer roots.
+generated weather and replicates, automatic nitrogen, residue and harvest,
+the automatic irrigation stop stage (IROFF), and per-layer roots.
 To build a FileX from nothing, use a [FileX template](simulation.md). See the
 [roadmap](../reference/roadmap.md) and [ADR 0005](../adr/0005-experiment-data-edits-an-existing-filex.md).

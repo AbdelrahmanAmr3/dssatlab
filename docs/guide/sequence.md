@@ -247,7 +247,10 @@ treatments:
 ```
 
 Each component takes optional `planting`, `cultivar`, `fertilizer` and `irrigation` with the
-same fields, units and checks as a [single treatment](experiment.md). Pass the YAML path or
+same fields, units and checks as a [single treatment](experiment.md), except that
+irrigation accepts dated events in list form only. `days_after_planting` (IDATE)
+and the `{efficiency, events}` dict (EFIR) are rejected per component; irrigation
+management belongs to the treatment. Pass the YAML path or
 an equivalent Python dict through `management=`:
 
 ```python

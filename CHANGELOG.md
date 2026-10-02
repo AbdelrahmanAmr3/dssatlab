@@ -2,6 +2,21 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.16.0] - Unreleased
+
+### Added
+- Experiment data `controls` fields for irrigation management (IRRIG), planting management (PLANT), automatic irrigation (IMDEP, ITHRL, ITHRU, IMETH, IRAMT, IREFF) and automatic planting windows, soil water and temperature limits (PFRST, PLAST, PH2OL, PH2OU, PH2OD, PSTMX, PSTMN). Omitted fields keep the copied FileX values ([ADR 0020](docs/adr/0020-automatic-management-as-controls-fields.md)).
+- Irrigation events with `days_after_planting` (IDATE) under IRRIG D, with ascending, unique day counts and weather coverage checks when the planting date is known.
+- Irrigation dict form `{efficiency: ..., events: [...]}` for EFIR; the existing list form still writes EFIR 1. EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
+- Checks against the effective IRRIG code: D takes day events, R/P/W take dated events, and A/F/N take no events. Changing IRRIG with an inherited irrigation level requires an explicit irrigation section.
+- Guide tables and tutorial Case 15 for automatic irrigation and the efficiency dict form.
+
+### Notes
+- The same automatic management fields work with a copied FileX or a FileX template; template defaults stay unchanged. Rotation components accept dated irrigation events in list form only.
+- Real-DSSAT proof covered IRRIG A, F, D (days after planting), R (dated) and N. P and W are written and checked but not proven on DSSAT.
+- On UFGA8201 treatment 1, IREFF 1 versus 0.5 gave IRCM 214 versus 330 mm. EFIR 0.75 matched a hand-edited FileX exactly (IRCM 110 mm, HWAM 2335 kg/ha).
+- Zero runtime dependencies are preserved.
+
 ## [0.15.0] - 2026-10-02
 
 ### Added

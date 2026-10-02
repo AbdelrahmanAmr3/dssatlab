@@ -19,6 +19,8 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.16.0 adds automatic irrigation and planting controls, irrigation in days after planting, and an irrigation efficiency dict with IRRIG/event checks.
+
 Version 0.15.0 adds checked DSSAT simulation options, eight initial-condition detail
 fields, and `initial_conditions: "off"` in experiment data. It also checks for a
 one-row treatment number colliding with a sequence number before a `Simulation` or
@@ -35,6 +37,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own soil data into a strictly checked simulation and run it
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Set DSSAT simulation options (including photosynthesis and CO2), initial-condition details, or initial conditions off through experiment data
+- [x] Set automatic irrigation and planting controls, day-based irrigation events, and irrigation efficiency through experiment data
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 - [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)

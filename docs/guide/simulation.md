@@ -101,6 +101,7 @@ treatments:
 ```
 
 - A treatment with no entry (like treatment 1, `"Control"`) remains the unchanged base.
+- Automatic irrigation and planting use the [controls fields](experiment.md#automatic-management); the template's IRRIG R and PLANT R defaults stay unchanged until overridden. Irrigation also accepts [day events and an efficiency dict](management.md#irrigation-timing-and-efficiency), checked against IRRIG.
 - `initial_conditions: "off"` points the treatment at IC 0 instead of adding a level; DSSAT supplies initial soil water and nitrogen. See [simulation options and initial-condition details](experiment.md).
 - Each entry receives its own new level; equal levels are not shared (ADR 0010).
 - When you create a single `Simulation(filex_template="filex.yaml", treatment=k, ...)`, `treatment` can be any integer from 1 to N (`treatment=1` by default). Out-of-range treatment numbers are rejected by `check()` with the valid range.
