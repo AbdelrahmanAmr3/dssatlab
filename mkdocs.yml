@@ -59,6 +59,7 @@ nav:
           - adr/0013-sequences-run-in-mode-q-through-a-batch-file.md
           - adr/0014-rotation-in-the-filex-template.md
           - adr/0015-experiment-data-per-rotation-component.md
+          - adr/0016-sweeps-run-as-generated-scenarios.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md
