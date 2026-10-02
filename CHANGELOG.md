@@ -5,7 +5,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ## [0.16.0] - Unreleased
 
 ### Added
-- Experiment data `controls` fields for irrigation management (IRRIG), planting management (PLANT), automatic irrigation (IMDEP, ITHRL, ITHRU, IMETH, IRAMT, IREFF) and automatic planting windows, soil water and temperature limits (PFRST, PLAST, PH2OL, PH2OU, PH2OD, PSTMX, PSTMN). Omitted fields keep the copied FileX values ([ADR 0020](docs/adr/0020-automatic-management-as-controls-fields.md)).
+- Experiment data `controls` fields for irrigation management (IRRIG), planting management (PLANT), automatic irrigation (IMDEP, ITHRL, ITHRU, IMETH, IRAMT, IREFF) and automatic planting windows, soil water and temperature limits (PFRST, PLAST, PH2OL, PH2OU, PH2OD, PSTMX, PSTMN). Omitted fields keep the copied FileX values ([ADR 0020](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0020-automatic-management-as-controls-fields.md)).
 - Irrigation events with `days_after_planting` (IDATE) under IRRIG D, with ascending, unique day counts and weather coverage checks when the planting date is known.
 - Irrigation dict form `{efficiency: ..., events: [...]}` for EFIR; the existing list form still writes EFIR 1. EFIR applies to the irrigation level's events; IREFF applies to automatic irrigation.
 - Checks against the effective IRRIG code: D takes day events, R/P/W take dated events, and A/F/N take no events. Changing IRRIG with an inherited irrigation level requires an explicit irrigation section.

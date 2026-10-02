@@ -23,20 +23,23 @@ def _effective_management(entry, text, treatment, field, column):
     return None
 
 
-def _management_problem(kind, code, where):
+def _management_problem(kind, code, where, *, date_only=False):
     if code == 'D' and kind == 'date':
-        message = ('uses a date but the irrigation management is "D" (days after planting). '
-                   'Use days_after_planting, or set controls irrigation_management to "R".')
+        message = 'uses a date but the irrigation management is "D" (days after planting). '
+        fix = 'Use days_after_planting, or set controls irrigation_management to "R".'
     elif code in ('R', 'P', 'W') and kind == 'days_after_planting':
-        message = (f'uses days after planting but the irrigation management is "{code}" (dates). '
-                   'Use date, or set controls irrigation_management to "D".')
+        message = f'uses days after planting but the irrigation management is "{code}" (dates). '
+        fix = 'Use date, or set controls irrigation_management to "D".'
     elif code in ('A', 'F', 'N'):
-        fix = 'D' if kind == 'days_after_planting' else 'R'
-        message = (f'has an event but the irrigation management is "{code}" (no events). '
-                   f'Remove the events (irrigation: []), or set controls irrigation_management to "{fix}".')
+        target = 'D' if kind == 'days_after_planting' else 'R'
+        message = f'has an event but the irrigation management is "{code}" (no events). '
+        fix = (f'Remove the events (irrigation: []), or set controls '
+               f'irrigation_management to "{target}".')
     else:
         return []
-    return [f'{where}: {message}']
+    if date_only:
+        fix = 'Remove the events (irrigation: []), or change the FileX component\'s IRRIG to "R".'
+    return [f'{where}: {message}{fix}']
 
 
 def _check_day_event(event, where, number, seen, previous, planting_date, weather_range):
@@ -129,7 +132,7 @@ def _check_irrigation_events(events, where, weather_range=None, *, code=None,
                 valid_timing = type(event[kind]) is int and event[kind] >= 0
                 has_day = has_day or valid_timing
             if valid_timing:
-                found.extend(_management_problem(kind, code, location))
+                found.extend(_management_problem(kind, code, location, date_only=date_only))
         problems.extend(found)
         report.extend(_report_lines(f'      event {number}', found))
     if len(kinds) > 1:
@@ -151,9 +154,16 @@ def _check_irrigation(entry, treatment, where, text, weather_range):
             try:
                 row = _section_row(text, 'TREATMENTS', 'N', treatment, ('MI', 'SM'))
                 _section_row(text, 'SIMULATION CONTROLS', 'N', int(row['SM']), ('MANAGEMENT', 'IRRIG'))
+            except (ValueError, TypeError):
+                return [], ['    irrigation: OK (omitted; keeps the FileX Level)']
+            try:
                 mi = int(row['MI'])
             except (ValueError, TypeError):
-                mi = 0
+                problems = [f'{where}, irrigation: controls irrigation_management is "{code}" '
+                            f'but irrigation is omitted and the treatment\'s FileX MI {row["MI"]!r} '
+                            'is not an integer level. Fix the FileX MI column. '
+                            'Supply the irrigation section with events matching the code, or [].']
+                return problems, _report_lines('    irrigation', problems)
             if mi != 0:
                 problems = [f'{where}, irrigation: controls irrigation_management is "{code}" '
                             f'but irrigation is omitted and the treatment inherits MI {mi}. '

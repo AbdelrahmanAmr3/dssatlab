@@ -173,7 +173,15 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
         elif section == 'planting':
             found = _check_planting(value, f'{where}, planting', weather_range=weather_range)
         elif section == 'irrigation':
-            found, _ = _check_irrigation_events(value, where, weather_range, date_only=True)
+            code = None
+            if text is not None:
+                try:
+                    code = _section_row(text, 'SIMULATION CONTROLS', 'N', int(row['SM']),
+                                        ('MANAGEMENT', 'IRRIG'))['IRRIG']
+                except (ValueError, TypeError, KeyError):
+                    pass  # Existing FileX checks report unavailable layouts.
+            found, _ = _check_irrigation_events(value, where, weather_range,
+                                                code=code, date_only=True)
         else:
             found, _ = _check_events(value, section, where, weather_range)
         events = [value] if section == 'planting' else value
