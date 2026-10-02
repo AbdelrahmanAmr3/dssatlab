@@ -12,6 +12,7 @@ from test_simulation_template import installed
 from test_simulation_run import fake_dssat, inputs
 from test_planting_run import seen
 from test_residues import EVENT, HEADER, FIELDS, sim
+from test_tillage_harvest import CASES, set_operation
 
 
 def test_l2_template_residue_level_written(data, rows, installed, tmp_path, capsys):
@@ -30,7 +31,8 @@ def test_l2_template_residue_level_written(data, rows, installed, tmp_path, caps
     assert (data, rows, edits) == original
 
 
-def test_experiment_template_documents_and_checks_residue_example(sim, tmp_path, capsys):
+@pytest.mark.parametrize("section", ["residues", "tillage", "harvest"])
+def test_experiment_template_documents_and_checks_residue_example(sim, tmp_path, capsys, section):
     pytest.importorskip("yaml")
     # Enough inline FileX columns for the template's other experiment sections.
     text = sim.filex.read_text(encoding="latin-1")
@@ -48,12 +50,22 @@ def test_experiment_template_documents_and_checks_residue_example(sim, tmp_path,
     template = path.read_text(encoding="utf-8")
     assert "residues" in template and all(column in template for _, column, _, _ in FIELDS)
     assert "RENAME" in template and "same date" in template and "-99" in template
-    template = template.replace("    # residues:", "    residues:").replace(
-        '    #   - {date: "1982-02-25", material: "RE001", amount: 1500}',
-        '      - {date: "1982-02-25", material: "RE001", amount: 1500}')
+    columns = {"residues": [row[1] for row in FIELDS] + ["RENAME"],
+               "tillage": ["TDATE", "TIMPL", "TDEP", "TNAME"],
+               "harvest": ["HDATE", "HSTG", "HCOM", "HSIZE", "HPC", "HBPC", "HNAME"]}
+    assert all(column in template for column in columns[section])
+    if section == "tillage":
+        assert 'TILL' in template and '"Y" applies tillage' in template
+    marker = section + ":"
+    template = template.replace(f"    # {marker}\n", f"    {marker}\n")
+    lines = template.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        if line == f"    {marker}\n":
+            lines[index + 1] = lines[index + 1].replace("    #   -", "      -", 1)
+    template = "".join(lines)
     path.write_text(template, encoding="utf-8")
     assert sim.check() == []
-    assert "residues: OK\n" in capsys.readouterr().out
+    assert f"{section}: OK\n" in capsys.readouterr().out
 
 
 def test_sweep_replaces_whole_residue_sections_in_each_copy(sim, seen, fake_dssat):
@@ -71,5 +83,52 @@ def test_sweep_replaces_whole_residue_sections_in_each_copy(sim, seen, fake_dssa
     assert b" 8 82056 RE001   500   -99   -99   -99   -99   -99   -99    -99" in seen[2]
     assert {row["scenario"] for row in result} == {"base", "none", "reported"}
     assert {row["residues"] for row in result} == {None, "none", "reported"}
+    assert len({row["run_dir"] for row in result}) == 3
+    assert (base, factors) == original and sim.filex.read_bytes() == source
+
+
+@pytest.mark.parametrize("section", CASES)
+def test_l2_template_operation_level_written(data, rows, installed, section, capsys):
+    case = CASES[section]
+    day = "2021-03-01"
+    if section == "harvest":
+        day = data["harvest_date"] = "2021-03-02"
+        rows[0].append(dict(rows[0][0], date=date(2021, 3, 2)))
+    event = dict(case["event"], date=day, **case["full"])
+    edits = {"treatments": {1: {section: [event]}}}
+    original = deepcopy((data, rows, edits))
+    simulation = Simulation(filex_template=data, weather=rows[0], soil=rows[1], management=edits)
+    assert simulation.check() == []
+    assert f"{section}: OK" in capsys.readouterr().out
+    simulation.run()
+    text = next(Path(installed.calls[-1][1]).glob("*.MZX")).read_text()
+    assert "*" + case["name"] + "\n" + case["header"] in text
+    # L2 already has a harvest level; tillage is inserted as its first level.
+    level = " 2 " if section == "harvest" else " 1 "
+    day_code = "21061" if section == "harvest" else "21060"
+    assert case["full_row"].replace(" 8 82057", level + day_code, 1) in text
+    treatment = next(line for line in text.splitlines() if "My treatment" in line and " 1  1 " in line)
+    assert treatment[case["offset"]:case["offset"]+3] == level.rstrip().rjust(3)
+    assert (data, rows, edits) == original
+
+
+@pytest.mark.parametrize("section", CASES)
+def test_sweep_replaces_whole_operation_sections(sim, seen, fake_dssat, section):
+    set_operation(sim, section)
+    case = CASES[section]
+    summary = Path(__file__).parent / "fixtures/output_files/summary/two_treatments/Summary.OUT"
+    fake_dssat.outputs["Summary.OUT"] = summary.read_bytes()
+    base = {"treatments": {2: {section: [dict(case["event"], **case["full"])]}}}
+    factors = {section: {"none": [], "reported": [dict(case["event"])]}}
+    original, source = deepcopy((base, factors)), sim.filex.read_bytes()
+    result = run_sweep(sim.filex, sim.weather, treatments=[2], management=base, factors=factors)
+    assert len(seen) == 3
+    assert case["full_row"].replace("82057", "82056").encode() in seen[0]
+    row = next(line for line in seen[1].splitlines() if b"none" in line)
+    assert row[case["offset"]:case["offset"]+3] == b"  0"
+    assert b" 8 82056" not in seen[1]
+    assert case["row"].encode() in seen[2]
+    assert {row["scenario"] for row in result} == {"base", "none", "reported"}
+    assert {row[section] for row in result} == {None, "none", "reported"}
     assert len({row["run_dir"] for row in result}) == 3
     assert (base, factors) == original and sim.filex.read_bytes() == source

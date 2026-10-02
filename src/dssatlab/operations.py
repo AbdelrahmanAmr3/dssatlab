@@ -21,6 +21,19 @@ _OPERATION_FIELDS = {
         "depth": ("RDEP", False, (0, None, False)),
         "method": ("RMET", False, "code"),
     },
+    "tillage": {
+        "date": ("TDATE", True, "date"),
+        "implement": ("TIMPL", True, "code"),
+        "depth": ("TDEP", True, (0, None, False)),
+    },
+    "harvest": {
+        "date": ("HDATE", True, "date"),
+        "stage": ("HSTG", False, "code"),
+        "component": ("HCOM", False, "text"),
+        "size": ("HSIZE", False, "text"),
+        "product_percent": ("HPC", False, (0, 100, False)),
+        "byproduct_percent": ("HBPC", False, (0, 100, False)),
+    },
 }
 
 
@@ -32,6 +45,9 @@ def _check_operation_field(value, rule):
     elif rule == "code":
         if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}[0-9]{3}", value):
             return "two ASCII letters followed by three digits for the DSSAT code"
+    elif rule == "text":
+        if not isinstance(value, str) or not re.fullmatch(r"[!-~]{1,5}", value):
+            return "1-5 printable ASCII characters without spaces"
     else:
         minimum, maximum, exclusive = rule
         if (_check_number(value, "")

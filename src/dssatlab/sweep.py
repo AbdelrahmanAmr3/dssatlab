@@ -10,7 +10,7 @@ from .management_file import _load_management
 from .scenarios import _select_treatments, combine_summaries, run_treatments
 
 
-_SECTIONS = ("planting", "irrigation", "fertilizer", "residues", "cultivar",
+_SECTIONS = ("planting", "irrigation", "fertilizer", "residues", "tillage", "harvest", "cultivar",
              "initial_conditions", "controls", "rotation")
 
 

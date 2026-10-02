@@ -166,14 +166,14 @@ def test_template_documents_options_and_loads_with_them(option_sim, tmp_path):
     write_experiment_template(path)
     text = path.read_text(encoding="utf-8")
     for field, (_, column, codes) in NEW_OPTIONS.items():
-        line = next(line for line in text.splitlines() if f"# {field}:" in line)
+        line = next(line for line in text.splitlines() if f"# {field}:" in line and "DSSAT" in line)
         assert f"DSSAT {column}" in line
         assert all((f'"{code}"' if isinstance(code, str) else str(code)) in line for code in codes)
     sim.management = path
     assert sim.check(verbose=False) == []
     # The documented examples must also pass when a user uncomments them all.
     for field in NEW_OPTIONS:
-        text = text.replace(f"# {field}:", f"{field}:")
+        text = text.replace(f"      # {field}:", f"      {field}:")
     path.write_text(text, encoding="utf-8")
     assert sim.check(verbose=False) == []
 

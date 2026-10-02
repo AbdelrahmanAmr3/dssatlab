@@ -79,16 +79,22 @@ treatments:
 
 
 _EXPERIMENT_SECTIONS_TEXT = """
-    # Omit a section to keep the FileX's own level.
-    # Residues: list of events; omit to keep MR, or [] for none for this treatment.
-    # Required date (RDATE): quoted ISO string, non-descending order; same date allowed.
-    # Required material (RCOD): two ASCII letters + three digits; amount (RAMT): kg/ha > 0.
+    # Field operations: lists; omit to keep MR/MT/MH, or [] for none for this treatment.
+    # Required date (RDATE/TDATE/HDATE): quoted ISO string in weather range, non-descending; same date allowed.
+    # Codes RCOD/RMET/TIMPL/HSTG: two ASCII letters + three digits; numbers finite, not booleans.
+    # Residues: required material (RCOD), amount (RAMT): kg/ha > 0.
     # Optional n (RESN), p (RESP), k (RESK), incorporation (RINP): % from 0 to 100.
-    # Optional depth (RDEP): cm >= 0; method (RMET): two ASCII letters + three digits.
-    # Numbers are finite, not booleans. Unknown keys are rejected.
-    # Omitted optional fields and RENAME write -99 in the new MR level.
+    # Optional depth (RDEP): cm >= 0; method (RMET). Unknown keys rejected.
+    # Omitted optional fields and RENAME/TNAME/HNAME write -99.
     # residues:
     #   - {date: "1982-02-25", material: "RE001", amount: 1500}
+    # Tillage: required implement (TIMPL), depth (TDEP): cm >= 0; controls tillage "Y" applies tillage (TILL).
+    # tillage:
+    #   - {date: "1982-02-25", implement: "TI005", depth: 20}
+    # Harvest: optional stage (HSTG), component (HCOM), size (HSIZE): 1-5 printable ASCII characters without spaces.
+    # Optional product_percent (HPC), byproduct_percent (HBPC): % from 0 to 100.
+    # harvest:
+    #   - {date: "1982-02-25", stage: "GS003", component: "C", size: "A", product_percent: 100}
     # Cultivar adds a new CULTIVARS level in the copy and repoints this treatment.
     cultivar:
       crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
@@ -182,15 +188,9 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
 
 
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
-    """Write commented YAML for management, residues, cultivar, initial conditions and controls.
-
-    Cultivar, initial conditions and controls are checked and applied to the FileX copy.
-    EFIR applies to the irrigation level's events; controls auto_irrigation_efficiency
-    (IREFF) applies to automatic irrigation.
-    Dates are quoted ISO calendar strings; units and codes are DSSAT's.
-    With filex, use its treatment numbers in file order, keeping example values.
-    Without filex, write one example treatment numbered 1. No PyYAML is needed.
-    Raise DSSATError if the destination exists or FileX treatments cannot be read.
+    """Write commented experiment YAML with DSSAT units, codes and quoted ISO dates.
+    With filex, use its treatment numbers; otherwise use 1. No PyYAML is needed.
+    Raise DSSATError for an existing destination or unreadable FileX treatments.
     """
     title = "# DSSATLab Management Template"
     intro = "# Management operations (planting, irrigation, fertilizer) by treatment number."
@@ -200,7 +200,7 @@ def write_experiment_template(path: str | Path, filex: str | Path | None = None)
     text = text.replace(
         intro,
         "# Experiment data by treatment number: planting, irrigation, fertilizer,\n"
-        "# residues, cultivar, initial_conditions and controls.", 1)
+        "# residues, tillage, harvest, cultivar, initial_conditions and controls.", 1)
     _write_template(path, text + _EXPERIMENT_SECTIONS_TEXT, "Experiment", filex)
 
 
