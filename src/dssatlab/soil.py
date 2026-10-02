@@ -150,6 +150,8 @@ def _code_text(value):
         return value
     if value is None or isinstance(value, str) and not value.strip():
         return "-99"
+    if isinstance(value, str) and not re.fullmatch(r"\s*([+-]?([\d.]+|inf|infinity)|nan)\s*", value, re.I):
+        return value  # Text such as "1E2" or "1_0" stays a code, not a number.
     try:
         number = float(value)
     except (TypeError, ValueError):

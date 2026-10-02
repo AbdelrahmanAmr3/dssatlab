@@ -76,6 +76,19 @@ def test_missing_codes_write_minus_99(simulation, rows, tmp_path, form, missing)
     assert lines[8][6:12] == "   -99"
 
 
+@pytest.mark.parametrize("form", ["rows", "csv", "dataframe"])
+@pytest.mark.parametrize("code", ["1E2", "2e1", "1_0"])
+def test_number_shaped_text_codes_stay_text(simulation, rows, tmp_path, form, code):
+    for row in rows:
+        row["slmh"] = code
+    simulation.soil = source_for(form, rows, tmp_path)
+    assert simulation.check() == []
+    parsed, problems = _parse_soil(simulation.soil)
+    assert problems == []
+    lines = write_soil_file(parsed, tmp_path / "SOIL.SOL").read_text("ascii").splitlines()
+    assert lines[8][6:12] == f"{code:>6}"
+
+
 @pytest.mark.parametrize("form", ["csv", "dataframe"])
 def test_scom_must_match_every_profile_row(simulation, rows, tmp_path, form):
     for row in rows:

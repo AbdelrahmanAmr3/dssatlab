@@ -89,7 +89,7 @@ left blank. The soil template includes the optional profile column `scom`.
 `slmh` (layer) and `smhb`, `smpx`, `smke`, `scom` (profile) are DSSAT text codes:
 use 1-5 ASCII letters, digits or `_ . + -`, without spaces. Blank or `-99` means
 missing; optional DataFrame `NaN` cells also count as missing. Numbers still work
-and are written as code text (for example `1.0` becomes `1`). `scom` must be the
+and are written as code text (for example `1.0` becomes `1`); text such as `1E2` stays as written. `scom` must be the
 same on every row of a profile, including missing values. Codes such as `IB0001`,
 `A B` or `2*BN` fail the checks with the row, column, value and code rule.
 
