@@ -83,3 +83,24 @@ def test_irrigation_code_change_rejects_noninteger_inherited_mi(tmp_path):
         'Management data treatment 1, irrigation', "MI 'X'", 'integer',
         'FileX MI column', 'Supply the irrigation section',
     ])
+
+
+@pytest.mark.parametrize('start,rejected', [('P', False), ('S', True)])
+def test_inherited_sdate_bounds_planting_window_only_when_start_is_s(tmp_path, start, rejected):
+    text = f"""*TREATMENTS
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 Window                     1  1  0  0  0  0  0  0  0  0  0  0  1
+*SIMULATION CONTROLS
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 1 GE              1     1     {start} 82100  2150 WINDOW
+@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS
+ 1 MA              A     R     R     N     M
+@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN
+ 1 PL          82056 82070    40   100    30    40    10
+"""
+    problems = _check_planting_window(
+        text, 1, {'auto_planting_first': '1982-02-25'}, 'Management data treatment 1',
+        None, (date(1982, 1, 1), date(1982, 12, 31)))
+    assert len(problems) == int(rejected)
+    if rejected:
+        assert "before simulation start date '1982-04-10'" in problems[0]

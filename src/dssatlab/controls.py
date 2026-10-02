@@ -107,8 +107,9 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
         return day
 
     if start_date is None:
-        general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "SDATE"))
-        start_date = inherited_date(general["SDATE"])
+        general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
+        if general["START"] == "S":  # DSSAT ignores SDATE for other START codes.
+            start_date = inherited_date(general["SDATE"])
     row = _section_row(text, "SIMULATION CONTROLS", "N", level, ("PLANTING", "PFRST", "PLAST"))
     first, last = (date.fromisoformat(controls[field]) if field in controls else inherited_date(row[column])
                    for field, column in zip(fields, ("PFRST", "PLAST")))
