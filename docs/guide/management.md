@@ -26,6 +26,9 @@ This writes a UTF-8 YAML template documenting every field, its units, code
 formats, and quoting rules. An existing destination raises `DSSATError`, preserving
 any existing file.
 
+When `filex=` is supplied, the template names each treatment once, using DSSAT's
+fixed-column treatment numbers ([ADR 0018](../adr/0018-treatment-rows-read-with-dssats-fixed-columns.md)).
+
 The template organizes operations under `treatments`, keyed by treatment number:
 
 ```yaml

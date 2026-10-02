@@ -43,9 +43,10 @@ Layer bottom depths (`slb`) must be positive and strictly increasing from top to
 | `slpf` | Profile | Yes | factor | Soil fertility factor, from 0 to 1 |
 | `slnf` | Profile | No | factor | Mineralization factor, from 0 to 1; defaults to -99 |
 | `slu1` | Profile | No | mm | Stage 1 soil evaporation limit; defaults to -99 |
-| `smhb` | Profile | No | - | Profile-level property; defaults to -99 |
-| `smpx` | Profile | No | - | Profile-level property; defaults to -99 |
-| `smke` | Profile | No | - | Profile-level property; defaults to -99 |
+| `smhb` | Profile | No | code | DSSAT method code (for example `IB001`); defaults to -99 |
+| `smpx` | Profile | No | code | DSSAT method code (for example `IB001`); defaults to -99 |
+| `scom` | Profile | No | code | Soil colour code (for example `BN`); defaults to -99 |
+| `smke` | Profile | No | code | DSSAT method code (for example `IB001`); defaults to -99 |
 | `slb` | Layer | Yes | cm | Layer bottom depth, positive and strictly increasing without duplicates |
 | `slll` | Layer | Yes | cm³/cm³ | Lower limit / wilting point, strictly between 0 and 1; must satisfy `slll < sdul < ssat` |
 | `sdul` | Layer | Yes | cm³/cm³ | Drained upper limit / field capacity, strictly between 0 and 1; must satisfy `slll < sdul < ssat` |
@@ -54,7 +55,7 @@ Layer bottom depths (`slb`) must be positive and strictly increasing from top to
 | `ssks` | Layer | No | cm/h | Saturated hydraulic conductivity, from 0 to 500; defaults to -99 |
 | `sbdm` | Layer | No | g/cm³ | Bulk density, from 0.5 to 2.5; defaults to -99 |
 | `sloc` | Layer | No | % | Organic carbon, from 0 to 100; defaults to -99 |
-| `slmh` | Layer | No | - | Master horizon code or property; defaults to -99 |
+| `slmh` | Layer | No | code | Master horizon code (for example `AP` or `BT`); defaults to -99 |
 | `slcl` | Layer | No | % | Clay content; defaults to -99 |
 | `slsi` | Layer | No | % | Silt content; defaults to -99 |
 | `slcf` | Layer | No | % | Coarse fraction; defaults to -99 |
@@ -64,12 +65,12 @@ Layer bottom depths (`slb`) must be positive and strictly increasing from top to
 | `scec` | Layer | No | cmol/kg | Cation exchange capacity; defaults to -99 |
 | `sadc` | Layer | No | - | Anion exchange capacity or property; defaults to -99 |
 
-Required columns (`soil_id`, `salb`, `slro`, `sldr`, `slpf`, `slb`, `slll`,
+Required numeric columns (`salb`, `slro`, `sldr`, `slpf`, `slb`, `slll`,
 `sdul`, `ssat`, `srgf`) must be supplied with non-empty, finite numbers. Real
 DSSAT stops with an error if any of these are missing or `-99`.
 
 Profile-level columns (`soil_id`, `salb`, `slro`, `sldr`, `slpf`, and optional
-`slnf`, `slu1`, `smhb`, `smpx`, `smke`) describe the overall profile and must have
+`slnf`, `slu1`, `smhb`, `smpx`, `smke`, `scom`) describe the overall profile and must have
 identical values on every row. `soil_id` must consist of 1 to 10 ASCII letters or
 digits; DSSAT silently truncates longer IDs.
 
@@ -83,8 +84,17 @@ dssatlab enforces strict inequalities because equal values leave no plant-availa
 water or no pore space.
 
 Optional columns default to `-99` (DSSAT's "not given" sentinel) when omitted or
-left blank. When supplied, they must be finite numbers and satisfy their valid
-ranges; range checks are skipped for `-99`.
+left blank. The soil template includes the optional profile column `scom`.
+
+`slmh` (layer) and `smhb`, `smpx`, `smke`, `scom` (profile) are DSSAT text codes:
+use 1-5 ASCII letters, digits or `_ . + -`, without spaces. Blank or `-99` means
+missing; optional DataFrame `NaN` cells also count as missing. Numbers still work
+and are written as code text (for example `1.0` becomes `1`). `scom` must be the
+same on every row of a profile, including missing values. Codes such as `IB0001`,
+`A B` or `2*BN` fail the checks with the row, column, value and code rule.
+
+Other optional columns must be finite numbers and satisfy their valid ranges
+when supplied; range checks are skipped for `-99`.
 
 ## Create a Simulation and inspect the checks
 

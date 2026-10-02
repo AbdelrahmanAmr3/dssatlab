@@ -41,7 +41,17 @@ results = dl.run_treatments("UFGA8201.MZX", weather="weather.csv")
 ```
 
 By default (`treatments=None`), `run_treatments()` reads the `*TREATMENTS` section
-of the FileX and executes every treatment found.
+of the FileX and executes every distinct treatment once in file order.
+
+Treatment numbers are read as DSSAT reads the TREATMENTS N column: columns 1-3,
+or columns 1-2 in a sequence FileX (R uses column 4, or columns 3-4 respectively).
+For example, a sensitivity-tool row `  11 0 0` names treatment 1, matching Summary
+`TRNO`, rather than treatment 11. A FileX uses the sequence columns when some
+treatment number has two or more rows when read with those columns; the filename
+extension does not decide this. See [ADR 0018](../adr/0018-treatment-rows-read-with-dssats-fixed-columns.md).
+
+The experiment, management and scenario templates name each treatment once, even
+when its sequence has several rotation component rows.
 
 To run a specific subset of treatments, pass a list of treatment integers:
 
