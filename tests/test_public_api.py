@@ -36,7 +36,7 @@ def test_daily_output_public_api_is_exported():
 
 
 def test_scenario_public_api_is_exported():
-    for name in ("run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template"):
+    for name in ("run_sweep", "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template"):
         assert name in dssatlab.__all__
         assert callable(getattr(dssatlab, name))
 
