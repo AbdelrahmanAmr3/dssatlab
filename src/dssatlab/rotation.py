@@ -109,22 +109,29 @@ def _check_rotation_dates(components, valid_components, where):
             last_end = last.get("end_date") if last.get("crop") == "fallow" else last.get("harvest_date")
             if last_end:
                 end_date = date.fromisoformat(last_end)
-                first_doy, last_doy = start_date.timetuple().tm_yday, end_date.timetuple().tm_yday
-                if first_doy == 1:
-                    problems.append(
-                        f"{where}, rotation: the first planting is on day 1 of the year "
-                        f"({start_date}), so the last component cannot end before it in the year; "
-                        "DSSAT would start the next cycle a year late. Plant the first crop after January 1."
-                    )
-                elif last_doy >= first_doy:
-                    example = date(end_date.year, 1, 1) + timedelta(days=first_doy - 2)
-                    problems.append(
-                        f"{where}, rotation: the last component ends on {last_end} "
-                        f"(day {last_doy} of the year), not before the first planting's day of the year "
-                        f"(day {first_doy}, {first['planting']['date']}); DSSAT would start the next cycle "
-                        f"a year late. End the last component before day {first_doy}, "
-                        f"for example on {example.isoformat()}."
-                    )
+                problems.extend(_check_cycle_closure(start_date, end_date, f"{where}, rotation"))
+    return problems
+
+
+def _check_cycle_closure(start_date, end_date, where):
+    """Check DSSAT's day-of-year boundary between successive rotation cycles."""
+    problems = []
+    first_doy, last_doy = start_date.timetuple().tm_yday, end_date.timetuple().tm_yday
+    if first_doy == 1:
+        problems.append(
+            f"{where}: the first planting is on day 1 of the year "
+            f"({start_date}), so the last component cannot end before it in the year; "
+            "DSSAT would start the next cycle a year late. Plant the first crop after January 1."
+        )
+    elif last_doy >= first_doy:
+        example = date(end_date.year, 1, 1) + timedelta(days=first_doy - 2)
+        problems.append(
+            f"{where}: the last component ends on {end_date} "
+            f"(day {last_doy} of the year), not before the first planting's day of the year "
+            f"(day {first_doy}, {start_date}); DSSAT would start the next cycle "
+            f"a year late. End the last component before day {first_doy}, "
+            f"for example on {example.isoformat()}."
+        )
     return problems
 
 

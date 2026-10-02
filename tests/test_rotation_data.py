@@ -184,7 +184,10 @@ def test_maturity_is_not_guessed(sim):
     assert sim.check(False) == []
 
 
-def test_all_known_dates_need_weather(sim):
+@pytest.mark.parametrize('omit_rotation', [False, True])
+def test_all_known_dates_need_weather(sim, omit_rotation):
+    if omit_rotation:
+        sim.management['treatments'][1].pop('rotation')
     sim.weather = weather('1978-03-15', '1978-12-31')
     assert any('rotation component 4' in p and 'outside weather range' in p
                for p in sim.check(False))
@@ -222,7 +225,10 @@ def test_lower_bound_is_exclusive(sim, day):
     assert (sim.check(False) == []) == (day == '1978-11-15')
 
 
-def test_first_inherited_planting_before_start(sim):
+@pytest.mark.parametrize('omit_rotation', [False, True])
+def test_first_inherited_planting_before_start(sim, omit_rotation):
+    if omit_rotation:
+        sim.management['treatments'][1].pop('rotation')
     sim.management['treatments'][1]['controls'] = dict(start_date='1978-03-16', years=1)
     assert any('rotation component 1' in p and 'before simulation start date' in p
                for p in sim.check(False))
@@ -248,3 +254,42 @@ def test_non_sequence_copied(tmp_path):
 def test_render_checks_column_fit(sim, section, value):
     edits(sim, {3: {section: value}})
     assert any('rotation component 3' in p and section in p for p in sim.check(False))
+
+
+@pytest.mark.parametrize('day,invalid', [
+    ('1978-01-01', True), ('1978-03-14', True), ('1978-03-15', False),
+])
+def test_override_cycle_closure(rotation, rows, installed, day, invalid):
+    planting = dict(rotation['rotation'][0]['planting'], date=day)
+    sim = Simulation(filex_template=rotation, soil=rows[1],
+                     weather=weather('1978-01-01', '1981-03-15'),
+                     management={'treatments': {1: {
+                         'controls': {'start_date': '1978-01-01'},
+                         'rotation': {1: {'planting': planting}},
+                     }}})
+    problems = sim.check(False)
+    closure = [p for p in problems if 'next cycle' in p]
+    assert bool(closure) == invalid
+    assert all('Management data treatment 1, rotation component 1, planting' in p
+               for p in closure)
+
+
+@pytest.mark.parametrize('component', [1, '1', '01', 3])
+@pytest.mark.parametrize('irrigation', [None, [], [
+    dict(date='1978-06-02', amount=25, method='IR001'),
+]])
+def test_component_irrigation_replaces_inherited_guard(sim, component, irrigation):
+    if sim.filex is None:
+        pytest.skip('Inherited irrigation belongs to a copied FileX')
+    entry = sim.management['treatments'][1]
+    entry['controls'] = dict(start_date='1978-06-02', years=1)
+    entry['rotation'] = {1: {'planting': dict(date='1978-06-02', method='S',
+        distribution='R', population=7, row_spacing=75, depth=5)}}
+    if irrigation is not None:
+        entry['rotation'].setdefault(component, {})['irrigation'] = irrigation
+        if isinstance(component, str):
+            entry['rotation'][component].update(entry['rotation'].pop(1))
+    problems = sim.check(False)
+    assert any('IPIRR' in p for p in problems) == (irrigation is None or component == 3)
+    if irrigation is not None and component != 3:
+        assert problems == []

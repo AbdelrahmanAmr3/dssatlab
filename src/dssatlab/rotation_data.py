@@ -194,7 +194,7 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
 def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
                          template=None, data_dir=None):
     """Return ordinary sections, component problems and report; never write files."""
-    if not isinstance(entry, dict) or 'rotation' not in entry:
+    if not isinstance(entry, dict):
         return entry, [], []
     ordinary = {key: value for key, value in entry.items() if key != 'rotation'}
     where = f'Management data treatment {treatment}'
@@ -204,13 +204,22 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
                            _CROPS.get(str(c.get('crop')), ('?',))[0])
                       for i, c in enumerate(template, 1)]
     if len(components) < 2:
+        if 'rotation' not in entry:
+            return entry, [], []
         problems = [f'{where}: rotation applies only to a sequence (a treatment with several '
                     'rotation components). Remove it, or move the sections up to the treatment.']
         return ordinary, problems, _report_lines('    rotation', problems)
     if any(not row['R'].isascii() or not row['R'].isdigit() for row in components):
         return ordinary, [], []  # Sequence checks already report invalid R numbers.
-    edits, problems = _rotation_keys(entry['rotation'], components, where)
+    edits, problems = _rotation_keys(entry.get('rotation', {}), components, where)
     known, notes = _known_dates(components, template, text, start, edits, where)
+    if template is not None and 1 in edits and isinstance(edits[1], dict):
+        planting = edits[1].get('planting')
+        if (isinstance(planting, dict) and _calendar_date(planting.get('date')) is not None
+                and known[-1][2] is not None):
+            from .rotation import _check_cycle_closure
+            problems.extend(_check_cycle_closure(
+                known[0][1], known[-1][2], f'{where}, rotation component 1, planting'))
     report = _report_lines('    rotation', problems) if problems else []
     for index, row in enumerate(components):
         number = int(row['R'])
@@ -239,31 +248,13 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
 
 def _write_rotation_data(filex, treatment, experiment_data):
     """Apply checked rotation component edits to the FileX copy."""
-    if not isinstance(experiment_data, dict):
+    if experiment_data is None:
         return
-    treatments = experiment_data.get('treatments')
-    if not isinstance(treatments, dict):
-        return
-    for key, entry in treatments.items():
-        try:
-            if int(key) != int(treatment):
-                continue
-        except (TypeError, ValueError, OverflowError):
-            continue
-        if not isinstance(entry, dict) or not isinstance(entry.get('rotation'), dict):
+    for key, entry in experiment_data['treatments'].items():
+        if int(key) == int(treatment) and entry.get('rotation'):
+            rotation = {int(r_key): value for r_key, value in entry['rotation'].items()}
+            path = Path(filex)
+            text = path.read_bytes().decode('latin-1')
+            text = _rotation_text(text, int(treatment), dict(sorted(rotation.items())))
+            path.write_bytes(text.encode('latin-1'))
             return
-        dedup = {}
-        for r_key, r_entry in entry['rotation'].items():
-            try:
-                r_num = int(r_key)
-            except (TypeError, ValueError, OverflowError):
-                continue
-            if r_num not in dedup and isinstance(r_entry, dict):
-                dedup[r_num] = r_entry
-        if not any(any(s in r for s in _SECTIONS) for r in dedup.values()):
-            return
-        path = Path(filex)
-        text = path.read_bytes().decode('latin-1')
-        text = _rotation_text(text, int(treatment), dict(sorted(dedup.items())))
-        path.write_bytes(text.encode('latin-1'))
-        return

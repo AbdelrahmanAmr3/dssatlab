@@ -8,6 +8,7 @@ from dssatlab import Simulation, run_treatments
 from dssatlab.filex import _section_row
 from test_filex_template import data, rows
 from test_rotation_template import rotation
+from test_rotation_data import sim, edits
 from test_season_coverage import weather
 from test_simulation_run import fake_dssat
 from test_simulation_template import installed
@@ -164,3 +165,33 @@ def test_run_treatments_and_scenarios_sequence(installed, sequence_copy):
         rows = written.split("*TREATMENTS")[1].split("*CULTIVARS")[0].splitlines()[2:6]
         assert rows[2][52:55].strip() == "3"
         assert name == "base" or name not in written
+
+
+@pytest.mark.parametrize('rotation_edits', [None, {}, {'3': {'fertilizer': []}}, {
+    '3': {'fertilizer': [fertilizer('1978-11-15')]},
+    1: {'fertilizer': [fertilizer('1978-03-15')]},
+}])
+def test_run_consumes_checked_rotation(sim, installed, rotation_edits):
+    from dssatlab.filex import _section_row
+
+    if rotation_edits is None:
+        sim.management['treatments'][1].pop('rotation')
+    else:
+        edits(sim, rotation_edits)
+    sim.management['treatments'][1]['controls'] = {'years': 1}
+    sim.management['treatments'] = {'1': sim.management['treatments'][1]}
+    result = sim.run()
+    written = next(result.run_dir.parent.glob('*.SQX')).read_text(encoding='latin-1')
+    components = written.split('*TREATMENTS')[1].split('*CULTIVARS')[0].splitlines()[2:6]
+    levels = [int(row[52:55]) for row in components]
+    if rotation_edits:
+        for key, entry in rotation_edits.items():
+            level = levels[int(key) - 1]
+            if not entry['fertilizer']:
+                assert level == 0
+            else:
+                row = _section_row(written, 'FERTILIZERS (INORGANIC)', 'F', level, ('FDATE',))
+                assert row['FDATE'] == ('78074' if int(key) == 1 else '78319')
+    else:
+        assert levels == (
+            [0, 0, 0, 0] if sim.filex is None else [1, 0, 1, 0])

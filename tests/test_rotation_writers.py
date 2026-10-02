@@ -94,3 +94,14 @@ def test_empty_events_repoint_only_component_to_zero(original, section, column):
                   if row.startswith(b" 1 3 "))
     expected = original.replace(target, target[:column] + b"  0" + target[column + 3:])
     assert _event_text(text, 1, [], section, rotation=3).encode("latin-1") == expected
+
+
+@pytest.mark.parametrize("writer,data,section,column,level,row_count", WRITERS)
+def test_missing_target_column_names_column(
+        original, writer, data, section, column, level, row_count):
+    text = original.decode("latin-1")
+    header = next(line for line in text.splitlines() if line.startswith('@N R'))
+    missing = header[column:column + 3].strip()
+    text = text.replace(header, header[:column] + ' XX' + header[column + 3:], 1)
+    with pytest.raises(ValueError, match=rf"TREATMENTS.*columns.*{missing}.*Supply"):
+        writer(text, 1, data, rotation=3)
