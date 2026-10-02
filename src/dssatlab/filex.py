@@ -7,7 +7,11 @@ from .weather import _dssat_date
 
 
 def _treatment_rows(text):
-    """Read N/R once per text; valid repeated component rows select mode Q's layout."""
+    """Read N/R once per text; valid repeated component rows select mode Q's layout.
+
+    In a sequence FileX only the rows of a repeated N use the sequence columns: a one-row
+    treatment runs in a normal mode, where DSSAT reads it with the normal columns.
+    """
     rows, active, header = [], False, False
     for line in text.splitlines():
         if line.startswith("*"):
@@ -23,9 +27,10 @@ def _treatment_rows(text):
     # Ordinary treatments 100 and 101 share N=10 under sequence columns.
     sequence = len(numbers) == len(rows) and all(
         re.fullmatch(r" [1-9]|[1-9][0-9]", line[2:4]) for line in rows)
-    width = 2 if sequence and len(numbers) != len(set(numbers)) else 3
+    repeated = {n for n in numbers if numbers.count(n) > 1} if sequence else set()
     result = {}
     for line in rows:
+        width = 2 if sequence and int(line[:2]) in repeated else 3
         n = line[:width].strip()
         result[line] = (n if n.isascii() and n.isdigit() else "", line[width:4].strip())
     return result

@@ -24,6 +24,8 @@ as a blank treatment or as treatment 11; the stock `MSKB8902.SQX` writes compone
   (` 1`..` 9` or `10`..`99`, never blank, 0 or a leading zero), and some N has two
   or more rows; otherwise with the normal columns (`I3,I1`). Ordinary treatments
   100 and 101 share sequence-column N 10, so repetition alone cannot select a sequence.
+  Even in a sequence FileX, a treatment with one row runs in a normal mode, so its row keeps
+  the normal columns (` 210` is treatment 21, as DSSAT reads it there).
 - Every reader of a treatment row uses this one rule, so check(), run(), the scenario runner and the
   templates always agree with each other and with DSSAT's Summary TRNO.
 
