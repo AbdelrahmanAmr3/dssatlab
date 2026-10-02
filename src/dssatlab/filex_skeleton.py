@@ -71,8 +71,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         return _check_rotation_simulation(sim, data, data_dir, template_problems,
                                           experiment_data, load_problems)
     fields = _template_treatment_fields(data) if isinstance(data, dict) else [1]
-    # Malformed field lists are reported by the template checks, never indexed,
-    # and the field keys are then not compared with them (count None).
+    # Template checks report malformed field lists; skip comparing their keys.
     count = max(fields) if not any("treatment_fields" in p for p in template_problems) else None
     if (not isinstance(fields, list) or not fields
             or any(type(k) is not int or not 1 <= k <= 99 for k in fields)):
@@ -102,9 +101,9 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         if not _check_date(planting_date, "planting date"):
             start = date.fromisoformat(planting_date)
     text, cultivar_path = None, None
-    if isinstance(data, dict) and isinstance(data.get("crop"), str) and data["crop"] in _CROPS:
-        if data_dir is not None:
-            cultivar_path = data_dir / "Genotype" / f"{_CROPS[data['crop']][2]}.CUL"
+    crop = data.get("crop") if isinstance(data, dict) else None
+    if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
+        cultivar_path = data_dir / "Genotype" / f"{_CROPS[crop][2]}.CUL"
     if not (weather_problems or soil_problems or template_problems):
         _, text = _render_filex(data, weather_fields, soil_fields)
     if cultivar_path is not None:
@@ -120,13 +119,13 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                                  f"data ({min(days)} to {max(days)}). Supply weather for that date.")
     if isinstance(data, dict) and "harvest_date" in data:
         harvest = data["harvest_date"]
-        if not _check_date(harvest, "harvest_date") and days and date.fromisoformat(harvest) not in days:
+        if (not _check_date(harvest, "harvest_date") and days
+                and date.fromisoformat(harvest) not in days):
             template_problems.append(f"FileX template, harvest_date: {harvest} is not covered by "
                                      f"weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for that date.")
     problems = weather_problems + soil_problems + template_problems
-    report = (weather_report + soil_report
-              + _report_lines("FileX template", template_problems))
+    report = weather_report + soil_report + _report_lines("FileX template", template_problems)
     if sim.management is not None:
         if load_problems:
             problems.extend(load_problems)
@@ -178,9 +177,10 @@ def _write_template_simulation(sim, experiment_data):
     for path in _template_genotype_files(data, data_dir):
         shutil.copy2(path, folder / path.name)
     if rotation:
-        # Import only at dispatch: rotation uses the shared skeleton helpers.
         from .rotation import _write_rotation_controls
+        from .rotation_data import _write_rotation_data
         _write_rotation_controls(filex, experiment_data, start)
+        _write_rotation_data(filex, sim.treatment, experiment_data)
         return filex
     if isinstance(experiment_data, dict) and isinstance(experiment_data.get("treatments"), dict):
         for key in sorted(experiment_data["treatments"], key=int):

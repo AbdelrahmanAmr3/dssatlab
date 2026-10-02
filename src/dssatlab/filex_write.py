@@ -64,12 +64,7 @@ def _newline(lines):
 
 
 def _insert_section(lines, section, body):
-    """Insert missing management before harvest or SIMULATION CONTROLS.
-
-    Return new lines, leaving every existing line unchanged. Body contains
-    header/row strings without line endings; future writers can pass multiple
-    header blocks (for example irrigation controls and events).
-    """
+    """Insert header/row strings before harvest or controls, preserving existing lines."""
     bounds = _section_bounds(lines, "SIMULATION CONTROLS")
     if bounds is None:
         raise ValueError("missing SIMULATION CONTROLS section. Supply that section "
@@ -105,14 +100,15 @@ def _planting_row(columns, level, planting):
                    for column, (start, end) in columns.items())
 
 
-def _planting_text(text, treatment, planting):
+def _planting_text(text, treatment, planting, *, rotation=None):
     """Check and render one planting edit in memory, preserving untouched bytes.
 
     Called by management checks for each valid planting entry, then by run()
     for the selected entry only. Invalid layouts/field overflow raise ValueError
     before Simulation creates a folder. Input planting has already been checked.
     """
-    _section_row(text, "TREATMENTS", "N", treatment, ("MP",))
+    if rotation is None:
+        _section_row(text, "TREATMENTS", "N", treatment, ("MP",))
     lines = text.splitlines(keepends=True)
     bounds = _section_bounds(lines, "PLANTING DETAILS")
     highest, insert_at = 0, None
@@ -142,7 +138,7 @@ def _planting_text(text, treatment, planting):
     level = highest + 1
     row = _planting_row(columns, level, planting)
 
-    _repoint(lines, treatment, "MP", level)
+    _repoint(lines, treatment, "MP", level, rotation=rotation)
     if bounds is None:
         lines = _insert_section(lines, "PLANTING DETAILS", [_PLANTING_HEADER, row])
     else:
@@ -150,29 +146,41 @@ def _planting_text(text, treatment, planting):
     return "".join(lines)
 
 
-def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N"):
-    _section_row("".join(lines), section, key, treatment, (column,))
-    start, end = _section_bounds(lines, section)
+def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, rotation=None):
+    """Repoint the first matching row, optionally selecting its R as well as N."""
+    if rotation is None:
+        _section_row("".join(lines), section, key, treatment, (column,))
+    start, end = _section_bounds(lines, section) or (0, 0)
     columns = {}
     for index in range(start + 1, end):
         line = lines[index]
         if line.startswith("@"):
             columns = _columns(line)
-        elif key in columns and column in columns:
+        elif key in columns and (rotation is not None or column in columns):
             left, right = columns[key]
             try:
                 number = int(line[left:right])
-            except ValueError:
+                if rotation is not None:
+                    left, right = columns["R"]
+                    if int(line[left:right]) != rotation:
+                        continue
+            except (ValueError, KeyError):
                 continue
             if number == treatment:
+                if column not in columns:
+                    raise ValueError(f"{section} header is missing columns {column}. "
+                                     "Supply the needed columns together.")
                 left, right = columns[column]
                 if line[left:right].strip() == str(level):
-                    break
+                    return
                 cell = _cell(level, right - left, section, column)
                 if column == "WSTA":  # DSSAT's sequence mode reads WSTA left-justified (A8).
                     cell = " " + cell.strip().ljust(right - left - 1)
                 lines[index] = line[:left] + cell + line[right:]
-                break
+                return
+    if rotation is not None:
+        raise ValueError(f"{section}: treatment {treatment}, rotation component R {rotation} "
+                         "has no matching row. Choose an existing (N, R) pair in the FileX.")
 
 
 def _append_rows(lines, index, rows):
@@ -220,16 +228,17 @@ def _event_row(columns, values, section):
                    for column, (start, end) in columns.items())
 
 
-def _event_text(text, treatment, events, section="irrigation"):
+def _event_text(text, treatment, events, section="irrigation", *, rotation=None):
     """Render checked events in memory, also used by pre-write checks."""
     name, column, headers = "IRRIGATION AND WATER MANAGEMENT", "MI", _IRRIGATION_HEADERS
     if section == "fertilizer":
         name, column, headers = "FERTILIZERS (INORGANIC)", "MF", (_FERTILIZER_HEADER,)
-    _section_row(text, "TREATMENTS", "N", treatment, (column,))
+    if rotation is None:
+        _section_row(text, "TREATMENTS", "N", treatment, (column,))
     lines = text.splitlines(keepends=True)
     blocks, highest = _event_blocks(lines, name, headers)
     level = highest + 1 if events else 0
-    _repoint(lines, treatment, column, level)
+    _repoint(lines, treatment, column, level, rotation=rotation)
     if not events:
         return "".join(lines)
     rows = [[]]
@@ -254,25 +263,6 @@ def _event_text(text, treatment, events, section="irrigation"):
         _append_rows(lines, max(block[1] for block in blocks), body)
     else:
         _append_rows(lines, blocks[0][1], rows[0])
-    return "".join(lines)
-
-
-def _cultivar_text(text, treatment, cultivar):
-    """Add a CULTIVARS level and repoint CU, using the management edit helpers."""
-    _section_row(text, "TREATMENTS", "N", treatment, ("CU",))
-    lines = text.splitlines(keepends=True)
-    header = "@C CR INGENO CNAME"
-    blocks, highest = _event_blocks(lines, "CULTIVARS", (header,))
-    columns, index, _ = blocks[0]
-    level = highest + 1
-    # CNAME is descriptive; -99 avoids retaining the previous cultivar's name.
-    row = _event_row(columns, {"C": level, "CR": cultivar["crop"],
-                               "INGENO": cultivar["code"], "CNAME": -99}, "CULTIVARS")
-    _repoint(lines, treatment, "CU", level)
-    if index is None:
-        lines = _insert_section(lines, "CULTIVARS", [header, row])
-    else:
-        _append_rows(lines, index, [row])
     return "".join(lines)
 
 
@@ -306,6 +296,7 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
         if int(key) == int(treatment) and entry:
             text = path.read_bytes().decode("latin-1")
             if "cultivar" in entry:
+                from .cultivar import _cultivar_text
                 text = _cultivar_text(text, int(treatment), entry["cultivar"])
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])

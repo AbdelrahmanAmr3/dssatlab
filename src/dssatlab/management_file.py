@@ -51,6 +51,21 @@ treatments:
         # Optional fertilizer fields:
         p: 20.0                   # Elemental phosphorus applied, kg/ha (must be >= 0)
         k: 10.0                   # Elemental potassium applied, kg/ha (must be >= 0)
+
+    # For a sequence, replace the sections above with this rotation example.
+    # R1 maize planted 1978-03-15; R2 fallow ends 1978-11-14;
+    # R3 wheat planted 1978-11-15; R4 fallow ends 1979-03-14.
+    # Events after maturity cannot be checked; leave a margin before the crop ends.
+    # rotation:
+    #   1:
+    #     fertilizer:
+    #       - {date: "1978-03-15", material: FE005, application: AP001, depth: 5, n: 60}
+    #     irrigation:
+    #       - {date: "1978-05-01", amount: 25, method: IR001}
+    #   3:
+    #     cultivar: {crop: WH, code: IB1500}
+    #     fertilizer:
+    #       - {date: "1978-11-15", material: FE005, application: AP001, depth: 5, n: 40}
 """
 
 

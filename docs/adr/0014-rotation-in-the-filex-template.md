@@ -29,7 +29,7 @@ wheat, fallow):
 - The first component's NYERS is the rotation's cycle in years, so a bare template runs one whole
   cycle; controls `years` in experiment data overrides it.
 - Experiment data for a rotation keeps v0.13's limit (controls years and start_date) until a later
-  release adds experiment data per rotation component.
+  release adds experiment data per rotation component. (Superseded by 0015 in v0.13.2.)
 
 ## Alternatives considered
 

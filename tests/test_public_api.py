@@ -14,7 +14,7 @@ def test_public_api_is_importable():
     assert "run" in dssatlab.__all__
     assert "summarize_seasons" in dssatlab.__all__
     assert "DSSATRunError" in dssatlab.__all__
-    assert dssatlab.__version__ == "0.13.1"
+    assert dssatlab.__version__ == "0.13.2"
 
 
 def test_summary_public_api_is_exported():

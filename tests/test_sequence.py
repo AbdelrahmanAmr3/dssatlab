@@ -188,10 +188,11 @@ def test_sequence_runner_errors(sequence, fake_dssat, failure):
     {"controls": {"water": "N"}}, {"irrigation": [], "fertilizer": []},
 ])
 def test_sequence_rejects_component_experiment_data(sequence, fake_dssat, entry, capsys):
+    sequence.weather = weather("1978-04-20", "1980-04-28")
     sequence.management = {"treatments": {"01": entry}}
     original = deepcopy(sequence.management)
     expected = ("Treatment 1 is a sequence of 6 rotation components; experiment data for a "
-                "sequence takes only controls years and start_date. Edit the components "
+                "sequence takes only controls years, start_date and rotation. Edit the components "
                 "in the FileX for other changes.")
     assert sequence.check(True) == [expected]
     assert "FileX: REJECTED" in capsys.readouterr().out
@@ -209,7 +210,7 @@ def test_sequence_rejects_component_experiment_data(sequence, fake_dssat, entry,
     {"years": 2, "start_date": "1978-04-21"},
 ])
 def test_sequence_controls_copy_only_first_component(sequence, fake_dssat, monkeypatch, controls):
-    sequence.weather = weather("1978-04-20", "1980-04-21", station="TEST")
+    sequence.weather = weather("1978-04-20", "1980-04-28", station="TEST")
     sequence.management = {"treatments": {1: {"controls": controls}}}
     original = sequence.filex.read_bytes()
     seen = {}
@@ -271,13 +272,17 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
                  f"after the weather data ends ({end}). Supply weather through {last}, "
                  "or fewer years."] if short else [])
     before = set(sequence.filex.parent.iterdir())
-    assert sequence.check(True) == expected
+    problems = sequence.check(True)
+    inherited = [p for p in problems if 'outside weather range' in p]
+    expected_count = (5 if start == '1980-02-29' else 2) if override and years == 1 else 0
+    assert len(inherited) == expected_count
+    assert [p for p in problems if p not in inherited] == expected
     report = capsys.readouterr().out
     if short:
         assert "FileX: REJECTED" in report and expected[0] in report
         with pytest.raises(DSSATCheckError) as error:
             sequence.run()
-        assert error.value.problems == expected
+        assert error.value.problems == expected + inherited
     assert set(sequence.filex.parent.iterdir()) == before
     assert fake_dssat.calls == []
 
@@ -295,7 +300,10 @@ def test_sequence_start_still_needs_weather(sequence, override):
     if override:
         sequence.management = {"treatments": {1: {"controls": {"start_date": "1978-04-20"}}}}
     expected = ("Controls start_date '1978-04-20'" if override else "FileX start year 78 day 110")
-    assert sequence.check(False) == [
+    problems = sequence.check(False)
+    inherited = [p for p in problems if 'outside weather range' in p]
+    assert len(inherited) == (2 if override else 0)
+    assert [p for p in problems if p not in inherited] == [
         f"{expected} is not covered by weather data (1978-04-21 to 1979-04-19). "
         "Supply weather for the simulation's start date."]
 

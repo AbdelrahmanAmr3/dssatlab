@@ -10,13 +10,14 @@ from .filex_write import _columns
 from .runner import _run_command
 
 
-def _rotation_components(source, treatment):
+def _rotation_components(source, treatment, *, text=None):
     """Read matching TREATMENTS rows in file order; unreadable inputs give []."""
     if isinstance(treatment, bool) or not isinstance(treatment, (int, str)):
         return []
     try:
         treatment = int(treatment)
-        text = Path(source).read_text(encoding="latin-1")
+        if text is None:
+            text = Path(source).read_text(encoding="latin-1")
     except (OSError, ValueError, TypeError):
         return []
     components, columns, in_section = [], {}, False
@@ -33,7 +34,7 @@ def _rotation_components(source, treatment):
                     continue
             except ValueError:
                 continue
-            component = {key: row.get(key, "?") for key in ("R", "FL", "SM", "CU")}
+            component = {key: row.get(key, "?") for key in ("R", "FL", "SM", "CU", "MP", "MH")}
             try:
                 cultivar = _section_row(text, "CULTIVARS", "C", int(component["CU"]), ("CR",))
                 component["CR"] = cultivar["CR"] or "?"
@@ -127,12 +128,12 @@ def _sequence_experiment_data(source, treatment, components):
         if not isinstance(entry, dict):
             continue  # Ordinary experiment checks report malformed entries.
         controls = entry.get("controls", {})
-        if entry.keys() - {"controls"} or (
+        if entry.keys() - {"controls", "rotation"} or (
                 isinstance(controls, dict) and controls.keys() - {"years", "start_date"}):
             if not problems:
                 problems.append(f"Treatment {int(treatment)} is a sequence of {len(components)} "
                                 "rotation components; experiment data for a sequence takes only "
-                                "controls years and start_date. Edit the components in the FileX "
+                                "controls years, start_date and rotation. Edit the components in the FileX "
                                 "for other changes.")
             checked[key] = {}
     return problems, dict(source, treatments=checked)
@@ -152,3 +153,31 @@ def _run_sequence(filex, treatment, components, executable):
     (filex.parent / "DSSBatch.v48").write_bytes(
         _batch_text(filex.name, treatment, components).encode("latin-1"))
     return _run_command(filex.parent, ["Q", "DSSBatch.v48"], executable)
+
+
+def _parse_sdate(sdate):
+    """Parse a FileX SDATE (YYDDD) string into (yy, doy) integers, or None."""
+    if isinstance(sdate, str) and re.fullmatch(r"[0-9]{5}", sdate):
+        return int(sdate[:2]), int(sdate[2:])
+    return None
+
+
+def _simulation_start_date(sdate, days):
+    """Resolve SDATE using weather years, or return the reason it cannot be checked."""
+    if sdate is None:
+        return None, "START is not S or SDATE is unavailable; check the FileX start controls"
+    parsed = _parse_sdate(sdate)
+    if parsed is None:
+        return None, f"SDATE {sdate!r} is not a DSSAT date (yyddd); correct SDATE"
+    if not days:
+        return None, "weather unreadable"
+    yy, doy = parsed
+    years = [y for y in range(min(d.year for d in days), max(d.year for d in days) + 1) if y % 100 == yy]
+    if not years:
+        return None, f"no weather year matches SDATE year {yy:02d}; supply weather for the start year"
+    if len(years) > 1:
+        return None, f"ambiguous start year (candidate years: {', '.join(map(str, years))}); supply controls.start_date"
+    year = years[0]
+    if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
+        return None, f"day {doy} does not exist in {year}; correct SDATE"
+    return date(year, 1, 1) + timedelta(days=doy - 1), None

@@ -152,7 +152,9 @@ _Avoid_: experiment input, FileX template
 **Experiment data**:
 The one user-supplied dict of everything written into a copy of the FileX for a treatment:
 management data, and later cultivar, initial conditions and simulation controls. Management
-data is one part of it, not a synonym.
+data is one part of it, not a synonym. For a sequence it holds the controls years and start
+date, and `rotation`: planting, cultivar, fertilizer and irrigation per rotation component,
+keyed by the component's R number.
 _Avoid_: management (for the whole dict), FileX input
 
 **FileX template**:

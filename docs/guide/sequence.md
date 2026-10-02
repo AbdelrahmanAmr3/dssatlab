@@ -75,11 +75,7 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    FileX NYERS 10: the sequence runs from 1978-04-20 through 1988-04-18, after the weather data ends (1987-12-31). Supply weather through 1988-04-18, or fewer years.
    ```
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
-6. **Experiment data restrictions**: For a sequence, experiment data currently accepts only `controls` with `years` and/or `start_date` (applied to a copy of the first component's controls level):
-   ```text
-   Treatment 1 is a sequence of 6 rotation components; experiment data for a sequence takes only controls years and start_date. Edit the components in the FileX for other changes.
-   ```
-   To modify cultivars, planting dates, or fertilizer for individual rotation components, edit them directly in the FileX.
+6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
 ## The WTHER and FNAME traps in DSSAT sample sequence files
 
@@ -195,7 +191,7 @@ sim = dl.Simulation(
 result = sim.run()
 ```
 
-With `years: 3`, the rotation runs for 3 full cycles, returning 12 summary rows cycling through components 1–4. Experiment data for a rotation template is restricted to controls `years` and `start_date` (modifying management for individual rotation components via experiment data is deferred to v0.13.2). You can also run a rotation template with `run_treatments(filex_template=rotation)`.
+With `years: 3`, the rotation runs for 3 full cycles, returning 12 summary rows cycling through components 1–4. Experiment data can also edit individual crop components through `rotation`, as described below. You can also run a rotation template with `run_treatments(filex_template=rotation)`.
 
 ### Pre-run rotation date checks
 
@@ -223,6 +219,95 @@ To protect against silent year skips, `dssatlab` validates all calendar dates be
 ### The maturity-overrun caveat
 
 When a crop is harvested at maturity (`harvest_date` omitted), DSSAT determines its actual harvest date dynamically based on weather conditions during simulation. In certain weather years, crop development may be delayed, causing the crop to mature after the next component's calendar date. When this happens, DSSAT moves the next component forward by an entire year. Because weather-driven maturity cannot be predicted prior to the run, this overrun cannot be caught by pre-run checks. To prevent unintended year shifts, specify an explicit `harvest_date` or leave an adequate buffer margin (such as a fallow period) before the following crop.
+
+## Experiment data per rotation component
+
+Give each crop its own planting, cultivar, fertilizer or irrigation in experiment data. Put
+`rotation` beside `controls` under the treatment number: it is a dictionary keyed by the
+rotation component's **R number**, as shown in the FileX TREATMENTS row and Summary's `R#`.
+For a rotation FileX template, R 1 is the first entry of the template's `rotation` list,
+R 2 the second, and so on. A copied FileX keeps its own R numbers.
+
+For the maize, fallow, wheat, fallow sequence above, save this as `experiment.yaml`:
+
+```yaml
+treatments:
+  1:
+    controls: {years: 3}
+    rotation:
+      1:
+        fertilizer:
+          - {date: "1978-03-15", material: FE005, application: AP001, depth: 5, n: 60}
+          - {date: "1978-04-20", material: FE005, application: AP001, depth: 5, n: 60}
+        irrigation:
+          - {date: "1978-05-01", amount: 25, method: IR001}
+      3:
+        cultivar: {crop: WH, code: IB1500}
+        fertilizer:
+          - {date: "1978-11-15", material: FE005, application: AP001, depth: 5, n: 40}
+```
+
+Each component takes optional `planting`, `cultivar`, `fertilizer` and `irrigation` with the
+same fields, units and checks as a [single treatment](experiment.md). Pass the YAML path or
+an equivalent Python dict through `management=`:
+
+```python
+sim = dl.Simulation(
+    filex_template="rotation.yaml",
+    weather=weather_rows,
+    soil="soil.csv",
+    management="experiment.yaml",
+)
+sim.check()
+result = sim.run()
+```
+
+The same experiment data works with a copied sequence FileX, `run_treatments()` and a
+scenario's `management` override. Each edit adds a new level and repoints only that
+component in the simulation folder's FileX. Other components, shared levels and the
+original FileX stay unchanged. Omitted sections keep their levels. Edits apply in every
+cycle, with DSSAT advancing the dates along with the component.
+
+`write_experiment_template()` includes a commented `rotation` example. For a sequence,
+replace the single-treatment sections with that example and keep only `years` and
+`start_date` in `controls`. Initial conditions, harvest and controls per component are
+not supported. Fallow components take no edits, and a cultivar must keep the component's
+crop. `check()` rejects `rotation` on a non-sequence treatment and unknown R numbers, for
+example: "the sequence has rotation components R 1-4. Use one of those numbers."
+
+### Keep dates inside the component's period
+
+DSSAT applies a component's fertilizer and irrigation only while that component runs.
+It silently skips events outside that period. Before writing files, `check()` checks
+planting overrides and every event date against the known dates in the **first cycle**,
+including planting overrides:
+
+- The lower bound is strictly after the previous component's last known date: its harvest
+  or fallow end, otherwise its planting date. For the first component, dates must be on
+  or after the simulation start.
+- The upper bound is the component's own harvest or fallow end date, inclusive. Without
+  that date, events must be strictly before the next component's first known date: its
+  planting date or, for a fallow, its end date. Without either, there is no upper bound.
+
+For example, wheat fertilizer on October 1 falls before the preceding fallow ends:
+
+```text
+Management data treatment 1, rotation component 3, fertilizer, event 1, field 'date': 1978-10-01 is not after rotation component 2's end (1978-11-14). DSSAT applies a component's events only while it runs and would skip this one without a warning. Move the date into the component's period.
+```
+
+An unreadable or `-99` FileX date supplies no bound; the check report notes which bound
+could not be checked. Dates are also checked against the supplied weather range.
+
+**Events after a crop's maturity cannot be checked before the run:** maturity depends on
+the weather, and a crop can end before the next known component date. Leave a margin
+before the expected crop end, even when `check()` passes. Inspect Summary `NICM` (nitrogen
+applied, kg N/ha) and `IRCM` (irrigation applied, mm) to see what DSSAT actually applied.
+
+On real DSSAT, the three-cycle probe with two 60 kg N/ha maize events and 50 mm total maize
+irrigation returned `NICM 120` and `IRCM 50` on every maize row, and `NICM 40` on every wheat
+row. The YAML above illustrates one 25 mm irrigation event; tutorial Case 11 uses two
+25 mm events for the probe's 50 mm total. Use `summarize_seasons()` to compare yields per
+rotation component across cycles. See [ADR 0015](../adr/0015-experiment-data-per-rotation-component.md).
 
 ## Summary rows and rotation components
 
