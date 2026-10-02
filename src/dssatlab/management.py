@@ -170,6 +170,8 @@ def _check_treatment_key(key, seen_numbers, text, filex):
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
                  soil_depth, cultivar_path, *, start_date_note=None):
+    from .irrigation import _check_irrigation
+
     sections = ("planting", "irrigation", "fertilizer", "cultivar", "initial_conditions", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
@@ -180,15 +182,17 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
     problems, report = list(entry_problems), []
     for section in ("planting", "irrigation", "fertilizer"):
         label = f"    {section}"
-        if section not in entry:
+        if section not in entry and section != "irrigation":
             report.append(f"{label}: OK (omitted; keeps the FileX Level)")
             continue
-        if section == "planting":
+        if section == "irrigation":
+            section_problems, lines = _check_irrigation(entry, number, where, text, weather_range)
+        elif section == "planting":
             section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
             lines = _report_lines(label, section_problems)
         else:
             section_problems, lines = _check_events(entry[section], section, where, weather_range)
-        if not section_problems and not entry_problems and text is not None:
+        if section in entry and not section_problems and not entry_problems and text is not None:
             try:
                 if section == "planting":
                     _planting_text(text, number, entry[section])
@@ -245,11 +249,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
                       soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None,
                       rotation_template=None, data_dir=None):
-    """Check every treatment without mutation; compare selected dates with FileX and weather.
-
-    If FileX is unreadable, Simulation reports that failure; shape checks still run.
-    Template simulations supply rendered text and their fixed model's cultivar path.
-    """
+    """Check treatments without mutation; unreadable FileX still permits shape checks."""
     from .rotation_data import _check_rotation_data
 
     label = "Management data"

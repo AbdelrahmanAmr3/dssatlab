@@ -251,8 +251,8 @@ def _event_text(text, treatment, events, section="irrigation", *, rotation=None)
     if section == "irrigation":
         rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": 1}, name)])
     for event in events:
-        day = date.fromisoformat(event["date"])
-        day_code = _dssat_date(day)
+        day_code = (event["days_after_planting"] if "days_after_planting" in event else
+                    _dssat_date(date.fromisoformat(event["date"])))
         if section == "irrigation":
             values = {"I": level, "IDATE": day_code, "IROP": event["method"], "IRVAL": event["amount"]}
         else:

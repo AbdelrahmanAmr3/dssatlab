@@ -36,6 +36,10 @@ treatments:
       sprout_length: 0.0          # Sprout length, cm
 
     # Irrigation schedule (optional section; omit to keep the FileX level, or [] for none)
+    # Each event uses exactly one of date or days_after_planting (DSSAT IDATE).
+    # days_after_planting: integer >= 0, not a boolean; ascending and unique.
+    # Use one timing kind per list: IRRIG D needs days; R/P/W need dates; A/F/N need [].
+    # Set controls.irrigation_management for day events; rotation components use dates only.
     irrigation:
       - date: "1982-03-15"        # Event date (quoted "YYYY-MM-DD"); must be ascending and unique
         amount: 30.0              # Water applied, mm (must be > 0)

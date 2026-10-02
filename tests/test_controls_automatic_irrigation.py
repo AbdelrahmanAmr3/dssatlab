@@ -53,6 +53,8 @@ def test_each_field_written_with_other_cells_preserved(automatic_sim, fake_dssat
     sim = automatic_sim
     block, column, value, _, _ = FIELDS[field]
     sim.management["treatments"][1]["controls"] = {field: value}
+    if field == "irrigation_management":
+        sim.management["treatments"][1]["irrigation"] = []
     original, inputs = sim.filex.read_bytes(), deepcopy(sim.management)
     assert sim.check(verbose=False) == []
     sim.run()
@@ -108,6 +110,7 @@ def test_numbers_reject_bools_and_nonfinite_values(automatic_sim, fake_dssat, fi
 @pytest.mark.parametrize("field,codes", [
     ("irrigation_management", "ANFRDPW"), ("planting_management", "AFR")])
 def test_management_codes_are_case_sensitive_strings(automatic_sim, fake_dssat, field, codes):
+    automatic_sim.management["treatments"][1]["irrigation"] = []
     for code in codes:
         automatic_sim.management["treatments"][1]["controls"] = {field: code}
         assert automatic_sim.check(verbose=False) == []
@@ -234,6 +237,7 @@ def test_l2_run_writes_irrig_and_keeps_defaults(data, rows, installed, controls,
 def test_threshold_whole_controls_section_sweep(automatic_sim, fake_dssat):
     sim = automatic_sim
     sim.management["treatments"][1]["controls"] = {"water": "N"}
+    sim.management["treatments"][1]["irrigation"] = []
     original = deepcopy(sim.management)
     factors = {"controls": {f"T{threshold}": {"irrigation_management": "A",
         "auto_irrigation_threshold": threshold} for threshold in (30, 70)}}
