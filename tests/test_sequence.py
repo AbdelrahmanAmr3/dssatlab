@@ -121,12 +121,21 @@ def test_nreps_one_or_default_passes(sequence, nreps):
     assert sequence.check() == []
 
 
-@pytest.mark.parametrize("value", ["0", "-1", "x"])
+@pytest.mark.parametrize("value", ["0", "x"])
 def test_invalid_rotation_number(sequence, value):
     change_component(sequence, 1, "R", value)
     assert sequence.check() == [
         f"Treatment 1 has rotation components R 1, {value}, 3, 4, 5, 6: "
         "give each row of a sequence its own R number."]
+
+
+def test_negative_component_selects_normal_columns(sequence):
+    from dssatlab.filex import read_treatment_numbers
+
+    change_component(sequence, 1, "R", "-1")
+    # R=-1 is not Fortran I2's positive component format, so N is " 1-".
+    with pytest.raises(ValueError, match="columns 1-3"):
+        read_treatment_numbers(sequence.filex)
 
 
 @pytest.mark.parametrize("name", ["another scenario", "too long to fit a treatment name column " * 3])

@@ -37,9 +37,21 @@ def test_stock_header_spellings(tmp_path, header, kind):
     table_text = ("@TRNO HWAM\n1 5\n" if kind == "A"
                   else "@TRNO DATE LAID\n1 2024001 2\n")
     path = observed_file(tmp_path, "  " + header.format(kind=kind) + "\n" + table_text,
-                         "trial.SBT" if kind == "A" else "trial.SBA")
+                         "trial.txt")
     expected = (dict(date=None, HWAM=5.) if kind == "A"
                 else dict(date="2024-01-01", LAID=2.))
+    assert dl.read_dssat_observed(path) == [dict(scenario="base", treatment=1, **expected)]
+
+
+@pytest.mark.parametrize("name,header,table,expected", [
+    ("trial.MZT", "*EXP. DATA (A): GHWA0401MZ My experiment observed (T) data",
+     "@TRNO DATE LAID\n1 2024001 2\n", dict(date="2024-01-01", LAID=2.)),
+    ("trial.SBA", "*EXP.DATA (T):", "@TRNO HWAM\n1 5\n", dict(date=None, HWAM=5.)),
+    ("trial.txt", "*EXP.DATA (T):", "@TRNO DATE LAID\n1 2024001 2\n",
+     dict(date="2024-01-01", LAID=2.)),
+])
+def test_extension_kind_precedes_header(tmp_path, name, header, table, expected):
+    path = observed_file(tmp_path, header + "\n" + table, name)
     assert dl.read_dssat_observed(path) == [dict(scenario="base", treatment=1, **expected)]
 
 
@@ -58,8 +70,8 @@ def test_header_kind_from_extension(tmp_path, extension):
 @pytest.mark.parametrize("text,name,lines", [
     ("*EXP:\n", "trial.txt", "line 1"),
     ("! no experiment header\n", "trial.SBA", "line 1"),
-    ("*EXP.DATA(A):\n*EXP.DATA (T) NAME\n", "trial.SBA", "line 1, 2"),
-    ("*EXP.DATA(A):\n*EXP:\n", "trial.SBT", "line 1, 2"),
+    ("*EXP.DATA(A):\n*EXP.DATA (T) NAME\n", "trial.txt", "line 1, 2"),
+    ("*EXP.DATA(A):\n*EXP:\n", "trial.crop", "line 1, 2"),
     ("*EXP.DATA(A):\n*EXP:\n", "trial.txt", "line 1, 2"),
 ])
 def test_invalid_header_kind_is_one_problem(tmp_path, text, name, lines):
@@ -171,6 +183,7 @@ def test_tables_merge_and_missing_measurements_drop(tmp_path):
     assert rows == [dict(scenario="base", treatment=1, date="2024-01-01", LAID=2., CWAD=100.),
                     dict(scenario="base", treatment=1, date="2024-01-02", CWAD=200., LAID=3.)]
     assert _load_observed(rows)[1] == []
+    path = path.with_suffix(".txt")
     path.write_text("*EXP. DATA (A)\n@TRNO HWAM ADAT\n1 -99.0 -99\n")
     assert dl.read_dssat_observed(path) == []
     path.write_text("*EXP. DATA (T)\n@TRNO DATE LAID\n1 -99 -99\n")
@@ -196,7 +209,7 @@ def test_all_problems_reported_with_path_and_line(tmp_path):
 
 def test_treatment_absent_from_filex_and_bad_anchor(tmp_path):
     anchor = filex(tmp_path)
-    path = observed_file(tmp_path, "*EXP. DATA (A)\n@TRNO HWAM ADAT\n9 bad 82150\n")
+    path = observed_file(tmp_path, "*EXP. DATA (A)\n@TRNO HWAM ADAT\n9 bad 82150\n", "trial.MZA")
     with pytest.raises(dl.DSSATCheckError, match="treatment number 9") as caught:
         dl.read_dssat_observed(path)
     assert len(caught.value.problems) == 2
@@ -222,6 +235,7 @@ def test_missing_file_unknown_kind_and_malformed_tables(tmp_path):
     with pytest.raises(dl.DSSATCheckError, match="not a FileA/FileT") as caught:
         dl.read_dssat_observed(path)
     assert len(caught.value.problems) == 2
+    path = path.with_suffix(".MZT")
     path.write_text("*EXP. DATA (T)\n@TRNO LAID\n1 2\n@TRNO DATE LAID\n1 2024001\n")
     with pytest.raises(dl.DSSATCheckError) as caught:
         dl.read_dssat_observed(path)
@@ -229,7 +243,7 @@ def test_missing_file_unknown_kind_and_malformed_tables(tmp_path):
 
 
 def test_conflicting_measurements_are_reported(tmp_path):
-    path = observed_file(tmp_path, "*EXP. DATA (A)\n@TRNO HWAM\n1 2\n@TRNO HWAM\n1 3\n")
+    path = observed_file(tmp_path, "*EXP. DATA (A)\n@TRNO HWAM\n1 2\n@TRNO HWAM\n1 3\n", "trial.MZA")
     with pytest.raises(dl.DSSATCheckError, match="line 5.*conflicting"):
         dl.read_dssat_observed(path)
 

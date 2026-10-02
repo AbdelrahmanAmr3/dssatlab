@@ -19,9 +19,11 @@ as a blank treatment or as treatment 11; the stock `MSKB8902.SQX` writes compone
 
 - N and R of a TREATMENTS row are read with DSSAT's fixed columns. The rest of the row (the factor
   levels) keeps the header-token columns, which equal DSSAT's for every DSSAT-written header.
-- A FileX is read with the sequence columns (`2I2`) when, read with those columns, some treatment
-  number has two or more rows; otherwise with the normal columns (`I3,I1`). That is the same test
-  dssatlab uses to run a treatment in mode Q (0013), so the columns always match the run mode.
+- A FileX is read with the sequence columns (`2I2`) only when every TREATMENTS row,
+  read with those columns, has a digit N and a positive R written as Fortran I2
+  (` 1`..` 9` or `10`..`99`, never blank, 0 or a leading zero), and some N has two
+  or more rows; otherwise with the normal columns (`I3,I1`). Ordinary treatments
+  100 and 101 share sequence-column N 10, so repetition alone cannot select a sequence.
 - Every reader of a treatment row uses this one rule, so check(), run(), the scenario runner and the
   templates always agree with each other and with DSSAT's Summary TRNO.
 
@@ -33,3 +35,5 @@ as a blank treatment or as treatment 11; the stock `MSKB8902.SQX` writes compone
   extension, and a `.SQX` with one row per treatment runs normally.
 - "Any row with R of 2 or more under the normal columns": misses sparse components (only R 1 and
   R 10, where R 10 reads as treatment 11).
+
+- "Some N has two or more rows" alone: reads treatments 100 and 101 as one sequence.

@@ -146,6 +146,8 @@ def _dataframe_cell(value):
 
 
 def _code_text(value):
+    if isinstance(value, str) and not value.isascii():
+        return value
     if value is None or isinstance(value, str) and not value.strip():
         return "-99"
     try:

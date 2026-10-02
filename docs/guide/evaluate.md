@@ -88,13 +88,13 @@ ax = dl.plot_observed(result, observed_t, "LAID")
 ```
 
 `read_dssat_observed()` accepts any header line whose stripped text starts with
-`*EXP`. The named `(A)` or `(T)` identifies the kind, with any spacing: for example
-`*EXP. DATA (A):`, `*EXP.DATA(A):` and `*EXPT.DATA  (A):` (and the T forms).
-If the header names no kind, the extension's last letter supplies it
-(case-insensitive): `.SBA` means FileA and `.SBT` means FileT. A generic `.txt`
-extension does not identify FileT. At least one `*EXP` header is required;
-repeated headers must all name or imply the same kind. Headers of different
-kinds, or a header with no kind and no FileA/FileT extension, are check problems.
+`*EXP`. A three-character extension ending in A or T (case-insensitive), except
+`.txt`, determines the kind: `.SBA` means FileA and `.MZT` means FileT, regardless
+of the header text. At least one `*EXP` header is still required.
+For other extensions, the `(A)` or `(T)` named in the `*EXP` headers identifies
+the kind, with any spacing: for example `*EXP. DATA (A):`, `*EXP.DATA(A):` and
+`*EXPT.DATA  (A):` (and the T forms). No named kind, or headers naming different
+kinds, is a check problem.
 Rows use scenario `base`, an integer `treatment` from `TRNO`, and `date=None`
 for FileA or an ISO `yyyy-mm-dd` date for FileT. Summary date measurements such
 as `ADAT` and `MDAT` also become ISO strings. Tables merge by treatment and date.

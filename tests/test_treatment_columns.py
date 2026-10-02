@@ -14,6 +14,8 @@ from test_season_coverage import weather
     ([" 1 1 1 0", " 110 1 0"], [1, 1]),
     ([" 1 1 1 0", " 110 1 0", " 2 1 0 0"], [1, 1, 2]),
     ([" 1 1 0 0", "10 1 0 0"], [1, 10]),
+    ([" 991 0 0", "1001 0 0", "1011 0 0", "1101 0 0"], [99, 100, 101, 110]),
+    (["100 1 0 0", "101 1 0 0"], [100, 101]),
 ])
 def test_numbers_and_templates(tmp_path, prefixes, expected):
     filex = tmp_path / "TEST0001.MZX"

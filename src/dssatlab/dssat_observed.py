@@ -72,10 +72,9 @@ def _read_date(value, path, treatment, anchors):
 def read_dssat_observed(path: str | Path) -> list[dict]:
     """Read FileA/FileT by headers starting with *EXP, for any crop.
 
-    Each header names (A) or (T), with any spacing before the kind; otherwise
-    the extension's last letter supplies A/T (case-insensitive). Repeated
-    headers must all name or imply the same kind. At least one is required.
-    A generic .txt extension does not identify FileT.
+    A three-character extension ending in A/T (case-insensitive), except .txt,
+    supplies the kind regardless of header text. Otherwise *EXP headers must
+    name one unambiguous (A)/(T) kind. At least one *EXP header is required.
 
     Rows contain scenario='base', integer treatment, date (ISO yyyy-mm-dd for
     FileT, None for FileA), and float measurements; Summary dates are ISO strings.
@@ -98,20 +97,21 @@ def read_dssat_observed(path: str | Path) -> list[dict]:
         raise DSSATCheckError([f"{path}, line 1: cannot read FileA/FileT: {error}. "
                                "Supply a readable FileA/FileT path."]) from error
     # .txt ends in t, but it is no FileT extension.
-    extension_kind = "" if path.suffix.lower() == ".txt" else path.suffix[-1:].upper()
+    extension_kind = (path.suffix[-1:].upper()
+                      if len(path.suffix) == 4 and path.suffix.lower() != ".txt"
+                      and path.suffix[-1:].upper() in {"A", "T"} else "")
     kinds, header_lines = set(), []
     for number, line in enumerate(lines, 1):
         if line.strip().startswith("*EXP"):
             header_lines.append(number)
             named_kinds = set(re.findall(r"\(([AT])\)", line))
-            kinds.update(named_kinds or {extension_kind if extension_kind in {"A", "T"}
-                                        else None})
+            kinds.update({extension_kind} if extension_kind else named_kinds or {None})
     problems = []
     if len(kinds) != 1 or None in kinds:
         numbers = ", ".join(map(str, header_lines)) or "1"
         problems.append(f"{path}, line {numbers}: not a FileA/FileT with one unambiguous "
-                        "kind. Checked *EXP header lines for (A)/(T) and the extension's "
-                        "last letter. Add (A) or (T) to the *EXP header or use a "
+                        "kind. Checked the three-character extension (except .txt), then "
+                        "*EXP header lines for (A)/(T). Add (A) or (T) to the *EXP header or use a "
                         ".??A/.??T extension; keep all headers the same kind.")
     kind = next(iter(kinds)) if len(kinds) == 1 else None
     allowed = (_PLANT_COLUMNS if kind == "T" else _SUMMARY_COLUMNS) - _METADATA

@@ -46,7 +46,7 @@ def test_codes_checked_and_written_in_six_character_columns(
 
 @pytest.mark.parametrize("form", ["rows", "csv", "dataframe"])
 @pytest.mark.parametrize("column", COLUMNS)
-@pytest.mark.parametrize("value", ["IB0001", "2*BN", "A B", "A,B", "A/B", 'A"B',
+@pytest.mark.parametrize("value", ["١", "IB0001", "2*BN", "A B", "A,B", "A/B", 'A"B',
                                  "A'B", "é", 123456, "oops!!", float("inf")])
 def test_invalid_codes_name_row_column_value_and_rule(
         simulation, rows, tmp_path, form, column, value):

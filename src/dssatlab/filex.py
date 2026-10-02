@@ -7,7 +7,7 @@ from .weather import _dssat_date
 
 
 def _treatment_rows(text):
-    """Read N/R once per text; repeated sequence-column N selects mode Q's layout."""
+    """Read N/R once per text; valid repeated component rows select mode Q's layout."""
     rows, active, header = [], False, False
     for line in text.splitlines():
         if line.startswith("*"):
@@ -19,8 +19,11 @@ def _treatment_rows(text):
             rows.append(line)
     numbers = [int(line[:2]) for line in rows if line[:2].strip().isascii()
                and line[:2].strip().isdigit()]
-    # The run-mode test is two or more component rows for the same N.
-    width = 2 if len(numbers) != len(set(numbers)) else 3
+    # Fortran I2 writes positive R as " 1".." 9" or "10".."99".
+    # Ordinary treatments 100 and 101 share N=10 under sequence columns.
+    sequence = len(numbers) == len(rows) and all(
+        re.fullmatch(r" [1-9]|[1-9][0-9]", line[2:4]) for line in rows)
+    width = 2 if sequence and len(numbers) != len(set(numbers)) else 3
     result = {}
     for line in rows:
         n = line[:width].strip()

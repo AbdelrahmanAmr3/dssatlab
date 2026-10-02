@@ -165,7 +165,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
                 if rotation is not None:
                     if int(r) != rotation:
                         continue
-            except (ValueError, KeyError):
+            except ValueError:
                 continue
             if number == treatment:
                 if column not in columns:

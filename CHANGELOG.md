@@ -6,7 +6,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Fixed
 - Treatment rows read with DSSAT's fixed columns, including sensitivity-tool rows and sequence rotation components; experiment, management and scenario templates name each treatment once (ADR 0018).
-- FileA/FileT headers starting with `*EXP` accepted with any spacing around the named `(A)` or `(T)` kind, falling back to the extension's last letter when no kind is named.
+- FileA/FileT kind comes from a three-character extension ending in A/T (case-insensitive, except `.txt`), regardless of header text; at least one `*EXP` header is required. Other extensions use one unambiguous `(A)`/`(T)` kind named by the `*EXP` headers, with any spacing.
 - Soil `slmh`, `smhb`, `smpx` and `smke` accept DSSAT text codes alongside numbers; optional profile column `scom` is included in the soil template and written to the soil file.
 - All six output readers find experiment-named files when the standard name is absent, report ambiguous candidates, and prefer standard names when present; `Simulation` accepts FNAME=Y.
 
