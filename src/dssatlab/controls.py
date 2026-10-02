@@ -97,11 +97,13 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
     def inherited_date(code):
         day, _ = _simulation_start_date(code, days)
         if day is None and days and (parsed := _parse_sdate(code)) is not None:
-            # An inherited window may lie outside the weather years. Use the
-            # reference century to still compare it with the simulation start.
-            year = (start_date or days[0]).year // 100 * 100 + parsed[0]
-            if year >= 1:
-                day, _ = _simulation_start_date(code, [date(year, 1, 1)])
+            # An inherited window may lie outside the weather years. Choose the
+            # nearest matching year; a tie belongs to the later century.
+            reference = (start_date or days[0]).year
+            base = reference // 100 * 100 + parsed[0]
+            year = min((y for y in (base - 100, base, base + 100) if 1 <= y <= 9999),
+                       key=lambda y: (abs(y - reference), -y))
+            day, _ = _simulation_start_date(code, [date(year, 1, 1)])
         return day
 
     if start_date is None:
