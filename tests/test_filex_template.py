@@ -153,6 +153,22 @@ def test_planting_overflow_checked_before_writing(data, data_dir):
                for p in _check_filex_template(data, data_dir))
 
 
+@pytest.mark.parametrize("field,column", [("population", "PPOP"), ("row_spacing", "PLRS"),
+                                         ("depth", "PLDP"), ("planting_material_weight", "PLWT"),
+                                         ("sprout_length", "SPRL")])
+def test_full_width_planting_checked_before_folder_creation(tmp_path, data, data_dir, rows,
+                                                           field, column):
+    from dssatlab.filex_skeleton import write_filex
+
+    data["planting"][field] = 123456
+    destination = tmp_path / "not-created"
+    with pytest.raises(DSSATCheckError) as error:
+        write_filex(data, *rows, destination, data_dir=data_dir)
+    assert any(f"column {column}" in p and "needs one leading blank" in p
+               for p in error.value.problems)
+    assert not destination.exists()
+
+
 def test_missing_cultivar_file_and_independent_planting_problem(data, data_dir):
     from dssatlab.filex_template import _check_filex_template
     (data_dir / "Genotype" / "MZCER048.CUL").unlink()

@@ -54,7 +54,7 @@ def test_scenarios_write_their_names_without_shifting_treatment_columns(
     results = run_treatments(
         filex, batch_inputs.rows, treatments=[3],
         management={"treatments": {3: {"controls": {"start_date": "1982-02-25"}}}},
-        scenarios={"own site": {}, "abcdefghijklmnopqrstuvwxyz": {}},
+        scenarios={"own site": {}, "abcdefghijklmnopqrstuvwxy": {}},
     )
     for (name, _), result in results.items():
         copied = (result.run_dir.parent / filex.name).read_text().splitlines()

@@ -72,6 +72,33 @@ def copy_text(sim, tmp_path):
     return path.read_text(encoding="latin-1")
 
 
+@pytest.mark.parametrize("value,expected", [(1000.0, "  1000"), (100.0, " 100.0"),
+                                           (1250, "  1250")])
+def test_residue_mass_keeps_icres_leading_blank(sim, tmp_path, value, expected):
+    conditions(sim)["residue_mass"] = value
+    assert sim.check(verbose=False) == []
+    text = copy_text(sim, tmp_path)
+    row = text.rsplit(HEADER, 1)[1].splitlines()[1]
+    assert row[38:44] == "   -99"  # ICWD stays separate from ICRES.
+    assert row[44:50] == expected
+    assert sim.filex.read_text(encoding="latin-1") == FILEX
+
+
+@pytest.mark.parametrize("value", [123456, 1234.5])
+def test_full_width_residue_mass_rejected_before_folder_creation(sim, value):
+    from dssatlab import DSSATCheckError
+
+    conditions(sim)["residue_mass"] = value
+    before = sorted(sim.filex.parent.iterdir())
+    problems = sim.check(verbose=False)
+    assert any("column ICRES" in p and "needs one leading blank" in p for p in problems)
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+    assert error.value.problems == problems
+    assert sorted(sim.filex.parent.iterdir()) == before
+    assert sim.filex.read_text(encoding="latin-1") == FILEX
+
+
 @pytest.mark.parametrize("field,column,value,bad,span", DETAILS)
 def test_detail_written_in_new_level(sim, tmp_path, field, column, value, bad, span):
     conditions(sim)[field] = value

@@ -137,7 +137,8 @@ def _controls_text(text, treatment, controls):
             if len(row) < right:
                 raise ValueError(f"{section} {column}: selected row is truncated. "
                                  "Supply a complete FileX row.")
-            row = row[:left] + _cell(value, right - left, section, column) + row[right:]
+            row = row[:left] + _cell(value, right - left, section, column,
+                                     first_column=left == 0) + row[right:]
         body.extend([header, row])
     missing = changes.keys() - applied
     if missing:
