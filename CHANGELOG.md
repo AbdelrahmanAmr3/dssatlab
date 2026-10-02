@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.14.1] - UNDATED
+## [0.14.1] - 2026-10-01
 
 ### Added
 - Optional `cultivar.coefficients` in experiment data: exact `.CUL` header names after `ECO#` mapped to finite numbers, checked before any run (ADR 0017).
