@@ -21,7 +21,8 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 Version 0.15.0 adds checked DSSAT simulation options, eight initial-condition detail
 fields, and `initial_conditions: "off"` in experiment data. It also checks for a
-one-row treatment number colliding with a sequence number before any run (#168).
+one-row treatment number colliding with a sequence number before a `Simulation` or
+`run_treatments` run (#168).
 Zero runtime dependencies are preserved. See the [changelog](CHANGELOG.md) and
 [experiment data guide](docs/guide/experiment.md).
 
