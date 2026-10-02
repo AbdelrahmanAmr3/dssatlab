@@ -132,6 +132,8 @@ df = dl.to_dataframe(combined)
 stats = dl.summarize_seasons(combined, variables=["HWAM"])
 ```
 
+For every combination of planting dates, nitrogen rates or other experiment data sections, [`run_sweep()`](docs/guide/sweeps.md) generates scenarios and returns Summary rows with a column for each factor label, ready for `to_dataframe()` and `summarize_seasons()`.
+
 How multi-treatment and scenario runs work:
 
 - By default (`treatments=None`), runs all treatments in the FileX or FileX template (1..N); pass a list (e.g. `treatments=[1, 3]`) to select a subset.

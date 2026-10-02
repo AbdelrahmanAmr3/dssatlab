@@ -30,9 +30,11 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.list_cultivars
 
-## Treatments and scenarios
+## Treatments, scenarios and sweeps
 
 ::: dssatlab.run_treatments
+
+::: dssatlab.run_sweep
 
 ::: dssatlab.combine_summaries
 
