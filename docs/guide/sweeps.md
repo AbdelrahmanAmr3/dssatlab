@@ -12,21 +12,22 @@ Use an existing `UFGA8201.MZX` and weather data covering its 1982 season:
 ```python
 import dssatlab as dl
 
-event = {"date": "1982-02-26", "material": "FE005", "application": "AP001", "depth": 5}
+event = {"material": "FE001", "application": "AP001", "depth": 10}
 planting = {"method": "S", "distribution": "R", "population": 7.2, "row_spacing": 61, "depth": 5}
 rows = dl.run_sweep(
     "UFGA8201.MZX", "weather.csv", treatments=[1],
     factors={
         "planting": {d: dict(planting, date=d) for d in ("1982-02-26", "1982-03-12")},
-        "fertilizer": {n: [dict(event, n=n)] if n else [] for n in (0, 60, 120)},
+        "fertilizer": {n: [dict(event, date=d, n=n // 2) for d in ("1982-04-07", "1982-05-17")] if n else [] for n in (0, 60, 120)},
     },
 )
 ```
 
 This runs treatment 1 seven times: the unchanged base, then two planting dates
 by three nitrogen rates (0, 60 and 120 kg N/ha). `[]` means no fertilizer events.
-The fertilizer date stays February 26 for both planting dates; the sweep does
-not move event dates automatically.
+The nitrogen rate is split into two equal side-dress applications on April 7
+and May 17 (`FE001` = ammonium nitrate). These event dates stay the same for
+both planting dates; the sweep does not move event dates automatically.
 
 ## Factors and labels
 
@@ -71,9 +72,14 @@ order, for example `"1982-03-12 60"`. This name is also written into the copied
 FileX's treatment name (`TNAME`/`TNAM`). **Keep labels short:** the joined name must
 fit that FileX's treatment name column. Checks reject names that are too long,
 duplicate joined names, and the reserved name `"base"`.
+Sequences (treatments with several rotation components) keep their rotation
+component names: the scenario name is not written to `TNAME` and the
+treatment-name length check does not apply, exactly as for `run_treatments()` scenarios.
 
-Every problem across all combinations is collected into one `DSSATCheckError`
-before anything runs, with scenario and treatment labels on input problems.
+Sweep problems (factors, labels, scenario names and treatment selection) are
+collected into one `DSSATCheckError`; once those are fixed, every combination's
+experiment data problems are collected into one `DSSATCheckError`, with scenario
+and treatment labels, still before anything runs.
 The first DSSAT run failure stops the sweep, as with `run_treatments()`, and
 the error names the kept run directories.
 

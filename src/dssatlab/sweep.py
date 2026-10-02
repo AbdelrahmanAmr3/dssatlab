@@ -98,6 +98,7 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
                         continue
                 entry = entries.setdefault(key, {})
                 if isinstance(entry, dict):
+                    entry = entries[key] = dict(entry)
                     for section, label in labels.items():
                         entry[section] = deepcopy(factors[section][label])
         scenarios[name] = {"management": merged}

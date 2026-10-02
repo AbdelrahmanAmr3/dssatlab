@@ -159,6 +159,29 @@ def test_complete_sections_and_top_level_keys_pass_through(section, monkeypatch)
     assert (base, value) == original
 
 
+def test_selected_treatment_does_not_change_aliased_entry(monkeypatch):
+    from dssatlab import sweep
+    shared = {"fertilizer": [], "irrigation": []}
+    base = {"treatments": {1: shared, 2: shared}}
+    original = deepcopy(base)
+    fertilizer = [{"date": "1982-04-07", "material": "FE001",
+                   "application": "AP001", "depth": 10, "n": 60}]
+    calls = []
+
+    def record(**kwargs):
+        calls.append(kwargs)
+        return {}
+
+    monkeypatch.setattr(sweep, "run_treatments", record)
+    assert lab.run_sweep("file.MZX", treatments=[1], management=base,
+                         factors={"fertilizer": {60: fertilizer}}) == []
+    merged = calls[0]["scenarios"]["60"]["management"]
+    assert merged["treatments"][1]["fertilizer"] == fertilizer
+    assert merged["treatments"][2] == original["treatments"][2]
+    assert base == original
+    assert base["treatments"][1] is base["treatments"][2] is shared
+
+
 def test_name_errors_collected_with_shape_errors(monkeypatch):
     from dssatlab import sweep
     monkeypatch.setattr(sweep, "run_treatments", lambda **kwargs: pytest.fail("must not run"))
