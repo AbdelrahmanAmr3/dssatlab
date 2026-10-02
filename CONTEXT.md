@@ -38,7 +38,8 @@ and management for one experiment.
 _Avoid_: experiment file, input file
 
 **Treatment**:
-One numbered row of a FileX. A run covers all treatments or a single one.
+One numbered row of a FileX. A run covers all treatments or a single one. Its number is the
+N column as DSSAT reads it, so it always equals the Summary's TRNO.
 
 **Experiment**:
 The set of treatments one FileX describes. A FileX holds one experiment.
@@ -242,7 +243,9 @@ the parsed output files (summary, plant growth, soil water, plant nitrogen, and 
 **Output file**:
 A file DSSAT writes into a run directory (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`,
 `PlantN.OUT`, `Weather.OUT`, ...). Five output files are read (summary, plant growth,
-soil water, plant nitrogen, and weather); every other one is only listed.
+soil water, plant nitrogen, and weather); every other one is only listed. When a FileX asks
+for experiment-named output files (FNAME=Y), DSSAT names the same files after the experiment
+(`DTCM6401.OSU` for `Summary.OUT`); they are still the same output files.
 _Avoid_: result file
 
 **Summary**:

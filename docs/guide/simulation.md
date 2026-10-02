@@ -280,9 +280,9 @@ component in a sequence), `check()` also validates the simulation methods and ou
 
 - `METHODS` `WTHER` must be `M` (measured weather). If set to `W` (weather generator),
   DSSAT would generate artificial weather and silently ignore your supplied weather data.
-- `OUTPUTS` `FNAME` must be `N`. If set to `Y`, DSSAT would name its output files after
-  the experiment (such as `UFGA7804.OSU`) instead of standard names like `Summary.OUT`,
-  which `dssatlab` reads.
+- `OUTPUTS` `FNAME=Y` is accepted: DSSAT names outputs after the experiment
+  (such as `UFGA7804.OSU`), and the readers find them when standard names are absent.
+  See [Standard and experiment-named output files](reading-results.md#standard-and-experiment-named-output-files).
 
 When `management` supplies experiment overrides for the selected treatment,
 the copied FileX uses the weather data's station and, if supplied, the soil

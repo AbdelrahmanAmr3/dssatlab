@@ -9,6 +9,27 @@ You can access these directly from a [Run result](run-filex.md#inspect-the-run-r
 after a simulation, or call the reader functions on any **run directory**, including
 runs performed outside dssatlab.
 
+## Standard and experiment-named output files
+
+When a FileX sets `OUTPUTS` `FNAME=Y`, DSSAT names output files after the experiment.
+`Simulation` accepts FNAME=Y, and every reader and its `RunResult` method uses the
+same lookup:
+
+| Standard name | Experiment-named form |
+| --- | --- |
+| `Summary.OUT` | `<name>.OSU` |
+| `PlantGro.OUT` | `<name>.OPG` |
+| `SoilWat.OUT` | `<name>.OSW` |
+| `PlantN.OUT` | `<name>.OPN` |
+| `Weather.OUT` | `<name>.OWE` |
+| `Evaluate.OUT` | `<name>.OEV` |
+
+The standard name wins whenever present. Otherwise the reader looks for one
+experiment-named file with the matching extension (case-insensitive) in the run
+directory. Two or more candidates raise `DSSATOutputError` naming the files;
+keep one experiment's output files in that run directory. If neither form exists,
+the error message names both forms checked. Files keep the names DSSAT wrote.
+
 ## What you get back
 
 After running a FileX or a `Simulation`:

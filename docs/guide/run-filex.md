@@ -23,6 +23,13 @@ import dssatlab as dl
 result = dl.run("UFGA8201.MZX", treatment=2)
 ```
 
+Treatment numbers are read as DSSAT reads the TREATMENTS N column: columns 1-3,
+or columns 1-2 in a sequence FileX (R uses column 4, or columns 3-4 respectively).
+For example, a sensitivity-tool row `  11 0 0` names treatment 1, matching Summary
+`TRNO`, rather than treatment 11. A FileX uses the sequence columns when some
+treatment number has two or more rows when read with those columns; the filename
+extension does not decide this. See [ADR 0018](../adr/0018-treatment-rows-read-with-dssats-fixed-columns.md).
+
 The FileX must exist. Its filename must contain **at most 12 characters including
 the extension**, following DSSAT's 8.3 style, such as `UFGA8201.MZX`. This limit
 applies to the filename, not the full path. A missing FileX or an overlong

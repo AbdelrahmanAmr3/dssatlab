@@ -2,6 +2,17 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.14.2] - 2026-10-02
+
+### Fixed
+- Treatment rows read with DSSAT's fixed columns, including sensitivity-tool rows and sequence rotation components; experiment, management and scenario templates name each treatment once (ADR 0018).
+- FileA/FileT kind comes from a three-character extension ending in A/T (case-insensitive, except `.txt`), regardless of header text; at least one `*EXP` header is required. Other extensions use one unambiguous `(A)`/`(T)` kind named by the `*EXP` headers, with any spacing.
+- Soil `slmh`, `smhb`, `smpx` and `smke` accept DSSAT text codes alongside numbers; optional profile column `scom` is included in the soil template and written to the soil file.
+- All six output readers find experiment-named files when the standard name is absent, report ambiguous candidates, and prefer standard names when present; `Simulation` accepts FNAME=Y.
+
+### Notes
+- No new public name. Upgrading from 0.14.1 needs no changes. Zero runtime dependencies are preserved.
+
 ## [0.14.1] - 2026-10-01
 
 ### Added

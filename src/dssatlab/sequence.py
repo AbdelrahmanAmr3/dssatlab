@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 from .controls import _selected_controls
-from .filex import _section_row
+from .filex import _section_row, _treatment_rows
 from .filex_write import _columns
 from .runner import _run_command
 
@@ -20,6 +20,7 @@ def _rotation_components(source, treatment, *, text=None):
             text = Path(source).read_text(encoding="latin-1")
     except (OSError, ValueError, TypeError):
         return []
+    treatments = _treatment_rows(text)
     components, columns, in_section = [], {}, False
     for line in text.splitlines():
         if line.startswith("*"):
@@ -29,6 +30,7 @@ def _rotation_components(source, treatment, *, text=None):
             columns = _columns(line)
         elif in_section and "N" in columns and line.strip() and not line.startswith("!"):
             row = {key: line[left:right].strip() for key, (left, right) in columns.items()}
+            row["N"], row["R"] = treatments.get(line, ("", ""))
             try:
                 if int(row["N"]) != treatment:
                     continue

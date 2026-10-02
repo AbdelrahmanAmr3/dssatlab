@@ -312,17 +312,10 @@ def test_checks_write_nothing_and_reread_inputs(filex, weather, tmp_path):
         "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
         "and ignore the weather data supplied. Set WTHER to M."
     ]),
-    ("M", "Y", [
-        "FileX FNAME 'Y' in controls level 1 (treatment 1): DSSAT would name its output "
-        "files after the experiment (UFGA8201.OSU) instead of Summary.OUT, which dssatlab "
-        "reads. Set FNAME to N."
-    ]),
+    ("M", "Y", []),
     ("W", "Y", [
         "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
         "and ignore the weather data supplied. Set WTHER to M.",
-        "FileX FNAME 'Y' in controls level 1 (treatment 1): DSSAT would name its output "
-        "files after the experiment (UFGA8201.OSU) instead of Summary.OUT, which dssatlab "
-        "reads. Set FNAME to N.",
     ]),
     ("S", "N", [
         "FileX WTHER 'S' in controls level 1 (treatment 1): DSSAT would generate weather "
@@ -333,7 +326,7 @@ def test_checks_write_nothing_and_reread_inputs(filex, weather, tmp_path):
         "and ignore the weather data supplied. Set WTHER to M."
     ]),
 ])
-def test_wther_and_fname_reported_for_one_row_treatment(filex, weather, wther, fname, expected_problems):
+def test_wther_checked_and_fname_y_allowed_for_one_row_treatment(filex, weather, wther, fname, expected_problems):
     controls = f"""
 @N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
  1 ME              {wther}     M     E     R     S     L     R     1     G     R     2
@@ -470,15 +463,10 @@ def test_run_treatments_labels_controls_problem(filex, weather):
     with pytest.raises(DSSATCheckError) as exc_info:
         run_treatments(filex=path, weather=weather(), treatments=[1])
     problems = exc_info.value.problems
-    assert len(problems) == 2
+    assert len(problems) == 1
     assert problems[0] == (
         "Scenario 'base', treatment 1: FileX WTHER 'W' in controls level 1 (treatment 1): "
         "DSSAT would generate weather and ignore the weather data supplied. Set WTHER to M."
-    )
-    assert problems[1] == (
-        "Scenario 'base', treatment 1: FileX FNAME 'Y' in controls level 1 (treatment 1): "
-        "DSSAT would name its output files after the experiment (UFGA8201.OSU) instead of "
-        "Summary.OUT, which dssatlab reads. Set FNAME to N."
     )
 
 
@@ -526,3 +514,30 @@ def test_verbose_check_reports_in_filex_section(filex, weather, capsys):
     assert "FileX WTHER 'W' in controls level 1 (treatment 1)" in captured
 
 
+def test_fname_y_simulation_checks_runs_and_reads_summary(filex, weather, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    import dssatlab.runner as runner
+
+    controls = """
+@N METHODS     WTHER INCON LIGHT EVAPO INFIL PHOTO HYDRO NSWIT MESOM MESEV MESOL
+ 1 ME              M     M     E     R     S     L     R     1     G     R     2
+@N OUTPUTS     FNAME OVVEW SUMRY FROPT GROUT CAOUT WAOUT NIOUT MIOUT DIOUT VBOSE CHOUT OPOUT FMOPT
+ 1 OU              Y     N     Y     1     N     N     N     N     N     N     Y     N     N     A
+"""
+    source = filex(text=SAMPLE + controls)
+    original = source.read_bytes()
+    sim = Simulation(source, 1, weather())
+    assert sim.check() == []
+    monkeypatch.setattr(runner, "connect", lambda **kwargs: tmp_path / "DSCSM048.EXE")
+
+    def fake_dssat(command, **kwargs):
+        folder = Path(kwargs["cwd"])
+        assert " 1 OU              Y" in (folder / source.name).read_text()
+        (folder / "X.OSU").write_text("@RUNNO TRNO TNAM.... HWAM\n     1    1     BASE   42\n")
+        return SimpleNamespace(returncode=0, stdout="finished", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_dssat)
+    result = sim.run()
+    assert result.summary() == [dict(RUNNO=1, TRNO=1, TNAM="BASE", HWAM=42)]
+    assert result.run_dir / "X.OSU" in result.outputs
+    assert source.read_bytes() == original

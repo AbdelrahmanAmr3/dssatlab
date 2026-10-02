@@ -6,8 +6,39 @@ import re
 from .weather import _dssat_date
 
 
+def _treatment_rows(text):
+    """Read N/R once per text; valid repeated component rows select mode Q's layout.
+
+    In a sequence FileX only the rows of a repeated N use the sequence columns: a one-row
+    treatment runs in a normal mode, where DSSAT reads it with the normal columns.
+    """
+    rows, active, header = [], False, False
+    for line in text.splitlines():
+        if line.startswith("*"):
+            active = line[1:].strip().split(" ")[0] == "TREATMENTS"
+            header = False
+        elif active and line.startswith("@"):
+            header = line.split()[:1] == ["@N"]
+        elif active and header and line.strip() and not line.startswith("!"):
+            rows.append(line)
+    numbers = [int(line[:2]) for line in rows if line[:2].strip().isascii()
+               and line[:2].strip().isdigit()]
+    # Fortran I2 writes positive R as " 1".." 9" or "10".."99".
+    # Ordinary treatments 100 and 101 share N=10 under sequence columns.
+    sequence = len(numbers) == len(rows) and all(
+        re.fullmatch(r" [1-9]|[1-9][0-9]", line[2:4]) for line in rows)
+    repeated = {n for n in numbers if numbers.count(n) > 1} if sequence else set()
+    result = {}
+    for line in rows:
+        width = 2 if sequence and int(line[:2]) in repeated else 3
+        n = line[:width].strip()
+        result[line] = (n if n.isascii() and n.isdigit() else "", line[width:4].strip())
+    return result
+
+
 def _section_row(text, section, key, level, required):
     """Find a level across blocks with the needed columns, using header token ends."""
+    treatments = _treatment_rows(text) if section == "TREATMENTS" else {}
     in_section = False
     matching_header = False
     columns = None
@@ -44,6 +75,13 @@ def _section_row(text, section, key, level, required):
                 columns = None
                 continue
             row = {name: line[start:end].strip() for name, start, end in columns}
+            if section == "TREATMENTS":
+                if line not in treatments:
+                    continue
+                row["N"], row["R"] = treatments[line]
+                if not row["N"].isascii() or not row["N"].isdigit():
+                    raise ValueError(f"TREATMENTS row {line!r}: DSSAT reads the treatment number "
+                                     "from columns 1-3 (1-2 in a sequence FileX). Correct the FileX row.")
             try:
                 number = int(row[key])
             except ValueError:
@@ -161,7 +199,7 @@ def _weather_filename(station: str, start_date: str) -> str:
 
 
 def _check_filex_controls(source, treatment, levels) -> list[str]:
-    """Report WTHER other than M and FNAME other than N in the controls levels (SM) a run uses."""
+    """Report WTHER other than M in the controls levels (SM) a run uses."""
     sm_levels = list(dict.fromkeys(int(level) for level in levels if level.isdigit()))
     if not sm_levels:
         return []
@@ -173,7 +211,6 @@ def _check_filex_controls(source, treatment, levels) -> list[str]:
         return []
 
     problems = []
-    stem = path.stem
     for level in sm_levels:
         try:
             methods = _section_row(text, "SIMULATION CONTROLS", "N", level, ("WTHER",))
@@ -183,18 +220,6 @@ def _check_filex_controls(source, treatment, levels) -> list[str]:
                     f"FileX WTHER '{wther}' in controls level {level} (treatment {treatment_num}): "
                     "DSSAT would generate weather and ignore the weather data supplied. "
                     "Set WTHER to M."
-                )
-        except ValueError:
-            pass
-
-        try:
-            outputs = _section_row(text, "SIMULATION CONTROLS", "N", level, ("FNAME",))
-            fname = outputs.get("FNAME", "").strip()
-            if fname and fname != "-99" and fname != "N":
-                problems.append(
-                    f"FileX FNAME '{fname}' in controls level {level} (treatment {treatment_num}): "
-                    f"DSSAT would name its output files after the experiment ({stem}.OSU) "
-                    "instead of Summary.OUT, which dssatlab reads. Set FNAME to N."
                 )
         except ValueError:
             pass
@@ -210,6 +235,7 @@ def read_treatment_numbers(source) -> list[int]:
         raise ValueError(f"Cannot read FileX {source}: {error}. Supply a readable FileX path.") from error
     in_section = found_section = has_header = False
     numbers = []
+    rows = _treatment_rows(text)
     for line in text.splitlines():
         if line.startswith("*"):
             in_section = line[1:].strip().split(" ")[0] == "TREATMENTS"
@@ -221,10 +247,13 @@ def read_treatment_numbers(source) -> list[int]:
                                  "Correct the FileX header.")
         elif in_section and has_header and line.strip() and not line.startswith("!"):
             try:
-                numbers.append(int(line.split()[0]))
+                number = rows[line][0]
+                if not number.isascii() or not number.isdigit():
+                    raise ValueError
+                numbers.append(int(number))
             except ValueError:
-                raise ValueError(f"FileX {source}: TREATMENTS row {line!r} does not start with a "
-                                 "treatment number. Correct the FileX row.") from None
+                raise ValueError(f"FileX {source}: TREATMENTS row {line!r}: DSSAT reads the treatment number "
+                                 "from columns 1-3 (1-2 in a sequence FileX). Correct the FileX row.") from None
     if not found_section:
         raise ValueError(f"FileX {source}: missing TREATMENTS section. Supply that section in the FileX.")
     if not numbers:

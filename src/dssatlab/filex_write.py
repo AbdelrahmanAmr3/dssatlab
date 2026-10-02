@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 import re
 
-from .filex import _section_row
+from .filex import _section_row, _treatment_rows
 from .weather import _dssat_date
 
 
@@ -150,6 +150,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
     """Repoint the first matching row, optionally selecting its R as well as N."""
     if rotation is None:
         _section_row("".join(lines), section, key, treatment, (column,))
+    treatments = _treatment_rows("".join(lines)) if section == "TREATMENTS" else {}
     start, end = _section_bounds(lines, section) or (0, 0)
     columns = {}
     for index in range(start + 1, end):
@@ -159,12 +160,12 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
         elif key in columns and (rotation is not None or column in columns):
             left, right = columns[key]
             try:
-                number = int(line[left:right])
+                n, r = treatments.get(line.rstrip("\r\n"), (line[left:right], ""))
+                number = int(n)
                 if rotation is not None:
-                    left, right = columns["R"]
-                    if int(line[left:right]) != rotation:
+                    if int(r) != rotation:
                         continue
-            except (ValueError, KeyError):
+            except ValueError:
                 continue
             if number == treatment:
                 if column not in columns:
