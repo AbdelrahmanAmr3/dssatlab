@@ -280,16 +280,16 @@ class Simulation:
             filex = Path(self.filex).resolve()
             sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
             shutil.copy2(filex, sim_folder / filex.name)
-            soil_id = soil_rows[0]["soil_id"] if soil_rows and station is not None else None
-            _write_management(sim_folder / filex.name, self.treatment, experiment_data,
-                              name=None if len(components) > 1 else self.name,
-                              station=station, soil_id=soil_id)
-            _write_rotation_data(sim_folder / filex.name, self.treatment, experiment_data)
             for sibling in filex.parent.iterdir():
                 if self.soil is not None and sibling.suffix.upper() == ".SOL":
                     continue
                 if sibling.is_file() and sibling.suffix.upper() in (".SOL", ".CUL", ".ECO", ".SPE"):
                     shutil.copy2(sibling, sim_folder / sibling.name)
+            soil_id = soil_rows[0]["soil_id"] if soil_rows and station is not None else None
+            _write_management(sim_folder / filex.name, self.treatment, experiment_data,
+                              name=None if len(components) > 1 else self.name,
+                              station=station, soil_id=soil_id)
+            _write_rotation_data(sim_folder / filex.name, self.treatment, experiment_data)
             write_weather_file(rows, sim_folder / weather_name)
             if self.soil is not None:
                 write_soil_file(soil_rows, sim_folder / "SOIL.SOL")

@@ -159,7 +159,13 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
             continue
         value = entry[section]
         if section == 'cultivar':
-            found = _check_cultivar(value, where, filex, None, treatment, cultivar_path=cultivar_path)
+            if isinstance(value, dict) and 'coefficients' in value:
+                found = [f"{where}, cultivar: coefficients are supported in a treatment's cultivar "
+                         "section only, not per rotation component. Remove 'coefficients'."]
+                value = {key: item for key, item in value.items() if key != 'coefficients'}
+            else:
+                found = []
+            found.extend(_check_cultivar(value, where, filex, None, treatment, cultivar_path=cultivar_path))
             if isinstance(value, dict) and 'crop' in value and value['crop'] != row['CR']:
                 found.append(f"{where}, cultivar: crop {value['crop']!r} differs from the component's "
                              f"crop {row['CR']!r}. Keep the component's crop and choose one of its cultivars.")

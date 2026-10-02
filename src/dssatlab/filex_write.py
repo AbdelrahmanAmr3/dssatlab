@@ -297,7 +297,8 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
             text = path.read_bytes().decode("latin-1")
             if "cultivar" in entry:
                 from .cultivar import _cultivar_text
-                text = _cultivar_text(text, int(treatment), entry["cultivar"])
+                from .cultivar_coefficients import _changed_cultivar
+                text = _cultivar_text(text, int(treatment), _changed_cultivar(path, entry["cultivar"]))
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])
             for section in ("irrigation", "fertilizer"):
