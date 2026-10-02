@@ -249,7 +249,7 @@ def write_scenario_template(path: str | Path, filex=None) -> None:
     message = f"Scenario template path {path} already exists. Choose another path."
     if path.exists():
         raise DSSATError(message)
-    treatments = "None" if filex is None else str(read_treatment_numbers(filex))
+    treatments = "None" if filex is None else str(list(dict.fromkeys(read_treatment_numbers(filex))))
     text = _SCENARIO_TEMPLATE.format(
         treatments_comment=f"# run_treatments(filex, weather, treatments={treatments}, scenarios=path)\n")
     try:
