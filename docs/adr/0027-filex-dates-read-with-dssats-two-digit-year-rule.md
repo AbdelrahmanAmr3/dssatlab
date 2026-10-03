@@ -14,8 +14,10 @@ review round found a case where two of these readers disagreed (#221, #226, #238
 Every FileX date is read by one function, `filex._filex_date`, with DSSAT's rule (DSSAT-CSM v4.8.6.0,
 Utilities/DATES.for, Y2K_DOY): years 00-40 are 2000-2040, 41-99 are 1941-1999. The weather never
 chooses a FileX century. When the resolved date is not covered by the weather, the coverage check
-says so and names the rule. Five-digit stock weather dates are decoded once, in DSSAT's file
-selection order, with the century from the simulation start.
+says so and names the rule. Stock weather file records are a separate matter: their dates are
+decoded only while walking DSSAT's file selection order, by the existing walker, whose century
+handling is unchanged (original start for the first file, the advancing date at each rollover, the
+previous record's year within a file).
 
 ## Alternatives considered
 
