@@ -18,6 +18,12 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.write_weather_template
 
+Weather template columns are `station`, `latitude`, `longitude`, `elevation`,
+`date`, `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`,
+`wndht`, `par`. Daily `par` is in mol/m2 per day, finite and from 0 to 100
+inclusive; fill every row or omit the column. The written example omits `par`.
+See [weather columns and checks](../guide/simulation.md#prepare-the-weather-template).
+
 ::: dssatlab.write_soil_template
 
 ::: dssatlab.write_management_template

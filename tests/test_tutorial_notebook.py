@@ -37,7 +37,9 @@ def test_case17_is_an_unexecuted_stock_sequence_run():
     start = next(i for i, cell in enumerate(cells)
                  if "".join(cell["source"]).startswith("## Case 17:"))
     calls = []
-    for cell in cells[start:]:
+    end = next(i for i, cell in enumerate(cells[start + 1:], start + 1)
+               if "".join(cell["source"]).startswith("## Case 18:"))
+    for cell in cells[start:end]:
         if cell["cell_type"] != "code":
             continue
         assert cell["execution_count"] is None and cell["outputs"] == []
@@ -49,6 +51,32 @@ def test_case17_is_an_unexecuted_stock_sequence_run():
     assert isinstance(call.func.value, ast.Name) and call.func.value.id == "dl"
     assert ast.literal_eval(call.args[0]) == "case17_sequence/MSKB8902.SQX"
     assert call.keywords == []  # run() selects sequence mode from the FileX.
+
+
+def test_case18_is_an_unexecuted_stock_weather_simulation(tmp_path, sim_inputs):
+    from test_simulation_stock_weather import stock_file
+
+    cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
+    start = next(i for i, cell in enumerate(cells)
+                 if "".join(cell["source"]).startswith("## Case 18:"))
+    calls = []
+    for cell in cells[start:]:
+        if cell["cell_type"] != "code":
+            continue
+        assert cell["execution_count"] is None and cell["outputs"] == []
+        calls.extend(node for node in ast.walk(ast.parse("".join(cell["source"])))
+                     if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute))
+    call, = [node for node in calls if node.func.attr == "Simulation"]
+    assert call.func.value.id == "dl" and call.args == []
+    kwargs = {kw.arg: ast.literal_eval(kw.value) for kw in call.keywords}
+    assert kwargs == {"filex": "case1_gainesville/UFGA8201.MZX", "treatment": 1,
+                      "weather": "case1_gainesville/UFGA8201.WTH"}
+    assert any(node.func.attr == "check" and node.func.value.id == "sim18" for node in calls)
+    assert any(node.func.attr == "run" and node.func.value.id == "sim18" for node in calls)
+    # Use a small stock fixture to check the documented input shape, without DSSAT.
+    filex, _ = sim_inputs
+    assert Simulation(filex=filex, treatment=kwargs["treatment"],
+                      weather=stock_file(tmp_path)).check(False) == []
 
 
 def test_case16_residue_passes_checks(sim_inputs):

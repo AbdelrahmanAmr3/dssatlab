@@ -30,7 +30,10 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.15.0 | Checked simulation options in experiment data controls, eight initial-condition detail fields, initial conditions off (ADR 0019), and a check for one-row treatment numbers colliding with a sequence number (#168). |
 | 0.16.0 | Automatic management in experiment data controls: irrigation and planting management codes, automatic irrigation and planting window fields, irrigation in days after planting, irrigation efficiency, and events checked against the irrigation code (ADR 0020). |
 | 0.16.1 | Residue, tillage and harvest events per treatment and rotation component, including fallows; same-date events, RESID/HARVS checks and harvest_management (ADR 0021). See the [field tables](../guide/experiment.md#residues-tillage-and-harvest). |
-| 0.17.0 (current) | Sequence and forecast runs: `run()` picks mode Q for sequence treatments and Y for `.FCX` files with a generated `DSSBatch.v48`, rotation templates up to 99 components with a leading fallow, HARVS R harvest checks, and level reuse past 99 (ADR 0022, ADR 0023). See [run modes](../guide/run-filex.md#run-modes-sequences-and-forecasts). |
+| 0.17.0 | Sequence and forecast runs: `run()` picks mode Q for sequence treatments and Y for `.FCX` files with a generated `DSSBatch.v48`, rotation templates up to 99 components with a leading fallow, HARVS R harvest checks, and level reuse past 99 (ADR 0022, ADR 0023). See [run modes](../guide/run-filex.md#run-modes-sequences-and-forecasts). |
+| 0.18.0 (current) | Stock weather and soil files copied unchanged, optional daily PAR, initial conditions deeper than the soil profile (ADR 0024), and fixes for sequence weather end, inherited harvest dates and identical treatment rows (#205, #206, #207). |
+
+Importing other weather layouts and weather/soil summaries are planned for 0.18.1.
 
 ## Deliberately not built yet
 
@@ -41,11 +44,11 @@ Each of these is a later phase, kept out so the package stays small and each ste
 | Full FileX or other output parsing | Six output files (Summary.OUT, PlantGro.OUT, SoilWat.OUT, PlantN.OUT, Weather.OUT, Evaluate.OUT) are read as of 0.9; reading other output files (ET.OUT, OVERVIEW.OUT, etc.) and full FileX parsing wait for later phases. |
 | Multi-field FileX with copied FileX, more crops | Several fields from scratch are supported as of 0.11.1; multiple fields for copied FileX and further crops wait for later phases. |
 | Other management operations | Planting, irrigation, inorganic fertilizer, residue, tillage and harvest events are supported; chemical applications, day-based residue/harvest events and automatic residue/harvest blocks wait for later phases. |
-| Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |
+| Listing soil profiles | A copied FileX can use a stock `.SOL` path and its existing ID_SOIL; listing profiles for selection is a later step. |
 | Unit converters | The weather template is in DSSAT's own units, and nothing is converted silently. |
 | Gap filling or any automatic repair | `check()` reports problems and the user decides how to treat missing data. |
 | Warnings | `check()` either reports a problem or passes; there is no softer level yet. |
-| Optional weather columns beyond the template | The template is one fixed shape so it can be checked strictly. |
+| Optional daily weather columns beyond `par` | The template accepts daily PAR; other extra columns reach DSSAT only through unchanged stock weather files. |
 | Model selection | Not needed to run one FileX treatment. |
 | Parallel execution, resume, and timeouts | Multi-treatment and scenario runs execute sequentially in isolated folders; parallel execution, resuming interrupted runs, retries, and timeouts wait for later phases. |
 | Managed cleanup | Removing managed installs is out of scope for now. |

@@ -68,7 +68,7 @@ Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO s
 | Section | What `check()` rejects |
 |---|---|
 | `cultivar` | A code that is not in the one `.CUL` file for that crop beside the FileX; the message lists the codes that do exist. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. |
-| `initial_conditions` | Layer depths that do not ascend, water outside 0 to 1, negative ammonium, nitrate or residue, detail values outside the ranges below, and, when you pass `soil=`, a layer deeper than the soil profile. Values other than a dict or the quoted string `"off"` are rejected. |
+| `initial_conditions` | Nonpositive or non-ascending layer depths, water outside 0 to 1, negative ammonium, nitrate or residue, and detail values outside the ranges below. Layers may go deeper than the soil profile. Values other than a dict or the quoted string `"off"` are rejected. |
 | `controls` | Simulation or management codes outside the tables below, automatic values outside their ranges, an invalid automatic planting window, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
 
 A misspelled field or a misnamed section is reported by name with the allowed list, and every
@@ -144,6 +144,18 @@ effective HARVS R must have at least one usable dated harvest event: supplying
 `harvest: []` fails. If `harvest` is omitted, the inherited MH level must be
 nonzero and contain a usable HDATE. This check runs even without management
 edits, fixing [#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192).
+An inherited HDATE under HARVS R must also be on or after both the known
+simulation start and planting dates, including experiment-data overrides
+([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)). FileX YYDDD dates
+use DSSAT's cutoff: years 00 through 40 mean 2000 through 2040, and 41 through
+99 mean 1941 through 1999. The message names the harvest level and each failed
+bound, for example:
+
+```text
+Treatment 1: FileX HDATE '82054' (1982-02-23) in harvest level 1 is before simulation start date (1982-02-25) and planting date (1982-02-25). Move HDATE on or after these bounds, or change the start or planting date.
+```
+
+For a sequence the prefix also names `rotation[R]`.
 It does not require events under M/A or for fallows; other event/code rules still
 apply. The checks ask you to change the events or code; dssatlab never changes
 a code for you. For a crop treatment with no dated harvest under R, the message is:
