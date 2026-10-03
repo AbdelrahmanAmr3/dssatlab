@@ -154,7 +154,7 @@ def test_experiment_overrides_apply_to_template(data, rows, installed, crop, cod
     ({"cultivar": {"crop": "MZ", "code": "XX9999"}}, "MZCER048.CUL"),
     ({"cultivar": {"crop": "WH", "code": "IB0035"}}, "template crop"),
     ({"initial_conditions": {"date": "2021-03-01", "layers": [
-        {"depth": 40, "water": 0.2, "nh4": 1, "no3": 2}]}}, "depth"),
+        {"depth": 0, "water": 0.2, "nh4": 1, "no3": 2}]}}, "positive"),
 ])
 def test_experiment_checks_use_skeleton_and_fixed_genotype(data, rows, installed, entry, word):
     if "planting" in entry:

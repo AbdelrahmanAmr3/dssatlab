@@ -144,7 +144,7 @@ def _check_events(events, section, where, weather_range=None):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
-                 soil_depth, cultivar_path, *, start_date_note=None):
+                 cultivar_path, *, start_date_note=None):
     from .irrigation import _check_irrigation
     from .operations import _OPERATION_FIELDS, _check_operation
 
@@ -202,7 +202,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
     for section in ("initial_conditions", "controls"):
         if section in entry:
             if section == "initial_conditions":
-                section_problems = _check_initial_conditions(entry[section], where, soil_depth)
+                section_problems = _check_initial_conditions(entry[section], where)
                 if not section_problems and not entry_problems and text is not None:
                     try:
                         _initial_conditions_text(text, number, entry[section])
@@ -229,6 +229,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
                       soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None,
                       rotation_template=None, data_dir=None, check_harvest=True):
     """Check treatments without mutation; unreadable FileX still permits shape checks."""
+    # soil_depth is unused; it stays only while Simulation still passes it.
     from .rotation_data import _check_rotation_data
     from .operations import _check_harvest
 
@@ -276,7 +277,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
-            soil_depth if is_selected else None, cultivar_path,
+            cultivar_path,
             start_date_note=start_date_note if is_selected else
             "only the selected treatment has a resolved simulation start date")
         treatment_problems.extend(rotation_problems)
