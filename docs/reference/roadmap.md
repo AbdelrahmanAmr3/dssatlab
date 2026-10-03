@@ -32,7 +32,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.16.1 | Residue, tillage and harvest events per treatment and rotation component, including fallows; same-date events, RESID/HARVS checks and harvest_management (ADR 0021). See the [field tables](../guide/experiment.md#residues-tillage-and-harvest). |
 | 0.17.0 | Sequence and forecast runs: `run()` picks mode Q for sequence treatments and Y for `.FCX` files with a generated `DSSBatch.v48`, rotation templates up to 99 components with a leading fallow, HARVS R harvest checks, and level reuse past 99 (ADR 0022, ADR 0023). See [run modes](../guide/run-filex.md#run-modes-sequences-and-forecasts). |
 | 0.18.0 | Stock weather and soil files copied unchanged, optional daily PAR, initial conditions deeper than the soil profile (ADR 0024), and fixes for sequence weather end, inherited harvest dates and identical treatment rows (#205, #206, #207). |
-| 0.18.1 (current) | Import a NASA POWER daily CSV into the weather template (ADR 0025). START P uses the effective planting date for coverage and harvest bounds (#225); stock weather selection follows DSSAT's lookup (#223, #224, #236). |
+| 0.18.1 (current) | Import a NASA POWER daily CSV into the weather template (ADR 0025). START P uses the effective planting date for coverage and harvest bounds (#225); stock weather selection follows DSSAT's lookup (#223, #224). |
 
 Weather and soil summaries are planned for 0.18.2.
 
