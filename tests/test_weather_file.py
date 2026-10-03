@@ -1,5 +1,6 @@
 """Daily weather files match the real DSSAT sample's fixed-width layout."""
 
+import csv
 from copy import deepcopy
 from datetime import date
 from pathlib import Path
@@ -140,3 +141,30 @@ def test_template_to_weather_file(tmp_path):
         b"21065  20.0  25.0  10.0   0.0\n"
         b"21066  20.0  25.0  10.0   0.0\n"
     )
+
+
+def test_template_with_par_to_weather_file(tmp_path):
+    template = tmp_path / "weather.csv"
+    weather.write_weather_template(template)
+    with template.open(encoding="utf-8", newline="") as stream:
+        raw = list(csv.DictReader(stream))
+    for row, par in zip(raw, [0, 100, 50.06, 25, 30, 40, 50]):
+        row["par"] = par
+    with template.open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(raw[0]))
+        writer.writeheader()
+        writer.writerows(raw)
+    rows, problems = weather._parse_weather(template)
+    assert problems == []
+    path = tmp_path / "weather.WTH"
+    weather.write_weather_file(rows, path)
+    assert path.read_bytes().splitlines()[4:] == [
+        b"@DATE  SRAD  TMAX  TMIN  RAIN   PAR",
+        b"21060  20.0  25.0  10.0   0.0   0.0",
+        b"21061  20.0  25.0  10.0   0.0 100.0",
+        b"21062  20.0  25.0  10.0   0.0  50.1",
+        b"21063  20.0  25.0  10.0   0.0  25.0",
+        b"21064  20.0  25.0  10.0   0.0  30.0",
+        b"21065  20.0  25.0  10.0   0.0  40.0",
+        b"21066  20.0  25.0  10.0   0.0  50.0",
+    ]

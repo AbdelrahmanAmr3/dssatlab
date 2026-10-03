@@ -19,7 +19,7 @@ The codebase under `src/dssatlab/` includes these modules:
 - `filex_skeleton.py`: Formats and writes a minimal FileX from scratch for template simulations.
 - `filex_template.py`: Writes the FileX template YAML (`write_filex_template`), validates template structure and cultivar codes, resolves the DSSAT data directory, and lists installed template crops and cultivars (`list_crops`, `list_cultivars`).
 - `filex_write.py`: Modifies FileX text to append new management levels (planting details, irrigation schedules, fertilizer applications, residues, tillage and harvest) and repoints treatment entries without altering other sections.
-- `initial_conditions.py`: Checks the experiment `initial_conditions` section (depths, ranges, soil depth) and writes a new `INITIAL CONDITIONS` level in the copied FileX.
+- `initial_conditions.py`: Checks the experiment `initial_conditions` section (positive ascending depths and value ranges, allowing layers deeper than the soil profile) and writes a new `INITIAL CONDITIONS` level in the copied FileX.
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
 - `management.py`: Validates management dictionary shape, field keys, numeric bounds, date order, and start date / weather bounds; formats structured check report lines.
 - `operations.py`: Holds residue, tillage and harvest field tables, event checks (including RESID/HARVS), component harvest end rules and FileX row values ([fields and columns](../guide/experiment.md#residues-tillage-and-harvest)).
@@ -30,6 +30,7 @@ The codebase under `src/dssatlab/` includes these modules:
 - `runner.py`: Executes the DSSAT executable on a FileX and moves generated output files into a dated run directory.
 - `simulation.py`: Coordinates pre-run checks, staging, weather, soil, and management file generation, execution, and output scanning for a single simulation.
 - `soil.py`: Writes the soil template, parses CSV/DataFrame/dict soil data, validates ranges and layer depths, and formats DSSAT soil files (`*.SOL`).
+- `stock.py`: Reads stock weather metadata and daily values into the shared checks, checks stock soil IDs and filenames, and copies stock weather/soil bytes unchanged ([ADR 0024](../adr/0024-stock-weather-and-soil-files-copied-unchanged.md)).
 - `weather.py`: Writes the weather template, parses CSV/DataFrame/dict weather data, validates ranges and dates, and writes DSSAT weather files (`*.WTH`).
 
 ## State management
@@ -92,6 +93,13 @@ Weather source + optional soil source + optional management source + FileX
 
 Weather and soil data are accepted as CSV file paths, lists of dictionary rows, or pandas DataFrames. When CSV files are provided, table reading helpers open them as UTF-8 (handling optional BOM) using the standard library `csv` module. If a pandas DataFrame is passed, it is converted to row dictionaries via `to_dict("records")` without importing pandas unless the object is detected (ADR 0002).
 
+With a copied FileX, weather also accepts a stock `.WTH` path or list of paths,
+and soil a stock `.SOL` path. `stock.py` reads these narrowly using Latin-1:
+weather metadata, dates and daily values for the usual checks; soil profile IDs
+and the filename DSSAT looks up. It does not parse stock soil layers. Optional
+daily `par` in weather-template rows is checked as finite, 0 to 100 mol/m2 per
+day, with a value on every row when present.
+
 Management data is accepted as a YAML file path or a plain Python dictionary. When a YAML file is provided, `_load_management` parses it using PyYAML's `SafeLoader` with strict duplicate-key rejection (ADR 0003). PyYAML is never imported if a dictionary is passed or if `management` is omitted.
 
 ### 2. Pre-run checks
@@ -112,7 +120,10 @@ When checks pass, `Simulation.run()` creates a dated simulation folder (`dssat_s
 
 When management data is provided, `filex_write._write_management()` edits the copied FileX inside the simulation folder: it appends new levels to the planting details, irrigation, or fertilizer sections and updates the treatment pointer (`MP`, `MI`, `MF`). The original FileX remains untouched.
 
-When soil data is provided, `Simulation.run()` writes `SOIL.SOL` directly into the simulation folder and skips copying sibling `.SOL` files. Because a `.SOL` file in the FileX folder always takes precedence over DSSAT's own `Soil` directory, DSSAT uses the user-provided soil profile. If no soil data was provided, sibling `.SOL` files are copied as before.
+When soil data is provided, `Simulation.run()` writes `SOIL.SOL` directly into the simulation folder and skips copying sibling `.SOL` files. A stock soil path is copied byte for byte under its own name, also replacing sibling soil files. Because a `.SOL` file in the FileX folder always takes precedence over DSSAT's own `Soil` directory, DSSAT uses the user-provided soil profile. If no soil was provided, sibling `.SOL` files are copied as before.
+
+Stock weather paths are copied byte for byte under upper-case names instead of
+generating weather; other columns, flags and a trailing DOS EOF byte survive.
 
 `weather.write_weather_file()` formats the parsed weather rows into DSSAT's fixed-width ASCII weather file format (`*.WTH`), writing station metadata headers and daily weather records directly into the simulation folder. The filename is derived from the station code and start date using DSSAT naming rules (`_weather_filename`).
 

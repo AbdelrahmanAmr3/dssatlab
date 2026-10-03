@@ -19,7 +19,7 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
-Version 0.17.0 adds sequence (Q) and forecast (Y) modes in `run()`, rotations of 2 to 99 components with leading fallow, dated-harvest checks for HARVS R, and free-level reuse past 99.
+Version 0.18.0 adds stock weather and soil files copied unchanged, optional daily PAR in the weather template, deeper initial conditions, and fixes sequence weather coverage, inherited harvest dates and identical treatment rows.
 
 Version 0.16.1 adds residue, tillage and harvest events per treatment or rotation component (including fallow), with RESID/HARVS checks and `harvest_management`.
 
@@ -101,17 +101,19 @@ Templates also support multi-treatment experiments and several fields: supply a 
 
 Values are in DSSAT's own units and nothing is converted:
 
-- **Weather template**: comma-separated UTF-8 CSV with `station`, `latitude`, `longitude`, `elevation`, `date` (`YYYY-MM-DD`), `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`, `wndht` (default -99). Station and coordinates repeat on every row; one row per calendar day without gaps or duplicates.
+- **Weather template**: comma-separated UTF-8 CSV with `station`, `latitude`, `longitude`, `elevation`, `date` (`YYYY-MM-DD`), `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`, `wndht` (default -99). Optional daily `par` is in mol/m2 per day, finite and from 0 to 100 inclusive; fill every row or omit the column. Station and coordinates repeat on every row; one row per calendar day without gaps or duplicates.
 - **Soil template**: one soil profile, one row per layer. Required profile columns: `soil_id` (1 to 10 ASCII characters matching the FileX `ID_SOIL`), `salb`, `slro`, `sldr`, `slpf`. Required layer columns: `slb` (cm, strictly increasing), `slll`, `sdul`, `ssat` (strictly `slll < sdul < ssat`), `srgf`. Optional columns (`slnf`, `ssks`, `sbdm`, `sloc`, etc.) default to -99. Profile values repeat identically on every row.
 - **Management template**: YAML file or Python dict organized under `treatments -> {treatment_number: ...}` with optional `planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, `harvest`, `cultivar`, `initial_conditions`, and `controls` sections (`dl.write_experiment_template()` writes a commented file covering these sections; all are checked and applied to a copy of your FileX, see the Guide). All dates must be quoted ISO strings (`"YYYY-MM-DD"`). Omitted sections keep the FileX's original levels; empty lists (`[]`) specify no events (level 0). PyYAML is optional (`pip install pyyaml` or `pip install dssatlab[yaml]`) and only imported when loading a YAML path; plain dictionaries require zero runtime dependencies.
 
 Inputs for weather and soil can be given as a CSV path, a list of dicts, or a pandas DataFrame (pandas is never required). Management can be given as a YAML path or a plain dictionary.
 
+With a copied FileX (`filex=`), weather also accepts a stock `.WTH` path or a list of paths, and soil a stock `.SOL` path. Weather files are copied byte for byte under upper-case names; soil keeps its own name. Stock files need names DSSAT looks up and pass narrow checks before running. See [stock weather](docs/guide/simulation.md#use-stock-weather-files) and [stock soil](docs/guide/soil.md#use-a-stock-soil-file).
+
 What happens:
 
 - `check()` reports every problem it finds: wrong or unknown columns/keys, empty or non-numeric values, bad dates or depths, gaps, impossible values (e.g. `tmax < tmin`, negative rain, non-increasing depths, water limits out of order, out-of-order event dates), and mismatches with the FileX (station code, start date coverage, case-sensitive `soil_id` match, planting date before start date). Nothing is fixed or filled in automatically. When management is supplied, a structured Checks report is printed.
 - `run()` raises one `DSSATCheckError` listing all problems if there are any, before writing anything.
-- Otherwise `run()` makes a new `dssat_sim_<date>` folder beside your FileX. With `soil`, it writes `SOIL.SOL` and does not copy sibling `.SOL` files (a local `.SOL` beats DSSAT's own Soil folder); `.CUL`, `.ECO`, and `.SPE` files are copied as before. Without `soil`, sibling `.SOL` files are copied. With `management`, it edits the copied FileX to append new management levels and repoints the selected treatment row. The generated weather file is written to the simulation folder, DSSAT runs there, and output files are collected into a `dssat_run_<date>` folder inside it. Your original files are never changed.
+- Otherwise `run()` makes a new `dssat_sim_<date>` folder beside your FileX. With soil data, it writes `SOIL.SOL`; with stock soil, it copies that file unchanged. Both replace sibling `.SOL` files (a local `.SOL` beats DSSAT's own Soil folder); `.CUL`, `.ECO`, and `.SPE` files are copied as before. Without `soil`, sibling `.SOL` files are copied. With `management`, it edits the copied FileX to append new management levels and repoints the selected treatment row. Weather is generated from template data or copied from the stock paths into the simulation folder, DSSAT runs there, and output files are collected into a `dssat_run_<date>` folder inside it. Your original files are never changed.
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 

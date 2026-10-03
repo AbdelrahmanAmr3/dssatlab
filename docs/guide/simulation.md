@@ -1,7 +1,7 @@
 # Run a Simulation from your weather data
 
 A `Simulation` combines one treatment of an existing FileX with your daily weather
-data, or creates a FileX from a template and your weather and soil data.
+data or stock weather files, or creates a FileX from a template and your weather and soil data.
 To supply your own soil data, see [Run with soil data](soil.md).
 Prepare the FileX and its supporting files, then
 [find or install a DSSAT executable](install.md). The examples use
@@ -72,7 +72,9 @@ The FileX template accepts either `treatment_name` (one treatment) or `treatment
 ```yaml
 # Single treatment:
 treatment_name: "My treatment"
+```
 
+```yaml
 # Or multiple treatments:
 treatments:
   - "Control"
@@ -208,6 +210,89 @@ current directory for a dict. It writes the FileX (holding all treatments), weat
 copies the crop's required genotype files from `Genotype`. Your original files are unchanged.
 `run_treatments()` also accepts `filex_template=` to run all or selected template treatments (see [Run treatments and scenarios](scenarios.md)).
 
+## Use stock weather files
+
+With a copied FileX (`filex=`), pass a string or `Path` ending in `.WTH`
+(case-insensitive), or a non-empty list of such paths:
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation(filex="UFGA7601.PNX", weather="UFGA7601.WTH")
+print(sim.check())
+result = sim.run()
+```
+
+For several yearly files, for example, use
+`weather=["MSKB8901.WTH", "MSKB9001.WTH"]` with the corresponding copied FileX.
+`run()` copies every supplied file byte for byte into the simulation folder,
+under its upper-case filename (`ufga7601.wth` becomes `UFGA7601.WTH`). No weather
+file is regenerated. Extra columns and flags, line endings and a trailing DOS EOF
+byte (Ctrl-Z) are preserved. A Ctrl-Z inside the daily records is rejected.
+Stock files also work through `run_treatments()`, scenarios and `run_sweep()`.
+FileX templates, including per-field sources, require weather data rows instead.
+
+`check()` reads the station from the first four filename characters (upper-case),
+and latitude, longitude and elevation by the `@ INSI` header. It reads daily
+DATE, SRAD, TMAX, TMIN and RAIN by their fixed header spans.
+One trailing letter flag on a number is accepted. Other daily columns, including PAR, are ignored
+by the checks and reach DSSAT unchanged. Required weather values of `-99` fail
+the usual range checks; nothing is filled or repaired.
+
+Dates may be YYDDD (`@DATE`, without `$WEATHER`) or YYYYDDD (`@  DATE`, with a
+`$WEATHER` format marker). A `*WEATHER DATA` file uses five-digit dates; seven-digit
+dates with that marker are rejected because DSSAT would read only the first five digits.
+Five-digit weather dates use
+DSSAT's weather century rule, anchored to the simulation start, including a
+first-record adjustment back one century when the record falls after that start,
+and a 99-to-00 rollover. Files are checked together in the order supplied: daily dates
+must be ascending, unique and continuous across file boundaries. Coordinates,
+daily ranges use the [weather template checks](#prepare-the-weather-template).
+Start coverage, the last seasonal start and scheduled sequence ends use the same
+FileX checks as template weather. Stock weather must also cover a fixed harvest
+(HARVS R), including the last season's inherited HDATE. Supplied experiment-data event dates are
+checked against the weather range; maturity-driven endings still need the
+post-run warning scan.
+
+The filenames must be ones DSSAT looks up for the FileX `WSTA` and simulated
+years: a four-character WSTA uses `<WSTA4><YY>01.WTH` per year or `<WSTA4>.WTH`.
+An eight-character WSTA also permits its explicit `<WSTA8>.WTH`; if its last two
+characters are `01`, yearly names are allowed too. Two paths cannot have the
+same name after upper-casing. Stock weather must match the FileX station unless
+experiment overrides repoint the copied field.
+
+dssatlab does not yet check whether an installed weather file in DSSAT's weather path would be read instead of the supplied file (planned, issue #224); supply weather under a name no installed file uses.
+
+### Stock weather problems
+
+These are the stock-specific messages, with `{...}` standing for the reported
+path, value or list. `{error}` is the operating-system read error; quoted values
+use Python's representation. Usual weather and FileX problems are reported too.
+
+```text
+Weather data mixes file paths and data rows. Supply only stock weather file paths, or only weather data rows or a DataFrame.
+A stock weather file needs a copied FileX. Supply weather data rows for a FileX template.
+Cannot read stock weather file {path}: {error}. Supply a readable stock weather file path.
+Stock weather file {path}: missing required column {label}. Supply a stock weather file with column {label}.
+Stock weather file {path}: DATE header spans {width} characters. Supply @DATE for YYDDD, or $WEATHER with @  DATE for YYYYDDD dates.
+Stock weather file {path}: DATE header spans {width} characters but the $WEATHER marker is {present_or_absent}. Checked the format marker and DATE width. Supply $WEATHER with @  DATE and YYYYDDD dates, or omit $WEATHER and use @DATE with YYDDD dates.
+Stock weather files {first_path} and {path} have the same file name {name} after upper-casing. Supply only one file with each name for the simulation folder.
+Stock weather file {path}: DSSAT does not look up this name for WSTA {station!r} in the simulated years. Expected {names}. Rename the file or correct the FileX WSTA.
+Stock weather file {path}, line {line}: invalid date {value!r}. Supply a valid YYDDD or YYYYDDD calendar date matching the DATE header width.
+```
+
+`{label}` is LAT, LONG, ELEV, DATE, SRAD, TMAX, TMIN or RAIN. A station mismatch
+names the stock weather file:
+
+```text
+FileX WSTA 'UFGA' expects station 'UFGA', but stock weather file XYZZ8201.WTH has station 'XYZZ'. Make the station codes exactly equal; filenames are case-sensitive on Linux.
+```
+
+On real DSSAT, stock UFGA7601.WTH matched DSSAT's reference on 6/6 Summary rows
+(HWAM 4348 to 4829), as did the weather template with `par`. UFGA7609 matched
+1/1 (HWAM 5115). A list of MSKB8901.WTH and MSKB9001.WTH ran across the year
+boundary like a hand run. See [ADR 0024](../adr/0024-stock-weather-and-soil-files-copied-unchanged.md).
+
 ## Prepare the weather template
 
 Create an example CSV in a notebook cell:
@@ -238,6 +323,7 @@ Values use DSSAT's own units; nothing is converted.
 | `tmax` | Yes | Daily maximum temperature in °C, from -60 to 60; must be at least `tmin` |
 | `tmin` | Yes | Daily minimum temperature in °C, from -60 to 60 |
 | `rain` | Yes | Daily rainfall in mm, from 0 to 1000 |
+| `par` | No | Daily photosynthetically active radiation in mol/m² per day, from 0 to 100; finite and filled on every row when present |
 | `tav` | No | Station average temperature in °C |
 | `amp` | No | Station temperature amplitude in °C |
 | `refht` | No | Reference height in m |
@@ -248,10 +334,23 @@ and finite. Supply one row per calendar day in ascending order, without gaps or
 duplicates. `station`, `latitude`, `longitude`, and `elevation` must be identical
 on every row.
 
-Optional columns may be omitted or left empty; they are written as `-99` (not
-given). Supplied optional values must be finite numbers. The weather file uses
-their values from the first row, so put station values there. The checks do not
-require optional values to be identical across rows.
+Optional station columns (`tav`, `amp`, `refht`, `wndht`) may be omitted or left
+empty; they are written as `-99` (not given). Supplied values must be finite
+numbers. The weather file uses their values from the first row, so put station
+values there. The checks do not require these values to be identical across rows.
+
+The template writer's example omits `par`; add it when you have daily PAR.
+Unlike station values, `par` must be supplied on every row if present, including
+in a list of dicts. A partially or entirely empty PAR column fails the checks.
+Daily values may vary and must be finite and from 0 to 100 inclusive. The writer
+adds PAR after RAIN, with one decimal place, only when `par` is present. For an
+empty column, a non-finite value and an out-of-range value, the messages are:
+
+```text
+Weather column 'par' is empty on {n} rows. Supply par on every row or drop the column.
+Weather data row {line}, column 'par': found {value}. Supply a non-empty finite number in mol/m2 per day.
+Weather data row {line}, column 'par': found {value}; allowed range is 0 to 100 mol/m2 per day. Correct the value using DSSAT's units.
+```
 
 ## Create a Simulation and inspect the checks
 
@@ -300,10 +399,12 @@ checks, including when no experiment data is supplied. Giving a name alone
 leaves the copied field IDs unchanged.
 
 **Start-date coverage is checked only when `START` is `S`.** In that case, a
-weather date must match the two-digit year and day of year in `SDATE`. These
-checks do not establish how long the crop will need weather. Supply weather for
-the full period DSSAT will simulate. They also do not check that the DSSAT
-executable can run.
+weather date must match the two-digit year and day of year in `SDATE`.
+Seasonal checks cover the last season's start; sequence checks require weather
+through the scheduled end of the component that crosses the stopping boundary
+([sequence coverage](sequence.md#sequence-checks)). Maturity-driven endings are
+known only during the run. Supply weather for the full period DSSAT will simulate.
+The checks do not establish that the DSSAT executable can run.
 
 ## Run after the checks
 
@@ -332,14 +433,17 @@ your FileX, adding a numeric suffix if needed. That simulation folder contains:
 
 - A copy of the FileX.
 - Copies of every `.SOL`, `.CUL`, `.ECO`, and `.SPE` file directly beside the
-  original FileX; suffix matching ignores case. (When you supply your own soil data
-  via `soil=...`, `Simulation.run()` writes `SOIL.SOL` and does not copy sibling
+  original FileX; suffix matching ignores case. (When you supply your own soil
+  via `soil=...`, `Simulation.run()` writes `SOIL.SOL` from template data or copies
+  the stock file under its own name, and does not copy sibling
   `.SOL` files; see [Run with soil data](soil.md).)
-- One generated `.WTH` weather file from your weather data.
+- One generated `.WTH` weather file from your weather data, or the supplied stock
+  weather files copied byte for byte under upper-case names.
 - A `dssat_run_YYYY-MM-DD_HHMMSS` run directory containing the files collected
   after DSSAT exits.
 
-The source weather CSV and existing weather files are not copied. If `WSTA` has
+The source weather CSV is not copied; stock weather paths are copied as above.
+For generated weather, if `WSTA` has
 eight characters, the generated weather file is named `<WSTA>.WTH`. If it has
 four, the name is `<WSTA><two-digit year from SDATE>01.WTH`. This naming uses
 `SDATE` for every `START` option. Your original FileX and supporting files are

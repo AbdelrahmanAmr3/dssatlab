@@ -1,13 +1,27 @@
 """Read only a treatment's field, weather station, soil profile and start."""
 
+from datetime import date, timedelta
 from pathlib import Path
 import re
 
 from .weather import _dssat_date
 
 
+def _filex_date(value):
+    """Return a FileX YYDDD calendar date, or None for an unreadable date."""
+    if not isinstance(value, str) or not re.fullmatch(r'[0-9]{5}', value):
+        return None
+    # DSSAT-CSM v4.8.6.0, Utilities/DATES.for, Y2K_DOY:
+    # YY <= 40 means 2000 + YY; larger YY means 1900 + YY.
+    yy, doy = int(value[:2]), int(value[2:])
+    year = (2000 if yy <= 40 else 1900) + yy
+    if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
+        return None
+    return date(year, 1, 1) + timedelta(days=doy - 1)
+
+
 def _treatment_rows(text, problems=None):
-    """Read N/R once per text; valid repeated component rows select mode Q's layout.
+    """Return (line, (N, R)) pairs in file order, keeping identical rows.
 
     In a sequence FileX only the rows of a repeated N use the sequence columns: a one-row
     treatment runs in a normal mode, where DSSAT reads it with the normal columns.
@@ -29,12 +43,13 @@ def _treatment_rows(text, problems=None):
     sequence = len(numbers) == len(rows) and all(
         re.fullmatch(r" [1-9]|[1-9][0-9]", line[2:4]) for line in rows)
     repeated = {n for n in numbers if numbers.count(n) > 1} if sequence else set()
-    result = {}
+    result = []
     for line in rows:
         width = 2 if sequence and int(line[:2]) in repeated else 3
         n = line[:width].strip()
-        result[line] = (n if n.isascii() and n.isdigit() else "", line[width:4].strip())
-        if problems is not None and width == 3 and result[line][0] and int(n) in repeated:
+        number = n if n.isascii() and n.isdigit() else ""
+        result.append((line, (number, line[width:4].strip())))
+        if problems is not None and width == 3 and number and int(n) in repeated:
             sequence_row = next(row for row in rows if int(row[:2]) == int(n))
             problems.append(
                 f"TREATMENTS rows {line!r} (one-row treatment {int(n)}) and "
@@ -51,7 +66,7 @@ def _section_row(text, section, key, level, required):
 
 def _section_rows(text, section, key, level, required):
     """Yield all rows of a level across blocks with the needed columns."""
-    treatments = _treatment_rows(text) if section == "TREATMENTS" else {}
+    treatments = dict(_treatment_rows(text)) if section == "TREATMENTS" else {}
     in_section = False
     matching_header = False
     found = False
@@ -72,6 +87,10 @@ def _section_rows(text, section, key, level, required):
             for index, token in enumerate(tokens):
                 name = token.group().lstrip("@").rstrip(".")
                 end = token.end()
+                if section == "FIELDS" and index == 0 and len(tokens) > 1:
+                    # DSSAT InputModule/IPEXP.for, IPFLD FORMAT 60: I3,A8,1X,2A4.
+                    # The level includes the @ column: "  1UFGA0001" or " 12UFGA0001".
+                    end = tokens[1].start()
                 if name == "ID_SOIL":
                     # Its ten-character value extends past the short header, but
                     # never into the next column.
@@ -255,7 +274,7 @@ def read_treatment_numbers(source) -> list[int]:
         raise ValueError(f"Cannot read FileX {source}: {error}. Supply a readable FileX path.") from error
     in_section = found_section = has_header = False
     numbers = []
-    rows = _treatment_rows(text)
+    rows = dict(_treatment_rows(text))
     for line in text.splitlines():
         if line.startswith("*"):
             in_section = line[1:].strip().split(" ")[0] == "TREATMENTS"

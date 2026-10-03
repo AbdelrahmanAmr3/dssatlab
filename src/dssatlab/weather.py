@@ -16,7 +16,7 @@ LONGITUDE_RANGE = (-180, 180)  # Longitude, degrees east.
 ELEVATION_RANGE = (-500, 9000)  # Station elevation, m.
 REQUIRED = ("station", "latitude", "longitude", "elevation", "date",
             "srad", "tmax", "tmin", "rain")
-OPTIONAL = ("tav", "amp", "refht", "wndht")
+OPTIONAL = ("tav", "amp", "refht", "wndht", "par")
 
 
 def write_weather_template(path: str | Path) -> None:
@@ -25,6 +25,7 @@ def write_weather_template(path: str | Path) -> None:
     Units: srad in MJ/m2 per day; tmax, tmin, tav and amp in degrees C;
     rain in mm; latitude/longitude in degrees; elevation/refht/wndht in m.
     Optional station values default to -99 (not given). Nothing is converted.
+    Add optional par in mol/m2 per day (0 to 100), filled on every row, or omit it.
     An existing path raises DSSATError, preserving the user's data.
 
     Args:
@@ -40,7 +41,7 @@ def write_weather_template(path: str | Path) -> None:
     try:
         with path.open("x", encoding="utf-8", newline="") as stream:
             writer = csv.writer(stream)
-            writer.writerow(REQUIRED + OPTIONAL)
+            writer.writerow(REQUIRED + tuple(name for name in OPTIONAL if name != "par"))
             for day in range(1, 8):
                 writer.writerow(("DEMO", 45, -100, 200, f"2021-03-{day:02}",
                                  20, 25, 10, 0, -99, -99, -99, -99))
@@ -57,6 +58,7 @@ def write_weather_file(rows: list[dict], path: str | Path) -> Path:
     """
     path = Path(path)
     first = rows[0]
+    daily_fields = ("srad", "tmax", "tmin", "rain") + (("par",) if "par" in first else ())
     station_fields = (("latitude", 9, 3), ("longitude", 9, 3),
                       ("elevation", 6, 0), ("tav", 6, 1), ("amp", 6, 1),
                       ("refht", 6, 2), ("wndht", 6, 2))
@@ -68,11 +70,11 @@ def write_weather_file(rows: list[dict], path: str | Path) -> Path:
             # Adding positive zero after rounding removes negative zero on 3.10.
             value = round(first[name], decimals) + 0.0
             stream.write(f"{value:{width}.{decimals}f}")
-        stream.write("\n@DATE  SRAD  TMAX  TMIN  RAIN\n")
+        stream.write("\n@DATE  SRAD  TMAX  TMIN  RAIN" + ("   PAR" if "par" in first else "") + "\n")
         for row in rows:
             day = row["date"]
             stream.write(_dssat_date(day))
-            for name in ("srad", "tmax", "tmin", "rain"):
+            for name in daily_fields:
                 value = round(row[name], 1) + 0.0
                 stream.write(f"{value:6.1f}")
             stream.write("\n")
@@ -179,7 +181,7 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
 
     CSV paths, plain rows and DataFrames share the same checks. Dates may be
     YYYY-MM-DD text, date objects or midnight datetimes; they become date objects.
-    Numbers become floats, absent optional values -99.
+    Numbers become floats, absent optional station values -99; par stays absent.
     Invalid fields are omitted; consumers must require no problems before using
     parsed rows. The source is never mutated, sorted, repaired or written.
     """
@@ -200,10 +202,13 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
               "tmin": (*TEMPERATURE_RANGE, "degrees C"),
               "rain": (*RAIN_RANGE, "mm"), "latitude": (*LATITUDE_RANGE, "degrees"),
               "longitude": (*LONGITUDE_RANGE, "degrees"),
-              "elevation": (*ELEVATION_RANGE, "m")}
+              "elevation": (*ELEVATION_RANGE, "m"), "par": (0, 100, "mol/m2 per day")}
     units = {name: bounds[2] for name, bounds in ranges.items()}
     units.update(tav="degrees C", amp="degrees C", refht="m", wndht="m")
     parsed, dated_rows, station_values = [], [], {}
+    has_par = "par" in (columns or ()) or any(
+        isinstance(row, dict) and "par" in row for _, row in rows)
+    empty_par = 0
     for line, row in rows:
         if not isinstance(row, dict):
             problems.append(("row shape", f"Weather data row {line} is not a dict. "
@@ -216,13 +221,19 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                             {kind for kind, _ in problems})
         result = {}
         for name in REQUIRED + OPTIONAL:
+            if name == "par" and not has_par:
+                continue
             if name not in row and name not in OPTIONAL:
                 if columns is not None and name in columns:
-                    problems.append((f"missing {name}", f"Weather data row {line}: "
+                    day = f" ({result['date']})" if "date" in result else ""
+                    problems.append((f"missing {name}", f"Weather data row {line}{day}: "
                                      f"missing value for {name!r}. Supply a value."))
                 continue
             value = row.get(name)
             where = f"Weather data row {line}, column {name!r}"
+            if name in REQUIRED and "date" in result and (value is None or
+                    isinstance(value, str) and not value.strip()):
+                where += f" ({result['date']})"
             if name == "station":
                 if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9]{4}", value):
                     problems.append(("station", f"{where}: found {_show_value(value)}. "
@@ -251,6 +262,9 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
             else:
                 if name in OPTIONAL and (value is None or
                                          isinstance(value, str) and not value.strip()):
+                    if name == "par":
+                        empty_par += 1
+                        continue
                     value = -99
                 try:
                     number = float(value)
@@ -265,6 +279,8 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                 if name in ranges:
                     low, high, unit = ranges[name]
                     if not low <= number <= high:
+                        if number == -99 and name in REQUIRED and "date" in result:
+                            where += f" ({result['date']})"
                         problems.append((f"range {name}", f"{where}: found {_show_value(value)}; "
                                          f"allowed range is {low} to {high} {unit}. "
                                          "Correct the value using DSSAT's units."))
@@ -284,5 +300,8 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                                  f"{first_line} has {first_value!r}. Use identical "
                                  f"{name} values on every row."))
         parsed.append(result)
+    if empty_par:
+        problems.append(("empty par", f"Weather column 'par' is empty on {empty_par} rows. "
+                         "Supply par on every row or drop the column."))
     _check_dates(dated_rows, problems)
     return parsed, _all_messages(problems)

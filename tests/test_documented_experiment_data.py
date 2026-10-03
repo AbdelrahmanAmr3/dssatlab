@@ -1,6 +1,7 @@
 """Guide experiment examples pass the public checks without running DSSAT."""
 
 import ast
+from copy import deepcopy
 from datetime import date, timedelta
 from pathlib import Path
 import re
@@ -59,28 +60,44 @@ def _examples():
 EXAMPLES = list(_examples())
 
 
-def _rotation_templates():
+def _filex_templates():
     yaml = pytest.importorskip('yaml')
     for page in PAGES:
         text = page.read_text(encoding='utf-8')
         for number, block in enumerate(re.findall(r'```yaml\n(.*?)```', text, re.S)):
             template = yaml.safe_load(block)
-            if isinstance(template, dict) and isinstance(template.get('rotation'), list):
+            if isinstance(template, dict) and (
+                    'crop' in template or isinstance(template.get('rotation'), list) or
+                    'treatment_name' in template or isinstance(template.get('treatments'), list)):
                 yield f'{page.name}:yaml:{number}', template
 
 
-ROTATIONS = list(_rotation_templates())
+TEMPLATES = list(_filex_templates())
 
 
-@pytest.mark.parametrize('label,template', ROTATIONS, ids=[label for label, _ in ROTATIONS])
-def test_guide_rotation_templates(label, template, rows, installed):
+@pytest.mark.parametrize('label,template', TEMPLATES, ids=[label for label, _ in TEMPLATES])
+def test_guide_filex_templates(label, template, data, rows, installed):
     genotype = installed.executable.parent / 'Genotype' / 'WHCER048.CUL'
     genotype.write_bytes(genotype.read_bytes() + b'IB1500 Wheat\n')
-    first = date(1977, 1, 1)
+    if 'rotation' in template:
+        first, last = date(1977, 1, 1), date(1982, 1, 1)
+    else:
+        # Short name-only examples use the preceding single-crop template's fields.
+        complete = deepcopy(data)
+        if 'treatments' in template:
+            complete.pop('treatment_name')
+        complete.update(template)
+        template = complete
+        first, last = date(2021, 1, 1), date(2022, 1, 1)
     weather = [dict(rows[0][0], date=(first + timedelta(days=i)).isoformat())
-               for i in range((date(1982, 1, 1) - first).days)]
+               for i in range((last - first).days)]
+    fields = set(template.get('treatment_fields', [1]))
+    soil = rows[1]
+    if len(fields) > 1:
+        weather, soil = ({field: weather for field in fields},
+                         {field: soil for field in fields})
     assert Simulation(filex_template=template, weather=weather,
-                      soil=rows[1]).check(False) == [], label
+                      soil=soil).check(False) == [], label
 
 
 @pytest.mark.parametrize('label,experiment', EXAMPLES, ids=[label for label, _ in EXAMPLES])

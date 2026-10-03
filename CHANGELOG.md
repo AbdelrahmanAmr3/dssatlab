@@ -2,6 +2,33 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.18.0] - 2026-10-03
+
+### Added
+- `weather=` accepts a stock `.WTH` path or a list of paths with a copied FileX. Files are copied byte for byte under upper-case names; checks read station metadata, dates and daily values without dropping extra columns ([ADR 0024](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0024-stock-weather-and-soil-files-copied-unchanged.md)).
+- Optional weather template `par`, daily photosynthetically active radiation in mol/m2 per day, written as PAR. Values must be finite, from 0 to 100 inclusive, and supplied on every row when the column is present.
+- `soil=` accepts a stock `.SOL` path with a copied FileX, copied byte for byte under its own name instead of sibling soil files. Checks verify the FileX profile ID and the filename DSSAT reads.
+- Stock-file and PAR guides, and tutorial Case 18 for stock weather with a copied FileX.
+
+### Changed
+- Initial-condition layers may extend deeper than the soil profile; depths still must be positive and strictly ascending.
+
+### Fixed
+- Sequence weather must reach the end of the component that crosses DSSAT's stopping boundary when its end is known before the run ([#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205)).
+- An inherited HARVS R harvest dated before the simulation start or planting date is rejected, with its HDATE, harvest level and bounds; in sequences only the first component uses a simulation-start bound ([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)).
+- Identical TREATMENTS rows remain separate: `run()` selects Q for two rows, while `Simulation.check()` reports their duplicate R numbers ([#207](https://github.com/AbdelrahmanAmr3/dssatlab/issues/207)).
+- A trailing DOS EOF byte (Ctrl-Z) in a stock weather or soil file is accepted and preserved in the copy.
+- Stock weather values skip separator-column flags, and their dates use the planting date (including overrides) under START P; START S keeps the simulation start date.
+- Stock weather with an unresolved simulation start (including START E) reports an actionable problem before a run or identity edit.
+- Seven-digit stock weather dates require the `$WEATHER` marker and `@  DATE`; inconsistent markers and date widths are rejected.
+
+### Notes
+- On real DSSAT, stock UFGA7601.WTH and the weather template with `par` each matched DSSAT's reference on 6/6 Summary rows (HWAM 4348 to 4829); UFGA7609 matched 1/1 (HWAM 5115).
+- A stock `.SOL` gave the same outputs as the sibling-copy soil. A list of MSKB8901.WTH and MSKB9001.WTH ran across the year boundary like a hand run.
+- UFGA8222 with 180 cm initial conditions on soil profiles from 60 to 210 cm matched 12/12. MSKB8921 with weather ending 1998-02-28 was refused (needs 1998-05-06) and ran 18 rows with complete weather. Two identical TREATMENTS rows ran in Q, with 2 rows matching a hand run.
+- Importing other weather layouts and weather/soil summaries are planned for 0.18.1.
+- Zero runtime dependencies are preserved.
+
 ## [0.17.0] - 2026-10-03
 
 ### Added

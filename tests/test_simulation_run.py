@@ -98,6 +98,20 @@ def snapshot(folder):
             if not path.relative_to(folder).parts[0].startswith("dssat_sim_")}
 
 
+def test_run_writes_daily_par(inputs, fake_dssat):
+    rows = [dict(row, par=value) for row, value in zip(inputs.rows, [0, 50.06, 100])]
+    sim = Simulation(inputs.filex, 2, rows)
+    assert sim.check() == []
+    sim.run()
+    folder = Path(fake_dssat.calls[0][1])
+    assert (folder / "UFGA8201.WTH").read_bytes().splitlines()[4:] == [
+        b"@DATE  SRAD  TMAX  TMIN  RAIN   PAR",
+        b"82055  20.0  25.0  10.0   0.0   0.0",
+        b"82056  20.0  25.0  10.0   0.0  50.1",
+        b"82057  20.0  25.0  10.0   0.0 100.0",
+    ]
+
+
 def test_filex_name_over_twelve_characters_is_a_check_problem_and_creates_nothing(
         inputs, fake_dssat):
     long_name = inputs.filex.with_name("UFGA82010.MZX")  # 13 characters
@@ -251,7 +265,7 @@ def test_all_problems_stop_before_writing_or_running(
     listing = set(inputs.filex.parent.iterdir())
     forbidden = Mock(side_effect=AssertionError("checks must finish before writing"))
     monkeypatch.setattr(Path, "mkdir", forbidden)
-    monkeypatch.setattr(simulation_module, "write_weather_file", forbidden)
+    monkeypatch.setattr("dssatlab.stock.write_weather_file", forbidden)
 
     with pytest.raises(DSSATCheckError) as error:
         sim.run()

@@ -113,8 +113,8 @@ def test_shared_identity_requires_equal_parsed_rows(
             assert (folder / "SOIL.SOL").read_text().count("*SOIL123456") == 1
 
 
-@pytest.mark.parametrize("check", ["start", "harvest", "management", "depth"])
-def test_selected_field_supplies_dates_and_depth(fields, installed, check):
+@pytest.mark.parametrize("check", ["start", "harvest", "management"])
+def test_selected_field_supplies_dates(fields, installed, check):
     data = fields["filex_template"]
     if check == "start":
         fields["weather"][2][0]["date"] = date(2021, 3, 2)
@@ -125,17 +125,21 @@ def test_selected_field_supplies_dates_and_depth(fields, installed, check):
         else:
             planting = dict(data["planting"], date="2021-03-02")
             fields["management"] = {"treatments": {k: {"planting": planting} for k in (1, 2)}}
-    else:
-        fields["soil"][1][0]["slb"] = 90
-        entry = dict(initial_conditions=dict(date="2021-03-01", layers=[
-            dict(depth=80, water=0.2, nh4=1, no3=2)]))
-        fields["management"] = {"treatments": {k: entry for k in (1, 2)}}
     assert Simulation(**fields, treatment=1).check(verbose=False) == []
     problems = Simulation(**fields, treatment=2).check(verbose=False)
     assert problems
     word = {"start": "start date", "harvest": "harvest_date",
-            "management": "weather", "depth": "depth"}[check]
+            "management": "weather"}[check]
     assert any(word in p for p in problems)
+
+
+@pytest.mark.parametrize("treatment", [1, 2])
+def test_deep_initial_conditions_are_allowed_for_each_field(fields, installed, treatment):
+    fields["soil"][1][0]["slb"] = 150
+    entry = dict(initial_conditions=dict(date="2021-03-01", layers=[
+        dict(depth=180, water=0.2, nh4=1, no3=2)]))
+    fields["management"] = {"treatments": {k: entry for k in (1, 2)}}
+    assert Simulation(**fields, treatment=treatment).check(verbose=False) == []
 
 
 @pytest.mark.parametrize("kind", ["weather", "soil"])

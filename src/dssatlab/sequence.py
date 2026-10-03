@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 from .controls import _selected_controls
-from .filex import _section_row, _treatment_rows
+from .filex import _filex_date, _section_row, _section_rows, _treatment_rows
 from .filex_write import _columns
 from .runner import _batch_text, _run_command, _run_mode
 
@@ -21,7 +21,7 @@ def _rotation_components(source, treatment, *, text=None):
     except (OSError, ValueError, TypeError):
         return []
     collision_problems = []
-    treatments = _treatment_rows(text, collision_problems)
+    treatments = dict(_treatment_rows(text, collision_problems))
     # Keep a colliding normal row out of the selected sequence's components.
     sequence_rows = {line for line, (number, _) in treatments.items()
                      if collision_problems and number and int(number) == treatment
@@ -94,8 +94,86 @@ def _check_sequence(source, treatment, components):
     return problems, [report]
 
 
-def _sequence_coverage(source, treatment, start, days, nyers=None):
-    """Check the final day using DSSAT's fixed day-of-year end rule."""
+def _sequence_stop(start, years):
+    """Return CSM's stopping boundary, or None beyond Python's date range."""
+    # DSSAT-CSM v4.8.6.0, CSM_Main/CSM.for, PROGRAM CSM: YRDOY_END.
+    year = start.year + years
+    if year <= date.max.year:
+        return date(year, 1, 1) + timedelta(days=start.timetuple().tm_yday - 2)
+    return None
+
+
+def _sequence_shift(day, year):
+    """Keep DSSAT's day of year when moving a scheduled date to another year."""
+    return date(year, 1, 1) + timedelta(days=day.timetuple().tm_yday - 1)
+
+
+def _sequence_end(source, treatment, start, stop, filex, template):
+    """Follow scheduled components; an unknown end keeps the boundary check."""
+    from .operations import _component_management
+    from .rotation_data import _calendar_date, _known_dates, _rotation_keys
+
+    try:
+        text = Path(filex).read_text(encoding='latin-1') if filex is not None else None
+        components = (_rotation_components(filex, treatment, text=text) if template is None else
+                      [dict(R=str(i), SM=str(i), CR='FA' if c['crop'] == 'fallow' else '?')
+                       for i, c in enumerate(template, 1)])
+        if len(components) < 2 or any(not row['R'].isdigit() for row in components):
+            return stop
+        entries = source.get('treatments', {}) if isinstance(source, dict) else {}
+        entry = next((value for key, value in entries.items()
+                      if str(key).isascii() and str(key).isdigit() and int(key) == int(treatment)
+                      and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
+        edits, _ = _rotation_keys(entry.get('rotation', {}), components, '')
+        known, _ = _known_dates(components, template, text, edits, '')
+        first_ends = []
+        for row, (_, planting, end, crop) in zip(components, known):
+            code = _component_management(text, row, 'HARVS', 'R' if end else 'M')
+            if (code not in ('R', 'W', 'X', 'Y', 'Z') or
+                    crop != 'FA' and _component_management(text, row, 'PLANT', 'R') != 'R'):
+                first_ends.append(None)  # Unknown until run time, if this component is reached.
+                continue
+            override = edits.get(int(row['R']), {})
+            events = override.get('harvest') if isinstance(override, dict) else None
+            if isinstance(events, list):
+                first = next((_calendar_date(event.get('date')) for event in events
+                              if isinstance(event, dict) and _calendar_date(event.get('date'))), None)
+            elif text is not None and end is not None:
+                harvests = _section_rows(text, 'HARVEST DETAILS', 'H', int(row['MH']), ('HDATE',))
+                first = next((_filex_date(h['HDATE']) for h in harvests if _filex_date(h['HDATE'])), None)
+            else:
+                first = end
+            first_ends.append(first)
+        current, run = start, 0
+        # CSM_Main/CSM.for, PROGRAM CSM tests YRDOY >= YRDOY_END only
+        # AFTER DAY_LOOP/SEAS_LOOP: the crossing component finishes in full.
+        # Management/MgmtOps.for (MGMTOPS), AUTPLT.for (AUTPLT), AUTHAR.for
+        # (AUTHAR) move planting/fallow anchors and then the harvest schedule.
+        while current <= stop:
+            for (_, planting, end, crop), first in zip(known, first_ends):
+                if end is None or first is None or crop != 'FA' and planting is None:
+                    return stop
+                shift = 0
+                if crop != 'FA' or run:
+                    anchor = first if crop == 'FA' else planting
+                    moved = _sequence_shift(anchor, current.year)
+                    if moved < current:
+                        moved = _sequence_shift(anchor, current.year + 1)
+                    shift = moved.year - anchor.year
+                actual_end = _sequence_shift(end, end.year + shift) if first < current else end
+                if actual_end < current:
+                    return stop  # Invalid schedules are reported by the ordinary checks.
+                if actual_end >= stop:
+                    return actual_end
+                current = actual_end + timedelta(days=1)
+                run += 1
+    except (OSError, ValueError, TypeError, KeyError, OverflowError):
+        pass  # Unreadable dates/levels cannot establish a scheduled end.
+    return stop
+
+
+def _sequence_coverage(source, treatment, start, days, nyers=None, *, filex=None, template=None):
+    """Require weather through the scheduled component that crosses NYERS."""
     if start is None or not days:
         return []
     controls = _selected_controls(source, treatment)
@@ -113,8 +191,9 @@ def _sequence_coverage(source, treatment, start, days, nyers=None):
     end = max(days)
     # Subtract one day after locating the start's day of year in the target year.
     last = f"day {day - 1} of {year}" if day > 1 else f"{year - 1}-12-31"
-    if year <= date.max.year:
-        last = date(year, 1, 1) + timedelta(days=day - 2)
+    stop = _sequence_stop(start, years)
+    if stop is not None:
+        last = _sequence_end(source, treatment, start, stop, filex, template)
         if last <= end:
             return []
     return [f"{label} {years}: the sequence runs from {start} through {last}, "

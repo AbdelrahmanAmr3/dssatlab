@@ -30,6 +30,12 @@ Here, treatment 1 is a sequence of 6 rotation components: bean (`BN`), fallow (`
 
 DSSAT runs the components sequentially: component 1 runs until harvest, component 2 (fallow) begins the very next day carrying over the soil water and nitrogen, and the cycle continues until the sequence's duration has elapsed.
 
+Identical TREATMENTS rows remain separate ([#207](https://github.com/AbdelrahmanAmr3/dssatlab/issues/207)).
+`run()` selects Q when the selected treatment has two rows, even if their text
+is identical. `Simulation.check()` reports their duplicate R numbers with the
+distinct-number message below. On real DSSAT, two identical rows ran in Q and
+produced 2 rows matching a hand run.
+
 ## Run a sequence with `Simulation`
 
 To run a sequence, pass the FileX path and sequence treatment number to `dl.Simulation`, along with your daily weather and soil data:
@@ -77,20 +83,26 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    ```text
    FileX NREPS 5 for sequence treatment 1: with measured weather every replicate repeats the same rows. Set NREPS to 1.
    ```
-5. **Weather coverage through the calculated stopping day**: Weather data must continuously cover the simulation start date through the stopping day checked by dssatlab. Under DSSAT's calendar rule (`CSM.for`), this day is:
+5. **Weather coverage through the last component's known end**: Weather must continuously cover the simulation start through the end of the component that crosses DSSAT's stopping boundary. Under DSSAT's calendar rule (`CSM.for`), that boundary is:
    `(start year + years)` at the start date's day of year, minus one day.
-   For example, if the sequence starts on `1978-04-20` and runs for `NYERS 10` (or `controls: years: 10`), the end date is `1988-04-18` (since 1988 is a leap year). If weather data ends earlier (e.g. `1987-12-31`), `check()` reports:
+   DSSAT tests the boundary after finishing a component, so that component can
+   end later. Checks follow scheduled planting, fallow and harvest dates across
+   the cycles, using the effective `NYERS` and experiment overrides. For example,
+   if the sequence starts on `1978-04-20` and runs for `NYERS 10`, the boundary is
+   `1988-04-18` (1988 is a leap year). When the scheduled final end equals that
+   boundary and weather ends on `1987-12-31`, `check()` reports:
    ```text
    FileX NYERS 10: the sequence runs from 1978-04-20 through 1988-04-18, after the weather data ends (1987-12-31). Supply weather through 1988-04-18, or fewer years.
    ```
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
 6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop or fallow components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
-**Known weather limit ([#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205))**:
-`check()` can accept weather that ends before DSSAT's last component actually
-ends. MSKB8921 needed weather through 1998-05-06, but the checks accepted weather
-ending on 1998-02-28. Supply weather through the actual final component end;
-passing the calculated stopping-day check does not prove that coverage is enough.
+This fixes [#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205): on real
+DSSAT, MSKB8921 with weather ending 1998-02-28 was refused because it needs
+1998-05-06, and complete weather ran 18 rows. When an end depends on maturity
+or automatic management and cannot be known before the run, the checks retain
+the boundary requirement. Missing weather beyond it is caught by the post-run
+`WARNING.OUT` scan; passing the checks does not predict maturity.
 
 ## Weather and replicate settings in DSSAT sample sequence files
 

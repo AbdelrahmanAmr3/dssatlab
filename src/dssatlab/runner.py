@@ -173,8 +173,8 @@ def run(
             "(for example my_weather.csv), or use Simulation, which runs in its own folder."
         )
 
-    rows = [(int(number), rotation) for number, rotation in
-            _treatment_rows(filex.read_text(encoding="latin-1")).values() if number]
+    rows = [(int(number), rotation) for _, (number, rotation) in
+            _treatment_rows(filex.read_text(encoding="latin-1")) if number]
     selected = int(treatment) if isinstance(treatment, str) and treatment.isdigit() else treatment
     rows = [row for row in rows if treatment is None or row[0] == selected]
     mode = _run_mode(filex, treatment, rows)

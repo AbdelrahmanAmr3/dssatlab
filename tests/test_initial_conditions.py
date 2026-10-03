@@ -148,24 +148,25 @@ def test_water_endpoints_and_zero_nitrogen_are_allowed(sim, fake_dssat):
     assert b" 2    30     1     0     0" in copied(sim, fake_dssat)
 
 
-def test_soil_profile_depth_is_checked_for_selected_treatment(sim, soil_rows):
+def test_initial_conditions_deeper_than_soil_profile_are_allowed(sim, soil_rows, fake_dssat):
+    soil_rows[-1]["slb"] = 150
     sim.soil = soil_rows
-    assert sim.check() == []  # Equal profile depth is allowed.
-    conditions(sim)["layers"][1]["depth"] = 31
-    assert any("31 cm" in p and "soil profile depth 30.0 cm" in p for p in sim.check())
-    # Compare the maximum even when a later row is out of order.
-    conditions(sim)["layers"][0]["depth"] = 35
-    problems = sim.check()
-    assert any("35 cm" in p and "soil profile depth" in p for p in problems)
-    assert any("ascending" in p for p in problems)
+    conditions(sim)["layers"][0]["depth"] = 150
+    conditions(sim)["layers"][1]["depth"] = 180
+    assert sim.check() == []
+    sim.run()
+    block = section(copied(sim, fake_dssat).decode("latin-1"))
+    assert any(line.split() == ["2", "180", "0.3", "0", "3.5"] for line in block.splitlines())
+
+
+def test_descending_depths_in_unselected_treatment_are_rejected(sim, soil_rows):
+    sim.soil = soil_rows
     sim.management["treatments"][1] = {"initial_conditions": deepcopy(conditions(sim))}
-    conditions(sim)["layers"] = [dict(depth=15, water=0.2, nh4=0, no3=0)]
-    assert any("ascending" in p for p in sim.check())  # All treatments still checked.
     sim.management["treatments"][1]["initial_conditions"]["layers"].reverse()
-    assert sim.check() == []  # soil= describes only the selected treatment.
+    assert any("treatment 1" in p and "strictly ascending" in p for p in sim.check())
 
 
-def test_no_soil_skips_profile_comparison_and_bad_soil_keeps_independent_checks(sim):
+def test_bad_soil_keeps_independent_initial_conditions_checks(sim):
     conditions(sim)["layers"][1]["depth"] = 999
     assert sim.check() == []
     sim.soil = []
