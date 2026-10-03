@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.16.1] - Unreleased
+## [0.16.1] - 2026-10-02
 
 ### Added
 - Experiment data `residues` (RDATE, RCOD, RAMT, RESN, RESP, RESK, RINP, RDEP, RMET), `tillage` (TDATE, TIMPL, TDEP) and `harvest` (HDATE, HSTG, HCOM, HSIZE, HPC, HBPC) event lists, written as new MR/MT/MH levels in the FileX copy. Omitted optional fields write -99; omitted sections keep their levels and empty lists set level 0 ([ADR 0021](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0021-field-operations-as-event-sections.md)).
