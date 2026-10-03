@@ -98,9 +98,10 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
 
     # DSSAT-CSM v4.8.6.0, CSM_Main/CSM.for, CSM (381-390): later Q
     # components start the day after the previous one ends, ignoring SDATE.
-    # InputModule/ipexp.for, IPEXP (655-669) resolves the initial START S/P/E;
+    # InputModule/ipexp.for, IPEXP (655-669): START S uses SDATE, P uses
+    # YRPLT, E uses IEMRG; an SDATE override is ignored for P/E.
     # CSM replaces that YRSIM for later components.
-    start = _controls_start_date(source, treatment) if first else None
+    start = None
     planting = override.get('planting')
     planting = (date.fromisoformat(planting['date']) if isinstance(planting, dict)
                 and not _check_date(planting.get('date'), '') else None)
@@ -109,8 +110,8 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
             ('MP', 'PLANTING DETAILS', 'P', 'PDATE')):
         try:
             details = _section_row(text, section, key, int(row[reference]), (column,))
-            if reference == 'SM' and first and start is None and details.get('START') == 'S':
-                start = _filex_date(details[column])
+            if reference == 'SM' and first and details.get('START') == 'S':
+                start = _controls_start_date(source, treatment) or _filex_date(details[column])
             elif reference == 'MP' and 'planting' not in override:
                 planting = _filex_date(details[column])
         except (ValueError, TypeError, KeyError):

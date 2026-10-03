@@ -261,10 +261,7 @@ characters are `01`, yearly names are allowed too. Two paths cannot have the
 same name after upper-casing. Stock weather must match the FileX station unless
 experiment overrides repoint the copied field.
 
-When a DSSAT installation is known, checks reject stock weather if a higher-priority
-filename in its installed weather path would replace the supplied file. Supply your
-weather under the reported filename. If no installation is known during `check()`,
-`run()` repeats this check after finding DSSAT, before creating the simulation folder.
+dssatlab does not yet check whether an installed weather file in DSSAT's weather path would be read instead of the supplied file (planned, issue #224); supply weather under a name no installed file uses.
 
 ### Stock weather problems
 
@@ -279,7 +276,6 @@ Cannot read stock weather file {path}: {error}. Supply a readable stock weather 
 Stock weather file {path}: missing required column {label}. Supply a stock weather file with column {label}.
 Stock weather file {path}: DATE header spans {width} characters. Supply @DATE for YYDDD, or $WEATHER with @  DATE for YYYYDDD dates.
 Stock weather file {path}: DATE header spans {width} characters but the $WEATHER marker is {present_or_absent}. Checked the format marker and DATE width. Supply $WEATHER with @  DATE and YYYYDDD dates, or omit $WEATHER and use @DATE with YYDDD dates.
-Stock weather for WSTA {station!r}: DSSAT would read installed file {installed} before the supplied weather. Checked the supplied names and DSSAT's installed weather path. Supply your weather under the file name {name}.
 Stock weather files {first_path} and {path} have the same file name {name} after upper-casing. Supply only one file with each name for the simulation folder.
 Stock weather file {path}: DSSAT does not look up this name for WSTA {station!r} in the simulated years. Expected {names}. Rename the file or correct the FileX WSTA.
 Stock weather file {path}, line {line}: invalid date {value!r}. Supply a valid YYDDD or YYYYDDD calendar date matching the DATE header width.

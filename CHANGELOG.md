@@ -18,7 +18,6 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - An inherited HARVS R harvest dated before the simulation start or planting date is rejected, with its HDATE, harvest level and bounds; in sequences only the first component uses a simulation-start bound ([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)).
 - Identical TREATMENTS rows remain separate: `run()` selects Q for two rows, while `Simulation.check()` reports their duplicate R numbers ([#207](https://github.com/AbdelrahmanAmr3/dssatlab/issues/207)).
 - A trailing DOS EOF byte (Ctrl-Z) in a stock weather or soil file is accepted and preserved in the copy.
-- Stock weather checks reject supplied files that a higher-priority installed weather filename would replace, naming the file to supply and honouring the configured WED path in Windows `DSSATPRO.V48` and Linux `DSSATPRO.L48`.
 - Stock weather values skip separator-column flags, and their dates use the planting date (including overrides) under START P; START S keeps the simulation start date.
 - Stock weather with an unresolved simulation start (including START E) reports an actionable problem before a run or identity edit.
 - Seven-digit stock weather dates require the `$WEATHER` marker and `@  DATE`; inconsistent markers and date widths are rejected.

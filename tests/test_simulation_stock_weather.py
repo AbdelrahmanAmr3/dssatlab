@@ -20,11 +20,6 @@ from test_season_coverage import weather
 from test_harvest_required import simulation as harvest_simulation
 
 
-@pytest.fixture(autouse=True)
-def no_host_installation(monkeypatch):
-    monkeypatch.setattr(lab.core, 'detect', lambda: {'dssat_path': None})
-
-
 def stock_file(folder, name="ufga8201.wth", days=None, *, wide=False):
     days = days or [date(1982, 2, 24), date(1982, 2, 25), date(1982, 2, 26)]
     codes = [f"{day.year if wide else day.year % 100:0{4 if wide else 2}d}"
@@ -257,86 +252,17 @@ def test_stock_weather_through_sequence_run(sequence, fake_dssat, tmp_path):
     assert_copied(result, [path])
 
 
-@pytest.mark.parametrize('wsta,name,installed_name', [
-    ('UFGA', 'UFGA.WTH', 'UFGA8201.WTH'),
-    ('UFGA', 'UFGA8301.WTH', 'UFGA8201.WTH'),
-    ('UFGA8209', 'UFGA.WTH', 'UFGA8209.WTH'),
+@pytest.mark.parametrize('wsta,name', [
+    ('UFGA', 'UFGA.WTH'),
+    ('UFGA', 'UFGA8301.WTH'),
+    ('UFGA8209', 'UFGA.WTH'),
 ])
-@pytest.mark.parametrize('shadow', [False, True])
-def test_installed_weather_precedes_supplied_fallback(
-        inputs, fake_dssat, tmp_path, wsta, name, installed_name, shadow):
+def test_supplied_weather_names_are_copied(inputs, fake_dssat, tmp_path, wsta, name):
     inputs.filex.write_text(inputs.filex.read_text().replace('UFGA       -99', f'{wsta:8s}   -99'))
     path = stock_file(tmp_path, name)
-    weather_dir = fake_dssat.executable.parent / 'Weather'
-    weather_dir.mkdir()
-    installed_file = weather_dir / installed_name
-    if shadow:
-        installed_file.write_text('installed weather', encoding='ascii')
     sim = lab.Simulation(inputs.filex, 2, path, executable=fake_dssat.executable.parent)
-    problems = sim.check(False)
-    assert len(problems) == int(shadow)
-    if shadow:
-        assert all(part in problems[0] for part in (str(installed_file), installed_name, 'Supply'))
-        with pytest.raises(lab.DSSATCheckError) as error:
-            sim.run()
-        assert error.value.problems == problems
-        assert fake_dssat.calls == []
-    else:
-        assert_copied(sim.run(), [path])
-
-
-def test_unknown_installation_is_checked_after_run_resolves_dssat(
-        inputs, fake_dssat, tmp_path, monkeypatch):
-    monkeypatch.setattr(lab.core, 'detect', lambda: {'dssat_path': None})
-    path = stock_file(tmp_path, 'UFGA.WTH')
-    weather_dir = fake_dssat.executable.parent / 'Weather'
-    weather_dir.mkdir()
-    installed_file = weather_dir / 'UFGA8201.WTH'
-    installed_file.write_text('installed weather', encoding='ascii')
-    sim = lab.Simulation(inputs.filex, 2, path)
-    assert sim.check(False) == []
-    before = snapshot(tmp_path)
-    with pytest.raises(lab.DSSATCheckError) as error:
-        sim.run()
-    assert len(error.value.problems) == 1
-    assert str(installed_file) in error.value.problems[0]
-    assert snapshot(tmp_path) == before
-    assert fake_dssat.calls == []
-
-
-def test_supplied_preferred_name_wins_over_installed_file(inputs, fake_dssat, tmp_path):
-    path = stock_file(tmp_path, 'UFGA8201.WTH')
-    weather_dir = fake_dssat.executable.parent / 'Weather'
-    weather_dir.mkdir()
-    (weather_dir / path.name).write_text('installed weather', encoding='ascii')
-    sim = lab.Simulation(inputs.filex, 2, path, executable=fake_dssat.executable)
     assert sim.check(False) == []
     assert_copied(sim.run(), [path])
-
-
-@pytest.mark.parametrize('os_name,profile', [
-    ('windows', 'DSSATPRO.V48'), ('linux', 'DSSATPRO.L48'),
-])
-def test_configured_weather_path_is_checked(inputs, fake_dssat, tmp_path, monkeypatch,
-                                          os_name, profile):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(lab.core, '_os_name', lambda: os_name)
-    monkeypatch.setattr(lab.core, 'detect', lambda: {'dssat_path': fake_dssat.executable})
-    weather_dir = tmp_path / 'ConfiguredWeather'
-    weather_dir.mkdir()
-    installed_file = weather_dir / 'UFGA8201.WTH'
-    installed_file.write_text('installed weather', encoding='ascii')
-    pro = fake_dssat.executable.parent / profile
-    pro.write_text('WED    ConfiguredWeather\n', encoding='ascii')
-    sim = lab.Simulation(inputs.filex, 2, stock_file(tmp_path, 'UFGA.WTH'))
-    problems = sim.check(False)
-    assert len(problems) == 1
-    assert str(Path('ConfiguredWeather') / installed_file.name) in problems[0]
-    installed_file.unlink()
-    conventional = fake_dssat.executable.parent / 'Weather'
-    conventional.mkdir()
-    (conventional / installed_file.name).write_text('ignored weather', encoding='ascii')
-    assert sim.check(False) == []
 
 
 def test_stock_century_boundary_covers_simulation_start(inputs, tmp_path):

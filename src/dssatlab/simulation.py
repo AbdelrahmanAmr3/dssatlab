@@ -3,7 +3,6 @@
 from pathlib import Path
 import shutil
 
-from . import runner
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
 from .filex import _check_filex_controls, _irrigation_dates, _read_filex
@@ -243,10 +242,7 @@ class Simulation:
             components = _rotation_components(self.filex, self.treatment)
             override_start = _controls_start_date(experiment_data, self.treatment)
             values, _ = _read_filex(self.filex, self.treatment, start_date=override_start)
-            if _stock_weather_paths(self.weather) and executable is None:
-                executable = runner.connect(interactive=False)
-            rows, weather_problems = _simulation_weather(
-                self, values, experiment_data, components, executable=executable)
+            rows, weather_problems = _simulation_weather(self, values, experiment_data, components)
             if weather_problems:
                 raise DSSATCheckError(weather_problems)
             station = rows[0]["station"] if _overrides_section(experiment_data, self.treatment) else None

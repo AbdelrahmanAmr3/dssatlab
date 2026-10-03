@@ -41,6 +41,26 @@ def test_inherited_reported_harvest_on_or_after_bounds(tmp_path, harvest):
     assert sim.check(False) == []
 
 
+@pytest.mark.parametrize('code,override,bound', [
+    ('P', '1989-05-01', None),
+    ('E', '1989-05-01', None),
+    ('S', '1989-05-01', '1989-05-01'),
+    ('S', None, '1989-05-02'),
+])
+def test_inherited_harvest_start_bound_only_for_start_s(tmp_path, code, override, bound):
+    sim = dated_simulation(tmp_path, '89122', '89080', '89120', '1989-03-01')
+    sim.filex.write_text(sim.filex.read_text().replace('     S 89122', f'     {code} 89122'))
+    if override is not None:
+        sim.management = {'treatments': {7: {'controls': {'start_date': override}}}}
+    problems = sim.check(False)
+    if bound is None:
+        assert problems == []
+    else:
+        assert len(problems) == 1
+        assert 'FileX HDATE' in problems[0]
+        assert f'simulation start date ({bound})' in problems[0]
+
+
 def test_sequence_inherited_harvest_before_planting_reported_once(tmp_path):
     sim = dated_simulation(tmp_path, '82060', '82074', '82069', '1982-02-25', sequence=True)
     row = next(line for line in sim.filex.read_text().splitlines() if line.startswith(' 7 2'))

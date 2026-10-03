@@ -5,7 +5,6 @@ from pathlib import Path
 import re
 import shutil
 
-from . import core
 from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _weather_filename
@@ -84,49 +83,6 @@ def _weather_names(station, start_date, end_date):
         names.extend(f"{station[:4]}{year % 100:02d}01.WTH"
                      for year in range(start_date.year, end_date.year + 1))
     return list(dict.fromkeys([*names, f"{station[:4]}.WTH"]))
-
-
-def _stock_weather_shadow(paths, station, start_date, end_date, executable):
-    """Report the first installed file DSSAT would read ahead of supplied weather."""
-    found = (core.detect()["dssat_path"] if executable is None
-             else core.find_dssat_path(Path(executable)))
-    if found is None:
-        return []
-    weather_dir = found.parent / "Weather"
-    # DSSAT-CSM v4.8.6.0, InputModule/PATH.for, PATH (49-65): WED in
-    # DSSATPRO selects the installed weather path, including split drive/path.
-    # Utilities/OSDefsWINDOWS.for / OSDefsLINUX.for (15) define V48 / L48;
-    # InputModule/PATH.for, PATHD (144) uses that DSSATPRO constant.
-    pro = found.parent / ("DSSATPRO.V48" if core._os_name() == "windows" else "DSSATPRO.L48")
-    try:
-        for line in pro.read_text(encoding="latin-1").splitlines():
-            if line.startswith("WED"):
-                parts = line[3:80].split()
-                if parts:
-                    weather_dir = Path(parts[0] + parts[1] if parts[0].endswith(':')
-                                       and len(parts) > 1 else parts[0])
-                break
-    except (OSError, ValueError):
-        pass  # A conventional installation keeps Weather beside the executable.
-    supplied = {path.name.upper() for path in paths}
-    # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for, IPEXP (741-765), and
-    # MAKEFILEW.f90, MAKEFILEW (272-296): the full name in the current /
-    # experiment directory, then WED, precedes the four-character fallback.
-    # Only supplied weather is copied into Simulation's experiment directory.
-    for year in range(start_date.year, end_date.year + 1):
-        names = _weather_names(station, date(year, 1, 1), date(year, 12, 31))
-        if year != start_date.year and not any(name in supplied for name in names):
-            continue  # No supplied fallback for this year can be shadowed.
-        for name in names:
-            if name in supplied:
-                break
-            installed = weather_dir / name
-            if name != f"{station[:4]}.WTH" and installed.is_file():
-                return [f"Stock weather for WSTA {station!r}: DSSAT would read installed "
-                        f"file {installed} before the supplied weather. Checked the supplied "
-                        f"names and DSSAT's installed weather path. Supply your weather "
-                        f"under the file name {name}."]
-    return []
 
 
 def _read_weather_file(path):
@@ -267,7 +223,7 @@ def _parse_template_weather(source):
     return ([], problems) if problems else _parse_weather(source)
 
 
-def _simulation_weather(sim, values, experiment_data, components, *, executable=None):
+def _simulation_weather(sim, values, experiment_data, components):
     """Read either weather source, sharing checks and the sequence end rule."""
     problems = _weather_source_problems(sim.weather)
     if problems:
@@ -343,9 +299,6 @@ def _simulation_weather(sim, values, experiment_data, components, *, executable=
     # avoid a second name-lookup problem for the same mismatch.
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
     rows, problems = _read_stock_weather(paths, station, start, end, check_names=same_station)
-    if same_station and not problems:
-        problems.extend(_stock_weather_shadow(paths, station, start, end,
-                                             sim.executable if executable is None else executable))
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)
