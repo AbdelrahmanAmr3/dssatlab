@@ -16,13 +16,16 @@ from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
 from .runner import _create_dated_folder
 from .soil import _parse_soil, _write_soil_profiles
-from .weather import _dssat_date, _parse_weather, write_weather_file
+from .stock import _parse_template_weather, _weather_source_problems
+from .weather import _dssat_date, write_weather_file
 
 
 def _parse_field_data(source, count, kind):
     """Check field keys against fields 1..count (any keys if count is None) and parse each source."""
     label = f"{kind.capitalize()} data"
-    parser = _parse_weather if kind == "weather" else _parse_soil
+    parser = _parse_template_weather if kind == "weather" else _parse_soil
+    if kind == "weather" and (problems := _weather_source_problems(source, template=True)):
+        return {}, problems, _report_lines(label, problems)
     if source is None and kind == "soil":
         problems = ["Soil data is required with a FileX template. Supply soil=..."]
         return {}, problems, _report_lines(label, problems)
