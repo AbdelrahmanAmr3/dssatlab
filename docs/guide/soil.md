@@ -6,10 +6,66 @@ then [find or install a DSSAT executable](install.md). The examples use
 `UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
 
 By default, a `Simulation` copies sibling `.SOL` files sitting beside the FileX.
-When you pass `soil` to `Simulation`, dssatlab generates a single `SOIL.SOL` file
-from your soil data instead. A `.SOL` file in the FileX folder always beats
+When you pass soil-template data to `Simulation`, dssatlab generates a single
+`SOIL.SOL` instead. A stock soil path is copied unchanged under its own name.
+Both replace sibling soil files. A `.SOL` file in the FileX folder always beats
 DSSAT's own `Soil` directory (`C:\DSSAT48\Soil` on Windows or the managed install
 cache on Linux), so the soil profile you provide is the one DSSAT uses.
+
+## Use a stock soil file
+
+With a copied FileX (`filex=`), `soil=` also accepts a string or `Path` ending in
+`.SOL` (suffix recognition ignores case). Supply one path, not a list of paths:
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation(
+    filex="UFGA7601.PNX", weather="UFGA7601.WTH", soil="UF.SOL",
+)
+print(sim.check())
+result = sim.run()
+```
+
+`run()` copies the file byte for byte into the simulation folder under its own
+filename. It copies no sibling `.SOL` files; `.CUL`, `.ECO` and `.SPE` siblings
+are still copied. The stock profile's ID is kept in the copied FileX, including
+when experiment data edits other sections. Stock soil also works through
+`run_treatments()`, scenarios and `run_sweep()`. FileX templates, including
+per-field sources, require soil data rows instead.
+
+`check()` reads only profile IDs: the first token after `*` on profile lines,
+skipping `*SOILS`. The FileX's `ID_SOIL` must be among them, with exactly the
+same case. The filename must be exactly `<first two ID_SOIL characters>.SOL`
+or `SOIL.SOL`; suffix recognition alone does not make a lower-case filename
+acceptable. Soil names are not upper-cased when copied, and DSSAT's filename
+lookup is case-sensitive on Linux. Layer values are not parsed or checked;
+DSSAT checks whether it can use the profile at run time. A trailing DOS EOF byte
+(Ctrl-Z) is accepted and preserved in the copy.
+
+These are the stock-soil messages, with `{...}` standing for the reported path,
+ID or list; `{error}` is the operating-system read error, and IDs use Python's
+quoted representation. `{ids}` is the IDs found, comma-separated, or `none`:
+
+```text
+A stock soil file needs a copied FileX. Supply soil data rows for a FileX template.
+Cannot read stock soil file {path}: {error}. Supply a readable stock soil file path.
+FileX has no readable ID_SOIL in the selected treatment's FIELDS row. Supply ID_SOIL matching a profile in stock soil file {path}. IDs found: {ids}.
+Stock soil file {path}: FileX ID_SOIL {soil_id!r} is not in the file. IDs found: {ids}. Supply a file containing that ID or correct the FileX ID_SOIL.
+Stock soil file {path}: DSSAT does not look up this name for ID_SOIL {soil_id!r}. Expected {names}. Rename the file or correct the FileX ID_SOIL; filenames are case-sensitive on Linux.
+```
+
+On real DSSAT, a stock `.SOL` gave the same outputs as the sibling-copy soil.
+See [ADR 0024](../adr/0024-stock-weather-and-soil-files-copied-unchanged.md).
+
+## Initial conditions deeper than the profile
+
+Experiment data `initial_conditions.layers` may extend below the deepest soil
+layer, with template soil or stock soil. Depths remain positive and strictly
+ascending; water must be from 0 to 1 and ammonium/nitrate nonnegative.
+There is no soil-depth rejection or warning. On real DSSAT, UFGA8222 with
+180 cm initial conditions on profiles from 60 to 210 cm matched 12/12.
+See [initial conditions](experiment.md#cultivar-initial-conditions-and-controls).
 
 ## Prepare the soil template
 
@@ -166,13 +222,16 @@ your FileX. That simulation folder contains:
 - A copy of the FileX.
 - Copies of every `.CUL`, `.ECO`, and `.SPE` file directly beside the original
   FileX; suffix matching ignores case.
-- One generated `.WTH` weather file from your weather data.
-- One generated `SOIL.SOL` soil file from your soil data.
+- One generated `.WTH` weather file from your weather data, or supplied stock
+  weather files copied under upper-case names.
+- One generated `SOIL.SOL` from soil data, or the stock soil file copied under
+  its own name.
 - A `dssat_run_YYYY-MM-DD_HHMMSS` run directory containing the files collected
   after DSSAT exits.
 
-When `soil` is provided, `Simulation.run()` writes `SOIL.SOL` directly into the
-simulation folder and copies no sibling `.SOL` files. Because a `.SOL` file in the
+When `soil` is provided, `Simulation.run()` writes `SOIL.SOL` from template data
+or copies the stock soil file into the simulation folder, and copies no sibling
+`.SOL` files. Because a `.SOL` file in the
 FileX folder always beats DSSAT's own `Soil` directory, DSSAT uses your soil profile.
 When `soil` is not provided (`soil=None`), behavior is unchanged: sibling `.SOL`
 files are copied as before.
