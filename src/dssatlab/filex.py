@@ -46,9 +46,15 @@ def _treatment_rows(text, problems=None):
 
 def _section_row(text, section, key, level, required):
     """Find a level across blocks with the needed columns, using header token ends."""
+    return next(_section_rows(text, section, key, level, required))
+
+
+def _section_rows(text, section, key, level, required):
+    """Yield all rows of a level across blocks with the needed columns."""
     treatments = _treatment_rows(text) if section == "TREATMENTS" else {}
     in_section = False
     matching_header = False
+    found = False
     columns = None
     for line in text.splitlines():
         if line.startswith("*"):
@@ -95,7 +101,10 @@ def _section_row(text, section, key, level, required):
             except ValueError:
                 continue
             if number == level:
-                return row
+                found = True
+                yield row
+    if found:
+        return
     if not in_section:
         raise ValueError(f"missing {section} section. Supply that section in the FileX.")
     if not matching_header:

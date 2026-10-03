@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .cultivar import _CROPS, _check_cultivar, _cultivar_text
 from .experiment import _check_date, _unknown_keys
-from .filex import _section_row
+from .filex import _section_row, _section_rows
 from .filex_write import _event_text, _planting_text
 from .irrigation import _check_irrigation_events
 from .management import (_check_events, _check_planting, _check_weather_date,
@@ -43,15 +43,23 @@ def _calendar_date(value):
 
 
 def _filex_date(text, row, reference, section, key, column, start):
-    """Resolve YYDDD to the first matching year on or after the start's year."""
+    """Resolve YYDDD dates; harvest uses the latest valid date of its level."""
     try:
-        value = _section_row(text, section, key, int(row[reference]), (column,))[column]
-        if start is None or len(value) != 5 or not value.isascii() or not value.isdigit():
+        if start is None:
             return None
-        year = start.year + (int(value[:2]) - start.year % 100) % 100
-        doy = int(value[2:])
-        if 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
-            return date(year, 1, 1) + timedelta(days=doy - 1)
+        rows = (_section_rows(text, section, key, int(row[reference]), (column,))
+                if reference == 'MH' else
+                [_section_row(text, section, key, int(row[reference]), (column,))])
+        days = []
+        for details in rows:
+            value = details[column]
+            if len(value) != 5 or not value.isascii() or not value.isdigit():
+                continue
+            year = start.year + (int(value[:2]) - start.year % 100) % 100
+            doy = int(value[2:])
+            if 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
+                days.append(date(year, 1, 1) + timedelta(days=doy - 1))
+        return max(days, default=None)
     except (ValueError, KeyError, TypeError):
         pass
     return None
@@ -105,7 +113,7 @@ def _known_dates(components, template, text, start, edits, where):
     return known, notes
 
 
-def _period_problems(day, location, index, known, start):
+def _period_problems(day, location, index, known, start, *, check_end=True):
     number, planting, end, crop = known[index]
     bounds = []
     if index:
@@ -115,7 +123,7 @@ def _period_problems(day, location, index, known, start):
             bounds.append(f"is not after rotation component {previous}'s end ({lower})")
     elif start is not None and day < start:
         bounds.append(f"is before simulation start date ({start}); planting must be on or after it")
-    if end is not None:
+    if check_end and end is not None:
         if day > end:
             bounds.append(f"is after rotation component {number}'s harvest date ({end})")
     if index + 1 < len(known):
@@ -212,7 +220,9 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
                 day = _calendar_date(event.get(field))
                 if day is not None:
                     location_field = f"{location}, field {field!r}"
-                    found.extend(_period_problems(day, location_field, index, known, start))
+                    found.extend(_period_problems(
+                        day, location_field, index, known, start,
+                        check_end=not (section == 'planting' and field == 'date')))
                     if field == 'emergence_date':
                         found.extend(_check_weather_date(event[field], location_field, weather_range))
         if not found and text is not None:
@@ -264,12 +274,27 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
                 cultivar_path = data_dir / 'Genotype' / f'{_CROPS[crop][2]}.CUL'
         override = edits.get(number, {})
         planting_override = isinstance(override, dict) and 'planting' in override
+        _, planting, end, crop = known[index]
+        if crop != 'FA' and planting is not None and end is not None and end <= planting:
+            component = template[index] if template is not None else {}
+            original_planting = component.get('planting')
+            # The template crop check already reports this pair if neither date changed.
+            already_checked = (isinstance(original_planting, dict)
+                               and original_planting.get('date') == planting.isoformat()
+                               and component.get('harvest_date') == end.isoformat())
+            if not already_checked:
+                problem = (f'{where}, rotation component {number}: harvest date {end} '
+                           f'is not after planting date {planting}. Move the harvest after '
+                           'planting or the planting before harvest.')
+                problems.append(problem)
+                report.append(f'      {problem}')
         # Supplied plantings are checked below; also check untouched known dates.
         for field, day in zip(('planting date', 'harvest/end date'), known[index][1:3]):
             if day is not None and not (field == 'planting date' and planting_override):
                 found = _check_weather_date(day.isoformat(), f'{where}, rotation component {number}, {field}', weather_range)
                 if index == 0 and field == 'planting date' and start is not None and day < start:
-                    found.extend(_period_problems(day, f'{where}, rotation component {number}, planting', index, known, start))
+                    found.extend(_period_problems(day, f'{where}, rotation component {number}, planting',
+                                                  index, known, start, check_end=False))
                 problems.extend(found)
                 report.extend(f'      {p}' for p in found)
         if number in edits:
