@@ -1,11 +1,19 @@
 """Stock weather reads preserve DSSAT's spans and weather calendar rule."""
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
 from dssatlab.stock import _read_stock_weather
 from dssatlab.weather import _parse_weather
+
+
+def test_stock_weather_term_describes_copy_and_checked_daily_columns():
+    text = (Path(__file__).parents[1] / "CONTEXT.md").read_text(encoding="utf-8")
+    term = text.split("**Stock weather file**:")[1].split("**Daily PAR**:")[0]
+    assert "under its upper-case name" in term
+    assert "srad, tmax, tmin and rain" in term
 
 
 def read(source, start=date(1976, 1, 1), end=None, station="UFGA"):
@@ -40,7 +48,7 @@ def test_header_spans_flags_and_ignored_columns(tmp_path, wide, code, start):
     assert problems == []
     assert rows == [dict(station="UFGA", longitude=-82.370, latitude=29.630,
                          elevation=10.0, date=date(1976, 1, 1), rain=0.0,
-                         tmin=15.0, srad=20.0, tmax=25.0, par=50.0)]
+                         tmin=15.0, srad=20.0, tmax=25.0)]
     assert _parse_weather(rows)[1] == []
     assert path.read_bytes() == before
 

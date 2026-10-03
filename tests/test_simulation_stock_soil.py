@@ -1,11 +1,21 @@
 """Stock soil checks read only IDs and runs preserve the supplied file."""
 
+from pathlib import Path
+
 import pytest
 
 import dssatlab as lab
 from test_filex_template import data, rows
 from test_simulation_run import fake_dssat, inputs, snapshot
 from test_simulation_template import installed
+
+
+def test_stock_soil_guide_example_uses_file_for_course_profile(inputs, tmp_path):
+    guide = (Path(__file__).parents[1] / "docs/guide/soil.md").read_text(encoding="utf-8")
+    assert 'filex="UFGA7601.PNX", weather="UFGA7601.WTH", soil="SOIL.SOL"' in guide
+    inputs.filex.write_text(inputs.filex.read_text().replace("IBMZ910014", "IBPN910015"))
+    path = stock_soil(tmp_path, "SOIL.SOL", ids=("IBPN910015",))
+    assert lab.Simulation(inputs.filex, 2, inputs.weather, soil=path).check(False) == []
 
 
 def stock_soil(folder, name="IB.SOL", ids=("IBOTHER001", "IBMZ910014")):
@@ -17,6 +27,14 @@ def stock_soil(folder, name="IB.SOL", ids=("IBOTHER001", "IBMZ910014")):
         content += b"@ SLB EXTRA\r\n   60 preserved\r\n"
     path.write_bytes(content)
     return path
+
+
+@pytest.mark.parametrize("header", ["SOILS", "SOILS:", "soils", "soils:"])
+def test_stock_soil_profile_id_starting_soils_is_found(inputs, tmp_path, header):
+    inputs.filex.write_text(inputs.filex.read_text().replace("IBMZ910014", "SOILS00001"))
+    path = stock_soil(tmp_path, "SOIL.SOL", ids=("SOILS00001",))
+    path.write_bytes(path.read_bytes().replace(b"*SOILS:", f"*{header}".encode("ascii")))
+    assert lab.Simulation(inputs.filex, 2, inputs.weather, soil=path).check(False) == []
 
 
 @pytest.mark.parametrize("ending", [b"\r\n\x1a", b"\x1a", b"\x1a\r\n"])

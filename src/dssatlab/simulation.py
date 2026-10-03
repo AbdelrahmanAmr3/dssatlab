@@ -17,7 +17,7 @@ from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
 from .sequence import (_check_sequence, _rotation_components, _run_sequence,
                        _sequence_coverage, _sequence_experiment_data,
                        _parse_sdate, _simulation_start_date)
-from .stock import (_simulation_soil, _simulation_weather,
+from .stock import (_simulation_soil, _simulation_weather, _stock_weather_paths,
                     _write_simulation_soil, _write_simulation_weather)
 
 
@@ -129,8 +129,10 @@ class Simulation:
             station = stations.pop()
             expected = values["WSTA"][:4]
             if station != expected:
+                paths = _stock_weather_paths(self.weather)
+                source = f"stock weather file {paths[0].name}" if paths else "the weather template"
                 filex_problems.append(f"FileX WSTA {values['WSTA']!r} expects station "
-                                     f"{expected!r}, but the weather template has station "
+                                     f"{expected!r}, but {source} has station "
                                      f"{station!r}. Make the station codes exactly equal; "
                                      "filenames are case-sensitive on Linux.")
         days = [row["date"] for row in rows if "date" in row]
@@ -241,6 +243,8 @@ class Simulation:
             values, _ = _read_filex(self.filex, self.treatment, start_date=override_start)
             rows, _ = _simulation_weather(self, values, experiment_data, components)
             station = rows[0]["station"] if _overrides_section(experiment_data, self.treatment) else None
+            if station is not None and _stock_weather_paths(self.weather) and values["WSTA"][:4] == station:
+                station = values["WSTA"]  # Keep an explicit stock filename in the copied field.
             if station is not None:
                 values["WSTA"] = station
             soil_rows, _, template_id = _simulation_soil(self, values, station is not None)

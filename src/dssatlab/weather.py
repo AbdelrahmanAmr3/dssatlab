@@ -225,11 +225,15 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                 continue
             if name not in row and name not in OPTIONAL:
                 if columns is not None and name in columns:
-                    problems.append((f"missing {name}", f"Weather data row {line}: "
+                    day = f" ({result['date']})" if "date" in result else ""
+                    problems.append((f"missing {name}", f"Weather data row {line}{day}: "
                                      f"missing value for {name!r}. Supply a value."))
                 continue
             value = row.get(name)
             where = f"Weather data row {line}, column {name!r}"
+            if name in REQUIRED and "date" in result and (value is None or
+                    isinstance(value, str) and not value.strip()):
+                where += f" ({result['date']})"
             if name == "station":
                 if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9]{4}", value):
                     problems.append(("station", f"{where}: found {_show_value(value)}. "
@@ -275,6 +279,8 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                 if name in ranges:
                     low, high, unit = ranges[name]
                     if not low <= number <= high:
+                        if number == -99 and name in REQUIRED and "date" in result:
+                            where += f" ({result['date']})"
                         problems.append((f"range {name}", f"{where}: found {_show_value(value)}; "
                                          f"allowed range is {low} to {high} {unit}. "
                                          "Correct the value using DSSAT's units."))

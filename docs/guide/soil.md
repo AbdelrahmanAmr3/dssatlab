@@ -21,11 +21,14 @@ With a copied FileX (`filex=`), `soil=` also accepts a string or `Path` ending i
 import dssatlab as dl
 
 sim = dl.Simulation(
-    filex="UFGA7601.PNX", weather="UFGA7601.WTH", soil="UF.SOL",
+    filex="UFGA7601.PNX", weather="UFGA7601.WTH", soil="SOIL.SOL",
 )
 print(sim.check())
 result = sim.run()
 ```
+
+`UFGA7601.PNX` selects profile `IBPN910015`, held in DSSAT's `Soil/SOIL.SOL`.
+Copy that file beside the FileX for this example.
 
 `run()` copies the file byte for byte into the simulation folder under its own
 filename. It copies no sibling `.SOL` files; `.CUL`, `.ECO` and `.SPE` siblings
