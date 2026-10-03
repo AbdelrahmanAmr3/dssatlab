@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.17.0] - Unreleased
+## [0.17.0] - 2026-10-03
 
 ### Added
 - `run()` selects forecast mode Y for `.FCX` FileX files and sequence mode Q for selected treatments with several TREATMENTS rows, whatever the extension; other FileX files keep modes A/C. Q/Y write `DSSBatch.v48` in the FileX folder and collect it into the run directory on success or failure; a failed launch deletes it ([ADR 0022](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0022-run-picks-dssats-run-mode-from-the-filex.md)).
