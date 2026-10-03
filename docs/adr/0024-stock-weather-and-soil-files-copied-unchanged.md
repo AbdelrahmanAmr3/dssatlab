@@ -13,7 +13,8 @@ gap: `soil=` took only soil-template data.
 ## Decision
 
 `weather=` also accepts a `.WTH` path (or a list of them) and `soil=` a `.SOL` path, for a copied
-FileX. `run()` copies each file unchanged, under its own name, into the simulation folder. The
+FileX. `run()` copies each file's content unchanged into the simulation folder (a weather file under its
+upper-case name, which DSSAT on Linux opens; a soil file under its own name). The
 checks read only what they need: for weather the station (the file name's first four characters,
 as DSSAT looks it up), the `@ INSI` coordinates, and DATE SRAD TMAX TMIN RAIN by header column, fed
 into the same checks as weather data; for soil the profile IDs and the file name DSSAT reads for
