@@ -245,8 +245,9 @@ dates with that marker are rejected because DSSAT would read only the first five
 Five-digit weather dates use
 DSSAT's weather century rule, anchored to the simulation start, including a
 first-record adjustment back one century when the record falls after that start,
-and a 99-to-00 rollover. Files are checked together in the order supplied: daily dates
-must be ascending, unique and continuous across file boundaries. Coordinates,
+and a 99-to-00 rollover. Checks follow the files DSSAT selects, rather than the
+order of the supplied paths. Daily dates must be ascending, unique and continuous
+across selected file boundaries. Coordinates and
 daily ranges use the [weather template checks](#prepare-the-weather-template).
 Start coverage, the last seasonal start and scheduled sequence ends use the same
 FileX checks as template weather. Stock weather must also cover a fixed harvest
@@ -254,14 +255,25 @@ FileX checks as template weather. Stock weather must also cover a fixed harvest
 checked against the weather range; maturity-driven endings still need the
 post-run warning scan.
 
-The filenames must be ones DSSAT looks up for the FileX `WSTA` and simulated
-years: a four-character WSTA uses `<WSTA4><YY>01.WTH` per year or `<WSTA4>.WTH`.
-An eight-character WSTA also permits its explicit `<WSTA8>.WTH`; if its last two
-characters are `01`, yearly names are allowed too. Two paths cannot have the
-same name after upper-casing. Stock weather must match the FileX station unless
-experiment overrides repoint the copied field.
+Stock weather must satisfy DSSAT's file lookup. For a four-character `WSTA`,
+DSSAT first requests `<WSTA4><YY>01.WTH` using SDATE's year, then the simulation
+start date's year if different. An eight-character `WSTA` requests its literal
+`<WSTA8>.WTH`. A next-year file alone cannot satisfy the first lookup.
+Two paths cannot have the same name after upper-casing. Stock weather must match
+the FileX station unless experiment overrides repoint the copied field.
 
-dssatlab does not yet check whether an installed weather file in DSSAT's weather path would be read instead of the supplied file (planned, issue #224); supply weather under a name no installed file uses.
+When a selected yearly file with only one year's records ends on December 31,
+DSSAT requests the next `<WSTA4><YY>01.WTH` beside the FileX.
+At rollover it does not search the installed
+WED path or use `<WSTA4>.WTH`. Supply every required yearly file.
+A selected multi-year file stays selected; DSSAT does not borrow another file
+when its records end.
+
+Mode C, used for a single crop treatment, rejects the four-character
+`<WSTA4>.WTH` fallback. Other run modes can use it when no yearly file wins the
+lookup. Checks read the installed DSSATPRO WED path and report an installed
+yearly file that would shadow a supplied fallback. Installed weather never
+counts as supplied coverage. Supply the requested yearly file to take priority.
 
 ### Stock weather problems
 
@@ -277,7 +289,9 @@ Stock weather file {path}: missing required column {label}. Supply a stock weath
 Stock weather file {path}: DATE header spans {width} characters. Supply @DATE for YYDDD, or $WEATHER with @  DATE for YYYYDDD dates.
 Stock weather file {path}: DATE header spans {width} characters but the $WEATHER marker is {present_or_absent}. Checked the format marker and DATE width. Supply $WEATHER with @  DATE and YYYYDDD dates, or omit $WEATHER and use @DATE with YYDDD dates.
 Stock weather files {first_path} and {path} have the same file name {name} after upper-casing. Supply only one file with each name for the simulation folder.
-Stock weather file {path}: DSSAT does not look up this name for WSTA {station!r} in the simulated years. Expected {names}. Rename the file or correct the FileX WSTA.
+DSSAT requests {name}, but no supplied file meets this lookup{reason}. Checked supplied names: {names}; installed weather cannot supply coverage. Supply {name}, or correct the FileX WSTA and start dates.
+DSSAT requests {name} at rollover on {date}. Checked supplied weather in the selected simulation folder; rollover does not search WED or use the four-character fallback. Supply {name} beside the FileX.
+Installed weather file {installed_path} shadows supplied {fallback}. Checked supplied names: {names} and DSSATPRO WED {wed}. Supply {name} in the simulation folder to take priority.
 Stock weather file {path}, line {line}: invalid date {value!r}. Supply a valid YYDDD or YYYYDDD calendar date matching the DATE header width.
 ```
 
@@ -352,6 +366,64 @@ Weather data row {line}, column 'par': found {value}. Supply a non-empty finite 
 Weather data row {line}, column 'par': found {value}; allowed range is 0 to 100 mol/m2 per day. Correct the value using DSSAT's units.
 ```
 
+### Import a NASA POWER file
+
+Download a daily point CSV from the
+[NASA POWER Data Access Viewer](https://power.larc.nasa.gov/data-access-viewer/).
+Choose the **AG** community, **daily** data and **CSV** format. Select the point
+and a date range covering the simulation. Request these parameters:
+
+| POWER parameter | Weather template column | Unit |
+| --- | --- | --- |
+| `ALLSKY_SFC_SW_DWN` | `srad` | MJ/m^2/day |
+| `T2M_MAX` | `tmax` | degrees C |
+| `T2M_MIN` | `tmin` | degrees C |
+| `PRECTOTCORR` | `rain` | mm/day |
+
+The solar radiation unit in the header must be `MJ/m^2/day`. A different unit
+raises `DSSATError` and asks for an AG community download. Older files with
+`PRECTOT` are accepted. Extra parameters such as `RH2M`, `WS2M` and POWER PAR
+are ignored. Monthly, hourly and regional files are not supported.
+
+Import the NASA POWER file once, then pass the returned weather template path
+to `Simulation`:
+
+```python
+import dssatlab as dl
+
+weather = dl.import_nasa_power(
+    "POWER_daily.csv", "weather.csv", station="MYFL",
+)
+sim = dl.Simulation("MYFL2101.MZX", treatment=1, weather=weather)
+for problem in sim.check():
+    print(problem)
+result = sim.run()  # Run after correcting any problems.
+```
+
+Replace `MYFL2101.MZX` with your FileX path and `MYFL` with its station code.
+Download weather for that FileX's simulation dates.
+`station` must contain exactly four ASCII letters or digits. Latitude,
+longitude and elevation come from the POWER header. Pass `latitude=`,
+`longitude=` or `elevation=` to replace a header value. If a value is missing
+from both places, `DSSATError` names the required keyword.
+
+The returned `Path` names a new weather template CSV. An existing output path
+raises `DSSATError`. Dates may use YEAR with DOY, or YEAR with MO and DY; when
+both are present, they must agree. Values keep their units. The header's missing
+marker (normally `-999`) becomes `-99`. Optional station values `tav`, `amp`,
+`refht` and `wndht` are written as `-99`.
+
+No gap filling is done. The importer does not check daily ranges.
+`sim.check()` reports a missing calendar day with a problem such as:
+
+```text
+Weather data: missing date 1984-01-02. Supply one row for each missing calendar day.
+```
+
+A missing parameter value becomes `-99`; the checks name its column and date
+in a range problem. `sim.run()` raises `DSSATCheckError` if these problems remain.
+Supply the missing weather data and check again.
+
 ## Create a Simulation and inspect the checks
 
 Once you have edited `weather.csv`, create the Simulation:
@@ -398,8 +470,21 @@ treatment name. Names that exceed the FileX column width are rejected during
 checks, including when no experiment data is supplied. Giving a name alone
 leaves the copied field IDs unchanged.
 
-**Start-date coverage is checked only when `START` is `S`.** In that case, a
-weather date must match the two-digit year and day of year in `SDATE`.
+Weather must cover the **simulation start date**. Under START S this is SDATE,
+or `controls.start_date` when supplied. Under START P it is the effective
+planting date (an experiment-data override, else PDATE). Under START E it is the
+effective emergence date (`planting.emergence_date`, else EDATE).
+`controls.start_date` is ignored under START P and E. Harvest bounds use the
+planting date under START P and the emergence date under START E; in a sequence,
+only the first rotation component uses this simulation start bound.
+
+SDATE's two-digit year uses the century of the first seven-digit `$WEATHER`
+date. If the initial SDATE falls before that weather year, it advances one
+century. Without an explicit weather year, DSSAT uses crossover 35: years 00
+through 35 mean 2000 through 2035, and 36 through 99 mean 1936 through 1999.
+Generated weather uses this crossover rule. Irrigation and automatic planting
+dates use the same year rule.
+
 Seasonal checks cover the last season's start; sequence checks require weather
 through the scheduled end of the component that crosses the stopping boundary
 ([sequence coverage](sequence.md#sequence-checks)). Maturity-driven endings are

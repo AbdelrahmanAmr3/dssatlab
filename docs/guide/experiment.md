@@ -76,7 +76,10 @@ problem of every treatment is reported at once. Crop-specific rules are still DS
 at run time.
 
 A changed `controls` `start_date` replaces the FileX `SDATE` in the weather-coverage and
-planting-date checks. The FileX `START` setting is left as it is.
+planting-date checks under START S. Under START P the effective planting date is
+the simulation start date; under START E it is the effective emergence date.
+`controls.start_date` is ignored under START P and E. The FileX `START` setting
+is left as it is. See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
 
 ## Residues, tillage and harvest
 
@@ -246,7 +249,7 @@ For automatic planting, set `planting_management` to `"A"` or `"F"` and give
 window dates and any soil water or temperature limits to change. The effective
 window uses your dates, otherwise the copied controls level's PFRST/PLAST.
 Its first date must be on or before its last and on or after the effective
-simulation start (`controls.start_date`, otherwise SDATE). Given window dates
+simulation start date. Given window dates
 must lie inside the weather range. These window checks run only under PLANT
 A/F when you supply a window date, `planting_management`, or `start_date`;
 an unused window under PLANT R is not checked. The checks do not predict

@@ -2,6 +2,21 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.18.1] - unreleased
+
+### Added
+- `import_nasa_power()` writes a downloaded NASA POWER daily point CSV as a weather template CSV. Use the AG community with solar radiation in MJ/m^2/day. Header coordinates can be replaced by keywords. The missing marker becomes -99; no gap filling or unit conversion is done.
+- A [NASA POWER import tutorial](guide/simulation.md#import-a-nasa-power-file) and an API reference entry.
+
+### Fixed
+- SDATE's two-digit year uses the century of the first seven-digit `$WEATHER` date. Without that date, years 00 through 35 mean 2000 through 2035, and 36 through 99 mean 1936 through 1999. An initial SDATE before the first explicit weather year advances one century. Irrigation and automatic planting dates use the same year rule ([#221](https://github.com/AbdelrahmanAmr3/dssatlab/issues/221)).
+- START P uses the effective planting date as the simulation start date. START E uses the effective emergence date. Start-day, season and sequence coverage checks use these dates; `controls.start_date` replaces SDATE only under START S ([#225](https://github.com/AbdelrahmanAmr3/dssatlab/issues/225)).
+- Harvest bounds use the effective planting date under START P and the effective emergence date under START E. A first rotation component's harvest before emergence is rejected ([#226](https://github.com/AbdelrahmanAmr3/dssatlab/issues/226)).
+- Stock weather selection follows DSSAT's lookup. Supplied files must satisfy the initial yearly name or eight-character WSTA name. Yearly files ending on December 31 require the next yearly file beside the FileX at rollover; multi-year files stay selected. Mode C rejects the four-character fallback. Checks also report an installed weather file in DSSATPRO's WED path that shadows a supplied fallback ([#223](https://github.com/AbdelrahmanAmr3/dssatlab/issues/223), [#224](https://github.com/AbdelrahmanAmr3/dssatlab/issues/224)).
+
+### Notes
+- Zero runtime dependencies are preserved.
+
 ## [0.18.0] - 2026-10-03
 
 ### Added

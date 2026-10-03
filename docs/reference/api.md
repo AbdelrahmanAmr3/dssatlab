@@ -24,6 +24,18 @@ Weather template columns are `station`, `latitude`, `longitude`, `elevation`,
 inclusive; fill every row or omit the column. The written example omits `par`.
 See [weather columns and checks](../guide/simulation.md#prepare-the-weather-template).
 
+::: dssatlab.import_nasa_power
+    options:
+      show_root_heading: true
+      show_signature: true
+      show_signature_annotations: true
+      separate_signature: true
+
+Returns the `Path` of a new weather template CSV. Coordinates come from the
+NASA POWER header unless the corresponding keyword replaces them. No gap
+filling, unit conversion or range checking is done. Pass the returned path as
+`weather=` to `Simulation`. See [Import a NASA POWER file](../guide/simulation.md#import-a-nasa-power-file).
+
 ::: dssatlab.write_soil_template
 
 ::: dssatlab.write_management_template
