@@ -37,6 +37,11 @@ DSSAT's experiment file (`*.MZX`, `*.SBX`, ...). It describes fields, treatments
 and management for one experiment.
 _Avoid_: experiment file, input file
 
+**FileX date**:
+A five-digit YYDDD date in a FileX (SDATE, PDATE, EDATE, HDATE, irrigation and automatic planting
+dates). Always read with DSSAT's rule: years 00-40 are 2000-2040, 41-99 are 1941-1999. The weather
+never chooses its century.
+
 **Treatment**:
 One numbered row of a FileX. A run covers all treatments or a single one. Its number is the
 N column as DSSAT reads it, so it always equals the Summary's TRNO.
@@ -135,8 +140,8 @@ Only the user's weather data (the weather template), never a stock weather file.
 _Avoid_: weather report, weather statistics
 
 **Simulation start date**:
-The day used by the start-day, season and sequence coverage checks: SDATE under START S,
-resolved from the years the weather covers, or the effective planting date under START P.
+The day used by the start-day, season and sequence coverage checks: SDATE under START S, read as
+a FileX date, or the effective planting date under START P.
 controls.start_date replaces SDATE under START S only.
 
 **Weather file**:
