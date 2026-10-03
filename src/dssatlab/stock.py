@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import shutil
 
+from . import core
 from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
 from .filex import _filex_date, _weather_filename
@@ -41,7 +42,7 @@ def _stock_number(value):
         return value
 
 
-def _weather_date(value, previous_year):
+def _weather_date(value, previous_year, *, start_date=None):
     """Resolve a stock date with the weather century, or return None."""
     if not re.fullmatch(r"[0-9]{5}|[0-9]{7}", value):
         return None
@@ -54,6 +55,12 @@ def _weather_date(value, previous_year):
         year += previous_year // 100 * 100
         if year < previous_year and previous_year % 100 == 99:
             year += 100
+        # DSSAT-CSM v4.8.6.0, Weather/IPWTH_alt.for, IpWRec (1073-1081):
+        # only the first record read at simulation start moves back a century
+        # when its resolved YRDOYW > YRSIM and the raw code is < 99366.
+        if (start_date is not None and int(value) < 99366
+                and year * 1000 + doy > start_date.year * 1000 + start_date.timetuple().tm_yday):
+            year -= 100
     if not 1 <= year <= 9999:
         return None
     if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
@@ -76,6 +83,47 @@ def _weather_names(station, start_date, end_date):
         names.extend(f"{station[:4]}{year % 100:02d}01.WTH"
                      for year in range(start_date.year, end_date.year + 1))
     return list(dict.fromkeys([*names, f"{station[:4]}.WTH"]))
+
+
+def _stock_weather_shadow(paths, station, start_date, end_date, executable):
+    """Report the first installed file DSSAT would read ahead of supplied weather."""
+    found = (core.detect()["dssat_path"] if executable is None
+             else core.find_dssat_path(Path(executable)))
+    if found is None:
+        return []
+    weather_dir = found.parent / "Weather"
+    # DSSAT-CSM v4.8.6.0, InputModule/PATH.for, PATH (49-65): WED in
+    # DSSATPRO selects the installed weather path, including split drive/path.
+    pro = found.parent / ("DSSATPRO.W48" if core._os_name() == "windows" else "DSSATPRO.L48")
+    try:
+        for line in pro.read_text(encoding="latin-1").splitlines():
+            if line.startswith("WED"):
+                parts = line[3:80].split()
+                if parts:
+                    weather_dir = Path(parts[0] + parts[1] if parts[0].endswith(':')
+                                       and len(parts) > 1 else parts[0])
+                break
+    except (OSError, ValueError):
+        pass  # A conventional installation keeps Weather beside the executable.
+    supplied = {path.name.upper() for path in paths}
+    # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for, IPEXP (741-765), and
+    # MAKEFILEW.f90, MAKEFILEW (272-296): the full name in the current /
+    # experiment directory, then WED, precedes the four-character fallback.
+    # Only supplied weather is copied into Simulation's experiment directory.
+    for year in range(start_date.year, end_date.year + 1):
+        names = _weather_names(station, date(year, 1, 1), date(year, 12, 31))
+        if year != start_date.year and not any(name in supplied for name in names):
+            continue  # No supplied fallback for this year can be shadowed.
+        for name in names:
+            if name in supplied:
+                break
+            installed = weather_dir / name
+            if name != f"{station[:4]}.WTH" and installed.is_file():
+                return [f"Stock weather for WSTA {station!r}: DSSAT would read installed "
+                        f"file {installed} before the supplied weather. Checked the supplied "
+                        f"names and DSSAT's installed weather path. Supply your weather "
+                        f"under the file name {name}."]
+    return []
 
 
 def _read_weather_file(path):
@@ -116,7 +164,16 @@ def _read_weather_file(path):
     width = daily_columns["DATE"].stop
     if width not in (5, 7):
         return [], [f"Stock weather file {path}: DATE header spans {width} characters. "
-                    "Supply @DATE for YYDDD or @  DATE for YYYYDDD dates."]
+                    "Supply @DATE for YYDDD, or $WEATHER with @  DATE for YYYYDDD dates."]
+    # DSSAT-CSM v4.8.6.0, InputModule/MAKEFILEW.f90, MAKEFILEW (348-398)
+    # enables FirstWeatherDate only with $WEATHER; Weather/IPWTH_alt.for,
+    # IpWRec (1002-1008) then reads I7, otherwise I5 regardless of the header.
+    wide = any("$WEATHER" in line for line in lines[:daily_start - 1])
+    if width != (7 if wide else 5):
+        return [], [f"Stock weather file {path}: DATE header spans {width} characters "
+                    f"but the $WEATHER marker is {'present' if wide else 'absent'}. "
+                    "Checked the format marker and DATE width. Supply $WEATHER with "
+                    "@  DATE and YYYYDDD dates, or omit $WEATHER and use @DATE with YYDDD dates."]
     rows = []
     for index in range(daily_start, len(lines)):
         line = lines[index]
@@ -146,6 +203,7 @@ def _read_stock_weather(source, station, start_date, end_date=None, *,
     names = _weather_names(station, start_date, end_date or start_date)
     rows, problems, seen = [], [], {}
     previous_year = start_date.year
+    initial_record = True
     for source_path in paths:
         path = Path(source_path)
         name = path.name.upper()
@@ -164,7 +222,9 @@ def _read_stock_weather(source, station, start_date, end_date=None, *,
                             f"for WSTA {station!r} in the simulated years. Expected "
                             f"{', '.join(names)}. Rename the file or correct the FileX WSTA.")
         for line, row in raw:
-            day = _weather_date(row["date"], previous_year)
+            day = _weather_date(row["date"], previous_year,
+                                start_date=start_date if initial_record else None)
+            initial_record = False
             if day is None:
                 problems.append(f"Stock weather file {path}, line {line}: invalid date "
                                 f"{row['date']!r}. Supply a valid YYDDD or YYYYDDD "
@@ -204,7 +264,7 @@ def _parse_template_weather(source):
     return ([], problems) if problems else _parse_weather(source)
 
 
-def _simulation_weather(sim, values, experiment_data, components):
+def _simulation_weather(sim, values, experiment_data, components, *, executable=None):
     """Read either weather source, sharing checks and the sequence end rule."""
     problems = _weather_source_problems(sim.weather)
     if problems:
@@ -255,6 +315,9 @@ def _simulation_weather(sim, values, experiment_data, components):
     # avoid a second name-lookup problem for the same mismatch.
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
     rows, problems = _read_stock_weather(paths, station, start, end, check_names=same_station)
+    if same_station and not problems:
+        problems.extend(_stock_weather_shadow(paths, station, start, end,
+                                             sim.executable if executable is None else executable))
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)

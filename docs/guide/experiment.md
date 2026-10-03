@@ -145,7 +145,9 @@ effective HARVS R must have at least one usable dated harvest event: supplying
 nonzero and contain a usable HDATE. This check runs even without management
 edits, fixing [#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192).
 An inherited HDATE under HARVS R must also be on or after both the known
-simulation start and planting dates, including experiment-data overrides
+simulation start and planting dates, including experiment-data overrides. Under
+effective planting management A or F, DSSAT chooses the planting date, so the
+reported PDATE is ignored and only the simulation-start bound applies
 ([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)). FileX YYDDD dates
 use DSSAT's cutoff: years 00 through 40 mean 2000 through 2040, and 41 through
 99 mean 1941 through 1999. The message names the harvest level and each failed

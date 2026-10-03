@@ -239,9 +239,13 @@ One trailing letter flag on a number is accepted. Other daily columns, including
 by the checks and reach DSSAT unchanged. Required weather values of `-99` fail
 the usual range checks; nothing is filled or repaired.
 
-Dates may be YYDDD (`@DATE`) or YYYYDDD (`@  DATE`). Five-digit weather dates use
+Dates may be YYDDD (`@DATE`, without `$WEATHER`) or YYYYDDD (`@  DATE`, with a
+`$WEATHER` format marker). A `*WEATHER DATA` file uses five-digit dates; seven-digit
+dates with that marker are rejected because DSSAT would read only the first five digits.
+Five-digit weather dates use
 DSSAT's weather century rule, anchored to the simulation start, including a
-99-to-00 rollover. Files are checked together in the order supplied: daily dates
+first-record adjustment back one century when the record falls after that start,
+and a 99-to-00 rollover. Files are checked together in the order supplied: daily dates
 must be ascending, unique and continuous across file boundaries. Coordinates,
 daily ranges use the [weather template checks](#prepare-the-weather-template).
 Start coverage, the last seasonal start and scheduled sequence ends use the same
@@ -257,6 +261,11 @@ characters are `01`, yearly names are allowed too. Two paths cannot have the
 same name after upper-casing. Stock weather must match the FileX station unless
 experiment overrides repoint the copied field.
 
+When a DSSAT installation is known, checks reject stock weather if a higher-priority
+filename in its installed weather path would replace the supplied file. Supply your
+weather under the reported filename. If no installation is known during `check()`,
+`run()` repeats this check after finding DSSAT, before creating the simulation folder.
+
 ### Stock weather problems
 
 These are the stock-specific messages, with `{...}` standing for the reported
@@ -268,7 +277,9 @@ Weather data mixes file paths and data rows. Supply only stock weather file path
 A stock weather file needs a copied FileX. Supply weather data rows for a FileX template.
 Cannot read stock weather file {path}: {error}. Supply a readable stock weather file path.
 Stock weather file {path}: missing required column {label}. Supply a stock weather file with column {label}.
-Stock weather file {path}: DATE header spans {width} characters. Supply @DATE for YYDDD or @  DATE for YYYYDDD dates.
+Stock weather file {path}: DATE header spans {width} characters. Supply @DATE for YYDDD, or $WEATHER with @  DATE for YYYYDDD dates.
+Stock weather file {path}: DATE header spans {width} characters but the $WEATHER marker is {present_or_absent}. Checked the format marker and DATE width. Supply $WEATHER with @  DATE and YYYYDDD dates, or omit $WEATHER and use @DATE with YYDDD dates.
+Stock weather for WSTA {station!r}: DSSAT would read installed file {installed} before the supplied weather. Checked the supplied names and DSSAT's installed weather path. Supply your weather under the file name {name}.
 Stock weather files {first_path} and {path} have the same file name {name} after upper-casing. Supply only one file with each name for the simulation folder.
 Stock weather file {path}: DSSAT does not look up this name for WSTA {station!r} in the simulated years. Expected {names}. Rename the file or correct the FileX WSTA.
 Stock weather file {path}, line {line}: invalid date {value!r}. Supply a valid YYDDD or YYYYDDD calendar date matching the DATE header width.

@@ -78,3 +78,45 @@ def test_filex_cutoff_year_in_inherited_harvest(tmp_path, year, first):
     problems = sim.check(False)
     assert len(problems) == 1
     assert first in problems[0] and first[:4] + '-01-02' in problems[0]
+
+
+@pytest.mark.parametrize('code', ['A', 'F', 'R'])
+@pytest.mark.parametrize('override', [False, True])
+@pytest.mark.parametrize('planting_override', [False, True])
+def test_harvest_bound_uses_effective_planting_management(
+        tmp_path, code, override, planting_override):
+    sim = dated_simulation(tmp_path, '82056', '82200', '82180', '1982-02-25')
+    text = sim.filex.read_text().replace(
+        ' 1 MA              R', f' 1 MA              {"R" if override else code}')
+    if planting_override:
+        text = text.replace('@P PDATE\n 1 82200',
+                            '@P PDATE EDATE  PPOP  PPOE  PLME  PLDS  PLRS  PLRD  '
+                            'PLDP  PLWT  PAGE  PENV  PLPH  SPRL\n'
+                            ' 1 82200   -99     5     5     S     R    75     0     5'
+                            '   -99   -99   -99   -99   -99')
+    text += ('\n@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN\n'
+             ' 1 PL          82060 82070    40   100    30    40    10\n')
+    sim.filex.write_text(text, encoding='latin-1')
+    entry = {}
+    if override:
+        entry['controls'] = {'planting_management': code}
+    if planting_override:
+        entry['planting'] = {'date': '1982-07-19', 'population': 5,
+                             'row_spacing': 75, 'depth': 5, 'method': 'S', 'distribution': 'R'}
+    sim.management = {'treatments': {7: entry}} if entry else None
+    problems = sim.check(False)
+    if code == 'R':
+        assert len(problems) == 1
+        assert 'HDATE' in problems[0] and 'planting date (1982-07-19)' in problems[0]
+    else:
+        assert problems == []
+
+
+@pytest.mark.parametrize('code', ['A', 'F'])
+def test_automatic_planting_keeps_simulation_start_harvest_bound(tmp_path, code):
+    sim = dated_simulation(tmp_path, '82056', '82200', '82055', '1982-02-24')
+    sim.filex.write_text(sim.filex.read_text().replace(' 1 MA              R', f' 1 MA              {code}'))
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert 'simulation start date (1982-02-25)' in problems[0]
+    assert 'planting date (' not in problems[0]

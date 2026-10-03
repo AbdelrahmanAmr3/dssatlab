@@ -27,7 +27,7 @@ def weather_file(tmp_path, name="UFGA7601.WTH", codes=("76001",), *,
     # Adjacent signed station values and reordered daily columns defeat split().
     header = label + "   RAIN  DEWP   TMIN   SRAD   TMAX" + ("    PAR" if par else "")
     lines = [
-        "*WEATHER DATA : a small test fixture", "",
+        ("$WEATHER" if wide else "*WEATHER DATA") + " : a small test fixture", "",
         "@ INSI      LONG      LAT  ELEV   TAV",
         "  XXXX   -82.370   29.630    10 -99.0", header,
     ]
@@ -91,7 +91,7 @@ def test_five_digit_dates_use_weather_century(tmp_path, codes, start, expected):
 @pytest.mark.parametrize("wide,code,start", [
     (False, "00000", date(2000, 1, 1)),
     (False, "01366", date(2001, 1, 1)),
-    (False, "00366", date(2100, 1, 1)),
+    (False, "00366", date(2101, 1, 1)),
     (True, "2001366", date(2001, 1, 1)),
     (True, "xxxxxxx", date(2001, 1, 1)),
 ])
@@ -106,14 +106,14 @@ def test_invalid_weather_date_is_one_file_problem(tmp_path, wide, code, start):
 def test_files_keep_given_order_and_duplicates_for_existing_checks(tmp_path):
     first = weather_file(tmp_path, "UFGA7601.WTH", ("76366",))
     second = weather_file(tmp_path, "UFGA7701.WTH", ("76366", "77001"))
-    rows, problems = read([first, second], end=date(1977, 1, 1))
+    rows, problems = read([first, second], start=date(1976, 12, 31), end=date(1977, 1, 1))
     assert problems == []
     assert [row["date"] for row in rows] == [date(1976, 12, 31),
                                             date(1976, 12, 31), date(1977, 1, 1)]
     checks = _parse_weather(rows)[1]
     assert len(checks) == 1
     assert "duplicate date 1976-12-31" in checks[0]
-    rows, problems = read([second, first], end=date(1977, 1, 1))
+    rows, problems = read([second, first], start=date(1976, 12, 31), end=date(1977, 1, 1))
     assert problems == []
     assert [row["date"] for row in rows] == [date(1976, 12, 31),
                                             date(1977, 1, 1), date(1976, 12, 31)]
@@ -190,3 +190,29 @@ def test_required_missing_value_is_left_for_weather_checks(tmp_path):
     checks = _parse_weather(rows)[1]
     assert len(checks) == 1
     assert "srad" in checks[0] and "allowed range" in checks[0]
+
+
+def test_initial_record_before_century_boundary_covers_start(tmp_path):
+    path = weather_file(tmp_path, "UFGA.WTH", ("99365", "00001", "00002"))
+    rows, problems = read(path, start=date(2000, 1, 1))
+    assert problems == []
+    assert [row["date"] for row in rows] == [date(1999, 12, 31),
+                                           date(2000, 1, 1), date(2000, 1, 2)]
+    assert _parse_weather(rows)[1] == []
+
+
+@pytest.mark.parametrize("marker,wide,rejected", [
+    ("*WEATHER DATA", True, True), ("$WEATHER", True, False),
+    ("$WEATHER", False, True), ("*WEATHER DATA", False, False),
+])
+def test_weather_marker_matches_date_width(tmp_path, marker, wide, rejected):
+    path = weather_file(tmp_path, wide=wide, codes=("1976001" if wide else "76001",))
+    text = path.read_text()
+    path.write_text(marker + text[text.index(" :"):], encoding="ascii")
+    rows, problems = read(path)
+    assert len(problems) == int(rejected)
+    if rejected:
+        assert rows == []
+        assert all(part in problems[0] for part in (str(path), "DATE", "$WEATHER", "Supply"))
+    else:
+        assert rows[0]["date"] == date(1976, 1, 1)

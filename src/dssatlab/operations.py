@@ -94,6 +94,7 @@ def _harvest_bounds(source, text, treatment, row, override):
     """Read known start and planting bounds after experiment edits."""
     from .controls import _controls_start_date
     from .filex import _filex_date, _section_row
+    from .irrigation import _effective_management
 
     start = _controls_start_date(source, treatment)
     planting = override.get('planting')
@@ -110,6 +111,13 @@ def _harvest_bounds(source, text, treatment, row, override):
                 planting = _filex_date(details[column])
         except (ValueError, TypeError, KeyError):
             pass  # Existing checks report unavailable levels and invalid edits.
+    code = _effective_management(override, None, treatment, 'planting_management', 'PLANT')
+    if code is None:
+        code = _component_management(text, row, 'PLANT')
+    # DSSAT-CSM v4.8.6.0, Management/AUTPLT.for, AUTPLT (98-99):
+    # PLANT A/F discard the reported PDATE; only the simulation start bounds HDATE.
+    if code in ('A', 'F'):
+        planting = None
     return [('simulation start date', start), ('planting date', planting)]
 
 

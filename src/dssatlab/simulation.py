@@ -3,6 +3,7 @@
 from pathlib import Path
 import shutil
 
+from . import runner
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
 from .filex import _check_filex_controls, _irrigation_dates, _read_filex
@@ -235,13 +236,19 @@ class Simulation:
         problems, _ = self._check_inputs(experiment_data, load_problems)
         if problems:
             raise DSSATCheckError(problems)
+        executable = self.executable
         if self.filex_template is not None:
             prepared = _write_template_simulation(self, experiment_data=experiment_data)
         else:
             components = _rotation_components(self.filex, self.treatment)
             override_start = _controls_start_date(experiment_data, self.treatment)
             values, _ = _read_filex(self.filex, self.treatment, start_date=override_start)
-            rows, _ = _simulation_weather(self, values, experiment_data, components)
+            if _stock_weather_paths(self.weather) and executable is None:
+                executable = runner.connect(interactive=False)
+            rows, weather_problems = _simulation_weather(
+                self, values, experiment_data, components, executable=executable)
+            if weather_problems:
+                raise DSSATCheckError(weather_problems)
             station = rows[0]["station"] if _overrides_section(experiment_data, self.treatment) else None
             if station is not None and _stock_weather_paths(self.weather) and values["WSTA"][:4] == station:
                 station = values["WSTA"]  # Keep an explicit stock filename in the copied field.
@@ -266,8 +273,8 @@ class Simulation:
             prepared = sim_folder / filex.name
 
         components = _rotation_components(prepared, self.treatment)
-        result = (_run_sequence(prepared, self.treatment, components, self.executable)
+        result = (_run_sequence(prepared, self.treatment, components, executable)
                   if len(components) > 1 else
-                  run(prepared, treatment=int(self.treatment), executable=self.executable))
+                  run(prepared, treatment=int(self.treatment), executable=executable))
         _check_missing_weather(result)
         return result
