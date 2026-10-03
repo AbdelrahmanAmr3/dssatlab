@@ -1,7 +1,6 @@
 """Guide experiment examples pass the public checks without running DSSAT."""
 
 import ast
-from copy import deepcopy
 from datetime import date, timedelta
 from pathlib import Path
 import re
@@ -51,13 +50,8 @@ def _examples():
                               any(isinstance(t, ast.Name) and t.id == 'n_rates'
                                   for t in item.targets)), [None])
                 for rate in rates:
-                    candidate = deepcopy(node)
-                    if rate is not None:
-                        class Rate(ast.NodeTransformer):
-                            def visit_Name(self, name):
-                                assert name.id == 'rate', (page, name.id)
-                                return ast.Constant(value=rate)
-                        candidate = Rate().visit(candidate)
+                    candidate = node if rate is None else ast.parse(
+                        ast.unparse(node).replace(': rate', f': {rate}'), mode='eval').body
                     for data in _experiment_dicts(ast.literal_eval(candidate)):
                         yield f'{page.name}:python:{number}:{rate}', data
 

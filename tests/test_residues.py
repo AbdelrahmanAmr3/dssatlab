@@ -33,6 +33,7 @@ FIELDS = [
 @pytest.fixture
 def sim(inputs):
     text = SAMPLE.replace(TREATMENT, TREATMENT.replace(" 2 ", " 1 ", 1) + "\n" + TREATMENT)
+    text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 1 MA              R     R     R     R     R\n"
     inputs.filex.write_bytes(text.replace("*SIMULATION CONTROLS", SECTION + "*SIMULATION CONTROLS").encode("latin-1"))
     return Simulation(inputs.filex, 2, inputs.rows,
                       management={"treatments": {2: {"residues": [dict(EVENT)]}}})
@@ -158,30 +159,6 @@ def test_same_date_events_written_in_order(sim, seen):
     assert seen[0].index(b" 8 82056 RE001") < seen[0].index(b" 8 82056 RE002   500")
 
 
-@pytest.mark.parametrize("events", [None, []])
-def test_omitted_keeps_mr_and_empty_sets_zero(sim, seen, capsys, events):
-    original = sim.filex.read_bytes().replace(TREATMENT.encode(), (TREATMENT[:55] + "  7" + TREATMENT[58:]).encode())
-    sim.filex.write_bytes(original)
-    sim.management = {"treatments": {2: {} if events is None else {"residues": events}}}
-    assert sim.check() == []
-    assert ("residues: OK (omitted" if events is None else "residues: OK (empty list") in capsys.readouterr().out
-    sim.run()
-    expected = original if events is None else original.replace(
-        (TREATMENT[:55] + "  7" + TREATMENT[58:]).encode(), TREATMENT.encode())
-    assert seen == [expected] and sim.filex.read_bytes() == original
-
-
-def test_missing_section_inserted(sim, seen):
-    original = sim.filex.read_bytes().replace(SECTION.encode("latin-1"), b"")
-    sim.filex.write_bytes(original)
-    sim.run()
-    assert seen[0].count(b"*RESIDUES AND ORGANIC FERTILIZER") == 1
-    assert seen[0].index(HEADER.encode()) < seen[0].index(b"*SIMULATION CONTROLS")
-    assert b" 1 82056 RE001  1500   -99   -99   -99   -99   -99   -99    -99" in seen[0]
-    assert (TREATMENT[:55] + "  1" + TREATMENT[58:]).encode() in seen[0]
-    assert sim.filex.read_bytes() == original
-
-
 @pytest.mark.parametrize("column", ["MR", "R", *[row[1] for row in FIELDS], "RENAME"])
 def test_missing_writer_columns_checked_before_run(sim, seen, column):
     token = " MR " if column == "MR" else "@R " if column == "R" else column
@@ -203,14 +180,15 @@ def test_column_overflow_is_a_prewrite_problem(sim, seen, field, value):
 
 
 @pytest.mark.parametrize("filex_code,override", [
-    ("R", None), ("D", None), ("N", None), ("N", "R"), ("R", "D"), ("R", "N"),
+    ("R", None), ("D", None), ("N", None), ("G", None), ("X", None), ("-99", None),
+    ("N", "R"), ("R", "D"), ("R", "N"),
 ])
 @pytest.mark.parametrize("empty", [False, True])
 def test_residues_use_effective_management_code(option_sim, capsys, filex_code, override, empty):
     sim = option_sim
     text = sim.filex.read_text(encoding="latin-1").replace(
         " 1 MA              R     R     R     N     M",
-        f" 1 MA              R     R     R     {filex_code}     M")
+        f" 1 MA              R     R     R{filex_code:>6}     M")
     # A different SM level must not determine this treatment's code.
     text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 7 MA              R     R     R     D     D\n"
     sim.filex.write_text(text, encoding="latin-1")

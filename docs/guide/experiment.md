@@ -346,13 +346,13 @@ hand-edited FileX exactly: IRCM 110 mm and HWAM 2335 kg/ha.
 Residues on UFGA7901 and tillage on MSKB8921/MSKB8902 rebuilt from stock through
 experiment data matched the stock FileX runs exactly on the same weather file.
 
-On UFGA7601 peanut under HARVS M, harvest event dates `"1976-09-15"` and
+On UFGA7601 peanut under HARVS M set through `controls.harvest_management`,
+harvest event dates `"1976-09-15"` and
 `"1976-10-01"` gave identical Summary results: HDAT stayed `1976-09-18`.
-Changing HPC from 100 to 50 halved HWAH (4683 to 2342 kg/ha); changing HBPC
-from 100 to 50 halved BWAH (5839 to 2919 kg/ha). Changing HSTG from GS003 to
-GS002 left HDAT unchanged. These results establish that M ignored the event
-date and used the removal percentages in this peanut experiment. They do not
-establish general harvest component or size sensitivity.
+Changing HPC from 100 to 50 halved HWAH (4760 to 2380 kg/ha), while HWAM
+stayed 4760 kg/ha. Changing HSTG from GS003 to GS002 left HDAT unchanged.
+HBPC was held at 0 and HCOM/HSIZE at IBHCS, so this proof makes no claim
+about by-product removal, harvest component or size sensitivity.
 
 ## Not included
 

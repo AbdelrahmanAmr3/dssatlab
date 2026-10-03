@@ -328,10 +328,10 @@ def test_fallow_needs_scheduled_end(sim):
 @pytest.mark.parametrize('section,event,code,fix', [
     ('residues', dict(date='1978-11-15', material='RE001', amount=1500), 'N',
      'residue management "R" (reported dates), but it is "N". '
-     'Set controls residue to "R", or remove the residues events.'),
+     'Set the component\'s FileX SM level column RESID to "R", or remove the residues events.'),
     ('harvest', dict(date='1978-11-15'), 'D',
      'harvest management "R" or "M", but it is "D". '
-     'Set controls harvest_management to "R" or "M", or remove the harvest events.'),
+     'Set the component\'s FileX SM level column HARVS to "R" or "M", or remove the harvest events.'),
 ])
 def test_component_operation_code_from_own_sm(sim, section, event, code, fix):
     if sim.filex is None:
@@ -369,6 +369,11 @@ def test_component_operations_use_period_message(sim, section, event):
 
 @pytest.mark.parametrize('day,valid', [('1978-11-20', False), ('1978-11-21', True)])
 def test_reported_harvest_moves_neighbor_bound(sim, day, valid):
+    # Keep the component periods separate while checking the edited event's lower bound.
+    if sim.filex is None:
+        sim.filex_template['rotation'][2]['planting']['date'] = '1978-11-21'
+    else:
+        sim.filex.write_text(sim.filex.read_text().replace(' 2 78319', ' 2 78325'))
     edits(sim, {2: {'harvest': [{'date': '1978-11-16'}, {'date': '1978-11-20'}]},
                 3: {'fertilizer': [fertilizer(day)]}})
     problems = sim.check(False)
@@ -386,5 +391,73 @@ def test_maturity_harvest_ignores_populated_hdate(sim, capsys):
     sim.filex.write_text(text)
     edits(sim, {3: {'fertilizer': [fertilizer('1978-10-01')]}})
     assert sim.check(True) == []
-    assert ('rotation component 2: period bound check was skipped for unreadable HDATE '
-            '(including -99) or unavailable simulation start.') in capsys.readouterr().out
+    report = capsys.readouterr().out
+    assert ('rotation component 2: period bound check was skipped because HARVS "M" '
+            'harvests at maturity and ignores HDATE; the end bound is unknown and not checked.') in report
+    assert 'Correct the FileX date' not in report
+
+
+@pytest.mark.parametrize('section,event,column,field,fix', [
+    ('residues', dict(date='1978-11-15', material='RE001', amount=1500), 'RESID', 'residue', '"R"'),
+    ('harvest', dict(date='1978-11-15'), 'HARVS', 'harvest_management', '"R" or "M"'),
+])
+@pytest.mark.parametrize('code', ['G', 'X', '-99', None, 'unreadable_sm'])
+def test_component_rejects_unusable_operation_code(sim, section, event, column, field, fix, code):
+    if sim.filex is None:
+        pytest.skip('Unavailable or unknown SM codes belong to a copied FileX')
+    old = ' 3 MA              R     R     R     N     M'
+    row = ('' if code is None else
+           f' 3 MA              R     R     R{code:>6}     M' if column == 'RESID' else
+           f' 3 MA              R     R     R     N{code:>6}')
+    text = sim.filex.read_text().replace(old, row)
+    if code == 'unreadable_sm':
+        text = sim.filex.read_text().replace(' 0  0  0  0  3\n', ' 0  0  0  0  X\n')
+    sim.filex.write_text(text)
+    edits(sim, {3: {section: [event]}})
+    problems = [p for p in sim.check(False) if f'{section}: ' in p and 'events need' in p]
+    assert len(problems) == 1
+    if code in (None, 'unreadable_sm'):
+        assert f'could not be read (checked controls {field} and the FileX SM level column {column})' in problems[0]
+        assert '"None"' not in problems[0]
+    else:
+        assert f'but it is "{code}".' in problems[0]
+    assert f'Set the component\'s FileX SM level column {column} to {fix}, or remove the {section} events.' in problems[0]
+
+
+@pytest.mark.parametrize('day,valid', [('1978-11-14', True), ('1978-11-15', False), ('1978-11-20', False)])
+def test_edited_end_rechecks_unchanged_next_planting(sim, day, valid):
+    edits(sim, {2: {'harvest': [{'date': '1978-11-01'}, {'date': day}]}})
+    problems = sim.check(False)
+    expected = (
+        "Management data treatment 1, rotation component 2, harvest, event 2, field 'date': "
+        f"{day} is not before rotation component 3's planting date (1978-11-15). "
+        "DSSAT applies a component's events only while it runs and would skip this one "
+        "without a warning. Move the date into the component's period.")
+    assert problems == ([] if valid else [expected])
+
+
+@pytest.mark.parametrize('day,valid', [('1979-03-13', True), ('1979-03-14', False), ('1979-03-20', False)])
+def test_edited_end_rechecks_next_fallow_end(sim, day, valid):
+    if sim.filex is None:
+        sim.filex_template['rotation'][2]['harvest_date'] = '1979-03-01'
+    else:
+        sim.filex.write_text(sim.filex.read_text().replace(' 3 MA              R     R     R     N     M',
+                                                        ' 3 MA              R     R     R     N     R'))
+    edits(sim, {3: {'harvest': [{'date': day}]}})
+    problems = sim.check(False)
+    assert (problems == []) == valid
+    if not valid:
+        assert len(problems) == 1
+        assert f"{day} is not before rotation component 4's end date (1979-03-14)" in problems[0]
+
+
+@pytest.mark.parametrize('day,valid', [('1978-11-14', True), ('1978-11-15', False), ('1978-11-20', False)])
+def test_fallow_end_rechecks_unchanged_next_planting(sim, day, valid):
+    if sim.filex is not None:
+        pytest.skip('end_date belongs to a FileX template')
+    sim.filex_template['rotation'][1]['end_date'] = day
+    problems = sim.check(False)
+    assert (problems == []) == valid
+    if not valid:
+        assert any(f"1978-11-15 is not after rotation[2]'s end ({day})" in p
+                   for p in problems)

@@ -88,8 +88,12 @@ def _known_dates(components, template, text, start, edits, where):
         end = _harvest_end(entry, end, code)
         if end is not None and 'HDATE' in skipped:
             skipped.remove('HDATE')
-        if code == 'M' and 'HDATE' not in skipped:
-            skipped.append('HDATE')
+        if code == 'M':
+            if 'HDATE' in skipped:
+                skipped.remove('HDATE')
+            notes.append(f'    Note: {where}, rotation component {number}: period bound '
+                         'check was skipped because HARVS "M" harvests at maturity and ignores '
+                         'HDATE; the end bound is unknown and not checked.')
         for column in skipped:
             notes.append(f"    Note: {where}, rotation component {number}: period bound "
                          f"check was skipped for unreadable {column} (including -99) "
@@ -114,7 +118,7 @@ def _period_problems(day, location, index, known, start):
     if end is not None:
         if day > end:
             bounds.append(f"is after rotation component {number}'s harvest date ({end})")
-    elif index + 1 < len(known):
+    if index + 1 < len(known):
         following, next_planting, next_end, next_crop = known[index + 1]
         upper = next_end if next_crop == 'FA' else next_planting
         label = 'end date' if next_crop == 'FA' else 'planting date'
@@ -190,7 +194,8 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
         elif section in _OPERATION_FIELDS:
             column = 'RESID' if section == 'residues' else 'HARVS'
             code = _component_management(text, row, column)
-            found, _ = _check_operation_events(value, section, where, weather_range, code=code)
+            found, _ = _check_operation_events(value, section, where, weather_range,
+                                                code=code, component=True)
             if section == 'harvest' and row['CR'] == 'FA' and value == []:
                 found.append(f'{where}, harvest: a fallow needs its scheduled end. Supply '
                              'harvest events, or omit harvest to keep the FileX Level.')

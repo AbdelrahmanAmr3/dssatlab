@@ -59,9 +59,9 @@ def _check_operation_field(value, rule):
     return None
 
 
-# Section -> (event kind, controls field, codes that read the events, valid codes, fix wording).
-_CODE_RULES = {"residues": ("residue", "residue", ("R",), ("N", "R", "D"), '"R"'),
-               "harvest": ("harvest", "harvest_management", ("R", "M"), ("A", "M", "R", "D"),
+# Section -> (event kind, controls field, codes that read the events, FileX column, fix wording).
+_CODE_RULES = {"residues": ("residue", "residue", ("R",), "RESID", '"R"'),
+               "harvest": ("harvest", "harvest_management", ("R", "M"), "HARVS",
                            '"R" or "M"')}
 
 
@@ -101,7 +101,7 @@ def _harvest_end(entry, end, code):
     return end
 
 
-def _check_operation_events(events, section, where, weather_range=None, *, code=None):
+def _check_operation_events(events, section, where, weather_range=None, *, code=None, component=False):
     """Check shapes, fields and non-descending dates; allow same-date events."""
     from .management import _check_weather_date, _report_lines
 
@@ -116,11 +116,14 @@ def _check_operation_events(events, section, where, weather_range=None, *, code=
         return [], [f"{label}: OK (empty list; none for this treatment)"]
     problems, report, previous = [], [], None
     if section in _CODE_RULES:
-        kind, field, needed, codes, fix = _CODE_RULES[section]
-        if code in codes and code not in needed:
+        kind, field, needed, column, fix = _CODE_RULES[section]
+        if code not in needed:
             dates = " (reported dates)" if section == "residues" else ""
+            found = (f'it is "{code}"' if code is not None else
+                     f'it could not be read (checked controls {field} and the FileX SM level column {column})')
+            target = f"the component's FileX SM level column {column}" if component else f"controls {field}"
             problem = (f'{where}: {kind} events need the {kind} management {fix}{dates}, '
-                       f'but it is "{code}". Set controls {field} to {fix}, '
+                       f'but {found}. Set {target} to {fix}, '
                        f'or remove the {section} events.')
             problems.append(problem)
             report.append(f"      {problem}")

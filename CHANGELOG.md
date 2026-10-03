@@ -12,7 +12,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Notes
 - Residues on UFGA7901 and tillage on MSKB8921/MSKB8902 rebuilt from stock matched stock FileX runs exactly on the same weather file.
-- On UFGA7601 peanut under HARVS M, harvest dates 1976-09-15 and 1976-10-01 gave identical Summary results (HDAT 1976-09-18). HPC 100 to 50 halved HWAH (4683 to 2342); HBPC 100 to 50 halved BWAH (5839 to 2919). HSTG GS003 to GS002 left HDAT unchanged. General harvest component or size sensitivity is not established.
+- On UFGA7601 peanut under HARVS M set through `controls.harvest_management`, harvest dates 1976-09-15 and 1976-10-01 gave identical Summary results (HDAT 1976-09-18). HPC 100 to 50 halved HWAH (4760 to 2380), while HWAM stayed 4760. HSTG GS003 to GS002 left HDAT unchanged. HBPC was held at 0 and HCOM/HSIZE at IBHCS, so this proof makes no claim about by-product removal, harvest component or size sensitivity.
 - Known follow-ups: [#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192) checks for HARVS R without a harvest event; [#193](https://github.com/AbdelrahmanAmr3/dssatlab/issues/193) addresses new levels running out at 99 in long sequences.
 - Zero runtime dependencies are preserved.
 

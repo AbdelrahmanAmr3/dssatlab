@@ -9,7 +9,7 @@ from dssatlab import DSSATCheckError
 from test_controls_options import option_sim
 from test_management_file import sim_inputs
 from test_planting_run import TREATMENT, seen
-from test_residues import SECTION, sim
+from test_residues import EVENT, HEADER, OLD_ROW, SECTION, sim
 from test_simulation_run import fake_dssat, inputs, snapshot
 
 
@@ -26,6 +26,9 @@ CASES = {
         full=dict(stage="gs003", component="IBHCS", size="IBHCS", product_percent=100,
                   byproduct_percent=0), full_row=" 8 82057 gs003 IBHCS IBHCS   100     0   -99"),
 }
+COMMON_CASES = {"residues": dict(name="RESIDUES AND ORGANIC FERTILIZER", offset=55,
+    header=HEADER, old=OLD_ROW, event=EVENT,
+    row=" 8 82056 RE001  1500   -99   -99   -99   -99   -99   -99    -99"), **CASES}
 DATE_RULE = "a valid ISO calendar date as a quoted YYYY-MM-DD string"
 CODE_RULE = "two ASCII letters followed by three digits for the DSSAT code"
 TEXT_RULE = "1-5 printable ASCII characters without spaces"
@@ -44,7 +47,7 @@ FIELDS = [
 
 
 def set_operation(sim, section):
-    case = CASES[section]
+    case = COMMON_CASES[section]
     block = f"*{case['name']}\n{case['header']}\n{case['old']}\n! caf\xe9\n\n"
     sim.filex.write_bytes(sim.filex.read_bytes().replace(SECTION.encode("latin-1"), block.encode("latin-1")))
     sim.management = {"treatments": {2: {section: [dict(case["event"])]}}}
@@ -192,8 +195,10 @@ def test_same_date_events_written_in_order(operation_sim, section, seen):
 
 
 @pytest.mark.parametrize("events", [None, []])
-def test_omitted_keeps_level_and_empty_sets_zero(operation_sim, section, seen, capsys, events):
-    sim, case = operation_sim, CASES[section]
+@pytest.mark.parametrize("section", COMMON_CASES)
+def test_omitted_keeps_level_and_empty_sets_zero(sim, section, seen, capsys, events):
+    set_operation(sim, section)
+    case = COMMON_CASES[section]
     offset = case["offset"]
     old_treatment = (TREATMENT[:offset] + "  7" + TREATMENT[offset+3:]).encode()
     original = sim.filex.read_bytes().replace(TREATMENT.encode(), old_treatment)
@@ -207,8 +212,10 @@ def test_omitted_keeps_level_and_empty_sets_zero(operation_sim, section, seen, c
     assert sim.filex.read_bytes() == original
 
 
-def test_missing_section_inserted(operation_sim, section, seen):
-    sim, case = operation_sim, CASES[section]
+@pytest.mark.parametrize("section", COMMON_CASES)
+def test_missing_section_inserted(sim, section, seen):
+    set_operation(sim, section)
+    case = COMMON_CASES[section]
     block = f"*{case['name']}\n{case['header']}\n{case['old']}\n! caf\xe9\n\n"
     original = sim.filex.read_bytes().replace(block.encode("latin-1"), b"")
     sim.filex.write_bytes(original)
@@ -226,7 +233,8 @@ def test_missing_section_inserted(operation_sim, section, seen):
 def test_missing_writer_columns_prevent_run(sim, seen, section, column):
     set_operation(sim, section)
     token = column if column.startswith("@") else " " + column + " " if column.startswith("M") else column
-    sim.filex.write_bytes(sim.filex.read_bytes().replace(token.encode(), b"?" * len(token)))
+    replacement = token.encode().replace(column.encode(), b"?" * len(column))
+    sim.filex.write_bytes(sim.filex.read_bytes().replace(token.encode(), replacement))
     before = snapshot(sim.filex.parent)
     assert any(column.lstrip("@") in p and "Supply" in p for p in sim.check(verbose=False))
     with pytest.raises(DSSATCheckError):
@@ -245,6 +253,7 @@ def test_column_overflow_prevents_run(sim, seen, section, field, value):
 
 @pytest.mark.parametrize("filex_code,override", [
     ("D", None), ("A", None), ("R", None), ("M", None),
+    ("G", None), ("X", None), ("-99", None),
     ("M", "D"), ("M", "A"), ("D", "R"), ("A", "M"),
 ])
 @pytest.mark.parametrize("empty", [False, True])
@@ -252,7 +261,7 @@ def test_harvest_uses_effective_management_code(option_sim, capsys, filex_code, 
     sim = option_sim
     text = sim.filex.read_text(encoding="latin-1").replace(
         " 1 MA              R     R     R     N     M",
-        f" 1 MA              R     R     R     N     {filex_code}")
+        f" 1 MA              R     R     R     N{filex_code:>6}")
     text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 7 MA              R     R     R     N     D\n"
     sim.filex.write_text(text, encoding="latin-1")
     entry = sim.management["treatments"][1]
@@ -275,3 +284,21 @@ def test_harvest_uses_effective_management_code(option_sim, capsys, filex_code, 
 def test_tillage_has_no_management_code_check(option_sim):
     option_sim.management["treatments"][1]["tillage"] = [dict(CASES["tillage"]["event"])]
     assert option_sim.check(verbose=False) == []
+
+
+@pytest.mark.parametrize('section,event,column,field,fix', [
+    ('residues', dict(date='1982-02-25', material='RE001', amount=1500), 'RESID', 'residue', '"R"'),
+    ('harvest', dict(date='1982-02-25'), 'HARVS', 'harvest_management', '"R" or "M"'),
+])
+@pytest.mark.parametrize('empty', [False, True])
+def test_missing_management_code(option_sim, section, event, column, field, fix, empty):
+    sim = option_sim
+    sim.filex.write_text(sim.filex.read_text().replace(' 1 MA              R     R     R     N     M', ''))
+    sim.management['treatments'][1][section] = [] if empty else [event]
+    kind = 'residue' if section == 'residues' else 'harvest'
+    dates = ' (reported dates)' if section == 'residues' else ''
+    expected = (f'Management data treatment 1, {section}: {kind} events need the {kind} '
+                f'management {fix}{dates}, but it could not be read (checked controls {field} '
+                f'and the FileX SM level column {column}). Set controls {field} to {fix}, '
+                f'or remove the {section} events.')
+    assert sim.check(False) == ([] if empty else [expected])
