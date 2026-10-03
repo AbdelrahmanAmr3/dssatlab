@@ -22,6 +22,12 @@ It refuses to overwrite an existing path. `write_management_template` is unchang
 management-only YAML is still valid: add a section only when you want to change it. Omit a
 section and the treatment keeps the FileX's own level.
 
+Edits normally append a new level. Past 99 they reuse the lowest number no
+TREATMENTS row references after the edit is repointed, replacing rows in the
+copy; if none is free, the checks report the level-limit problem. See
+[level reuse](sequence.md#reuse-free-levels-past-99) and
+[ADR 0023](../adr/0023-reuse-free-levels-past-99.md).
+
 ## Experiment data for sequences
 
 A sequence entry takes `controls` (`years` and `start_date`) and `rotation`, a dictionary
@@ -126,7 +132,6 @@ SIMULATION CONTROLS level. Codes are quoted, case-sensitive strings:
 
 | Controls field | DSSAT column | Allowed codes | Allowed supplied events |
 |---|---|---|---|
-| `harvest_management` | HARVS | `"A"`, `"M"`, `"R"`, `"D"` | Quoted, case-sensitive letter |
 | `residue` | RESID | `"R"`, `"D"`, `"N"` | R accepts dated residue events; D and N reject non-empty `residues` |
 | `harvest_management` | HARVS | `"A"`, `"M"`, `"R"`, `"D"` | R and M accept dated harvest events; A and D reject non-empty `harvest` |
 | `tillage` | TILL | `"Y"`, `"N"` | Y applies tillage; there is no tillage/event code check |
@@ -134,10 +139,18 @@ SIMULATION CONTROLS level. Codes are quoted, case-sensitive strings:
 RESID D and HARVS D read days after planting, which these sections do not
 support. RESID N ignores residue events; HARVS A uses the automatic harvest
 block, which cannot yet be edited through experiment data. HARVS G is not
-accepted. Empty lists do not trigger RESID/HARVS code problems. The checks ask
-you to change the code or remove the events; dssatlab never changes a code for you.
-The check for HARVS R without any harvest event is still a follow-up
-([#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192)).
+accepted. Empty residues do not trigger a RESID code problem. A crop under
+effective HARVS R must have at least one usable dated harvest event: supplying
+`harvest: []` fails. If `harvest` is omitted, the inherited MH level must be
+nonzero and contain a usable HDATE. This check runs even without management
+edits, fixing [#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192).
+It does not require events under M/A or for fallows; other event/code rules still
+apply. The checks ask you to change the events or code; dssatlab never changes
+a code for you. For a crop treatment with no dated harvest under R, the message is:
+
+```text
+Treatment 1: harvest management is "R" (reported dates), but there are no harvest events with a date. Add a harvest event, or set controls harvest_management to another code.
+```
 
 For sequences, the codes come from each component's own SM level; component
 `controls` edits are not supported. See the

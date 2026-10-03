@@ -19,6 +19,8 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.17.0 adds sequence (Q) and forecast (Y) modes in `run()`, rotations of 2 to 99 components with leading fallow, dated-harvest checks for HARVS R, and free-level reuse past 99.
+
 Version 0.16.1 adds residue, tillage and harvest events per treatment or rotation component (including fallow), with RESID/HARVS checks and `harvest_management`.
 
 Version 0.16.0 adds automatic irrigation and planting controls, irrigation in days after planting, and an irrigation efficiency dict with IRRIG/event checks.
@@ -57,10 +59,11 @@ print(result.run_dir, result.outputs)
 
 How a run works:
 
-- DSSAT runs in the FileX's own folder, so weather and soil files beside the FileX are found. Its output files are then moved into a new `dssat_run_<date>` folder beside the FileX, and your FileX folder is left as it was.
-- The FileX filename can be at most 12 characters, including the extension (DSSAT's own limit), for example `UFGA8201.MZX`.
+- `run()` selects Y for `.FCX` (case-insensitive), otherwise Q when a selected treatment has several TREATMENTS rows, otherwise A for all treatments or C for one treatment. Q/Y write `DSSBatch.v48` in the FileX folder and move it into the run directory on success or failure; a failed launch deletes it. An existing batch file is refused and never overwritten. Q with several treatment numbers requires `treatment=n`. See the [run guide](docs/guide/run-filex.md#guards-before-dssat-starts) for the exact guard messages. Forecasts through `Simulation` are for a later release.
+- DSSAT runs in the FileX's own folder, so weather and soil files beside the FileX are found. Newly created or updated files move into a new `dssat_run_<date>` folder beside the FileX; unchanged files stay beside it.
+- The FileX filename can be at most 12 characters, including the extension, and must be exactly 12 for Q/Y, for example `MSKB8902.SQX`.
 - A failed run raises `DSSATRunError` with the command, the end of DSSAT's console output and the start of `ERROR.OUT`. The run folder is kept so you can look inside.
-- `run()` returns the files DSSAT wrote. Read outputs with `result.summary()`, `result.plant_growth()`, `result.soil_water()`, `result.plant_nitrogen()`, `result.weather()`, and `result.dssat_evaluation()`, or plot with `result.plot(variable)`. Building experiments from Python is not built yet.
+- `run()` returns the files DSSAT wrote. Read outputs with `result.summary()`, `result.plant_growth()`, `result.soil_water()`, `result.plant_nitrogen()`, `result.weather()`, and `result.dssat_evaluation()`, or plot with `result.plot(variable)`.
 
 Upgrading from 0.1.x on Linux or Colab: a DSSAT built by 0.1.x cannot run simulations, so the first `dl.install()` (or `dl.connect()` with consent) rebuilds it once.
 
@@ -94,7 +97,7 @@ dl.write_filex_template("filex.yaml")   # crop, treatment name(s), cultivar, pla
 sim = dl.Simulation(filex_template="filex.yaml", weather="weather.csv", soil="soil.csv")
 ```
 
-Templates also support multi-treatment experiments and several fields: supply a `treatments` list instead of `treatment_name`, optionally assign fields with `treatment_fields`, supply `weather` and `soil` per field as dictionaries (`{1: ..., 2: ...}`), vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`. Supply `rotation` (a list of 2 to 9 crop and fallow components) to run a multi-year crop rotation in DSSAT's sequence mode.
+Templates also support multi-treatment experiments and several fields: supply a `treatments` list instead of `treatment_name`, optionally assign fields with `treatment_fields`, supply `weather` and `soil` per field as dictionaries (`{1: ..., 2: ...}`), vary each treatment with experiment data, and run all treatments via `run_treatments(filex_template=...)`. Supply `rotation` (a list of 2 to 99 crop and fallow components) to run a multi-year crop rotation in DSSAT's sequence mode. A leading fallow takes `start_date` before `end_date`; see the [sequence guide](docs/guide/sequence.md#start-with-a-fallow).
 
 Values are in DSSAT's own units and nothing is converted:
 

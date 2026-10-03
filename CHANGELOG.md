@@ -2,6 +2,27 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.17.0] - Unreleased
+
+### Added
+- `run()` selects forecast mode Y for `.FCX` FileX files and sequence mode Q for selected treatments with several TREATMENTS rows, whatever the extension; other FileX files keep modes A/C. Q/Y write `DSSBatch.v48` in the FileX folder and collect it into the run directory on success or failure; a failed launch deletes it ([ADR 0022](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0022-run-picks-dssats-run-mode-from-the-filex.md)).
+- Rotation FileX templates with 2 to 99 components, including a leading fallow with `start_date` before `end_date`. Its start date anchors SDATE, the FileX stem year, cycle length, weather coverage and component period checks.
+- Run-mode and sequence guides, and tutorial Case 17 for `run()` on MSKB8902.SQX in Q mode.
+
+### Changed
+- Q/Y runs refuse an existing `DSSBatch.v48` without overwriting it and require a FileX filename of exactly 12 characters. A sequence FileX with more than one treatment number requires `treatment=n`.
+- `Simulation.check()` rejects forecast FileX files and points to `run()`; forecast runs inside Simulation are for a later release.
+
+### Fixed
+- A crop treatment or rotation component under effective HARVS R must have a usable dated harvest event, including inherited FileX harvest levels and runs without experiment-data edits ([#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192)).
+- When a new FileX level would pass 99, edits reuse the lowest number no TREATMENTS row references after repointing the edit, replacing that level's rows in the copy. Levels below the limit retain the previous writer's byte-identical output ([#193](https://github.com/AbdelrahmanAmr3/dssatlab/issues/193), [ADR 0023](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0023-reuse-free-levels-past-99.md)).
+
+### Notes
+- On real DSSAT, `run()` on stock MSKB8902.SQX (Q) matched 55/55 Summary rows and UFAC2301 (Y) matched 46/46 rows, with RUNNO/TRNO/HWAM/HDAT/CWAM/PRCM identical to DSSAT's own runs. An 11-character FileX name was refused before DSSAT ran; an existing `DSSBatch.v48` was refused and left byte-identical.
+- A 12-component rotation with NYERS 2 matched the same FileX run by hand. A 99-component rotation template ran with 99 rows and no ERROR.OUT. HARVS R with `harvest: []` was rejected; adding a dated harvest passed. MSKB8902 rebuilt with 56 harvest events (levels 57 through 99, then reused 1 through 13) matched stock 55/55 exactly.
+- Known limit: [#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205), `check()` can accept sequence weather that ends before DSSAT's last component ends. MSKB8921 needed weather through 1998-05-06; the checks accepted 1998-02-28.
+- Zero runtime dependencies are preserved.
+
 ## [0.16.1] - 2026-10-02
 
 ### Added
