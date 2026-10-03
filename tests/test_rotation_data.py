@@ -208,15 +208,17 @@ def test_all_known_dates_need_weather(sim, omit_rotation):
                for p in sim.check(False))
 
 
-def test_century_resolution(sim):
+def test_start_override_does_not_change_filex_century(sim):
     if sim.filex is None:
         pytest.skip('Two-digit years belong to a copied FileX')
     sim.weather = weather('2077-03-15', '2081-03-15')
     sim.management['treatments'][1]['controls'] = dict(start_date='2077-03-15')
     edits(sim, {3: {'fertilizer': [fertilizer('2078-11-15')]}})
-    assert sim.check(False) == []
-    edits(sim, {3: {'fertilizer': [fertilizer('2078-10-01')]}})
-    assert any("rotation component 2's end (2078-11-14)" in p for p in sim.check(False))
+    problems = sim.check(False)
+    assert any("date '1978-03-15' is outside weather range" in p for p in problems)
+    assert any("rotation component 4's end date (1979-03-14)" in p for p in problems)
+    edits(sim, {3: {'fertilizer': [fertilizer('1978-10-01')]}})
+    assert any("rotation component 2's end (1978-11-14)" in p for p in sim.check(False))
 
 
 def test_loop_renders_all_component_edits(tmp_path):

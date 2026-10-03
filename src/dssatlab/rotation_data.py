@@ -1,11 +1,11 @@
 """Check Experiment data per rotation component and render its row-targeted edits."""
 
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 from .cultivar import _CROPS, _check_cultivar, _cultivar_text
 from .experiment import _check_date, _unknown_keys
-from .filex import _section_row, _section_rows
+from .filex import _filex_date, _section_row, _section_rows
 from .filex_write import _event_text, _planting_text
 from .irrigation import _check_irrigation_events
 from .management import (_check_events, _check_planting, _check_weather_date,
@@ -42,30 +42,24 @@ def _calendar_date(value):
     return None if _check_date(value, '') else date.fromisoformat(value)
 
 
-def _filex_date(text, row, reference, section, key, column, start):
-    """Resolve YYDDD dates; harvest uses the latest valid date of its level."""
+def _level_date(text, row, reference, section, key, column):
+    """Read dates of a level; harvest uses its latest valid date."""
     try:
-        if start is None:
-            return None
         rows = (_section_rows(text, section, key, int(row[reference]), (column,))
                 if reference == 'MH' else
                 [_section_row(text, section, key, int(row[reference]), (column,))])
         days = []
         for details in rows:
-            value = details[column]
-            if len(value) != 5 or not value.isascii() or not value.isdigit():
-                continue
-            year = start.year + (int(value[:2]) - start.year % 100) % 100
-            doy = int(value[2:])
-            if 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
-                days.append(date(year, 1, 1) + timedelta(days=doy - 1))
+            day = _filex_date(details[column])
+            if day is not None:
+                days.append(day)
         return max(days, default=None)
     except (ValueError, KeyError, TypeError):
         pass
     return None
 
 
-def _known_dates(components, template, text, start, edits, where):
+def _known_dates(components, template, text, edits, where):
     known, notes = [], []
     for index, row in enumerate(components):
         number, planting, end = int(row['R']), None, None
@@ -85,7 +79,7 @@ def _known_dates(components, template, text, start, edits, where):
                 # MH=0 means maturity, not an unreadable scheduled harvest.
                 if reference == 'MH' and row.get('MH') == '0':
                     continue
-                day = _filex_date(text, row, reference, section, key, column, start)
+                day = _level_date(text, row, reference, section, key, column)
                 if reference == 'MP':
                     planting = day
                 else:
@@ -105,7 +99,7 @@ def _known_dates(components, template, text, start, edits, where):
         for column in skipped:
             notes.append(f"    Note: {where}, rotation component {number}: period bound "
                          f"check was skipped for unreadable {column} (including -99) "
-                         "or unavailable simulation start. Correct the FileX date to check this bound.")
+                         "or unavailable level. Correct the FileX date to check this bound.")
         override = entry.get('planting') if isinstance(entry, dict) else None
         if isinstance(override, dict) and _calendar_date(override.get('date')) is not None:
             planting = _calendar_date(override['date'])
@@ -236,7 +230,7 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
 
 
 def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
-                         template=None, data_dir=None):
+                         template=None, data_dir=None, *, inherited_harvest_checked=False):
     """Return ordinary sections, component problems and report; never write files."""
     if not isinstance(entry, dict):
         return entry, [], []
@@ -256,7 +250,7 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
     if any(not row['R'].isascii() or not row['R'].isdigit() for row in components):
         return ordinary, [], []  # Sequence checks already report invalid R numbers.
     edits, problems = _rotation_keys(entry.get('rotation', {}), components, where)
-    known, notes = _known_dates(components, template, text, start, edits, where)
+    known, notes = _known_dates(components, template, text, edits, where)
     cycle_start = (known[0][1] or _calendar_date(template[0].get('start_date'))
                    if template is not None else None)
     if cycle_start is not None and known[-1][2] is not None:
@@ -291,6 +285,11 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
             already_checked = (isinstance(original_planting, dict)
                                and original_planting.get('date') == planting.isoformat()
                                and component.get('harvest_date') == end.isoformat())
+            # The HARVS R check names each early inherited HDATE and its level.
+            already_checked |= (inherited_harvest_checked and template is None
+                                and (not isinstance(override, dict) or 'harvest' not in override)
+                                and _component_management(text, row, 'HARVS') == 'R'
+                                and end < planting)
             if not already_checked:
                 problem = (f'{where}, rotation component {number}: harvest date {end} '
                            f'is not after planting date {planting}. Move the harvest after '
