@@ -80,6 +80,22 @@ def test_reuses_only_level_freed_by_this_edit(
     assert written.endswith("! keep caf\xe9\n*END\n! final comment without newline\xff")
 
 
+@pytest.mark.parametrize("key,column,section,data,blocks,expected",
+                         [case for case in CASES if case.id != "controls"])
+def test_reused_level_drops_zero_padded_rows(tmp_path, key, column, section, data, blocks, expected):
+    original = filex_text(section, blocks)
+    padded = "".join(header + "\n03" + row + "\n" for header, row in blocks)
+    original = original.replace("! keep", padded + "! keep", 1)
+    path = tmp_path / "TEST8201.MZX"
+    path.write_bytes(original.encode("latin-1"))
+    _write_management(path, 3, {"treatments": {3: {key: data}}})
+    written = path.read_bytes().decode("latin-1")
+    body = written.split("*" + section + "\n", 1)[1].split("*", 1)[0]
+    assert not any(line.startswith("03") for line in body.splitlines())
+    assert [row[2:].split() for row in level_rows(written, section, 3)] == [
+        row.split() for row in expected]
+
+
 @pytest.mark.parametrize("key,column,section,data,blocks,expected", CASES)
 def test_shared_level_is_protected_and_lowest_free_level_is_used(
         tmp_path, key, column, section, data, blocks, expected):

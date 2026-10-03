@@ -212,7 +212,7 @@ def _new_level(lines, treatment, column, highest, section, *, rotation=None):
     for index in range(start + 1, end):
         if lines[index].startswith("@"):
             left, right = next(iter(_columns(lines[index]).values()))
-        elif lines[index][left:right].strip() == str(level):
+        elif lines[index][left:right].strip().lstrip("0") == str(level):
             # Empty strings remove rows from the text without shifting insertion points.
             lines[index] = ""
     return level

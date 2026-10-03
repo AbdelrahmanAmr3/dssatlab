@@ -95,7 +95,9 @@ def test_batch_guards_write_nothing(inputs, monkeypatch, name, mode, label, guar
         batch.write_bytes(b"user batch\xff")
         message = (f"Cannot run FileX {name} in {label} mode ({mode}): {filex.parent} "
                    "already holds DSSBatch.v48, which run() writes. Nothing was run. "
-                   "Move or rename it, or use Simulation, which runs in its own folder.")
+                   "Move or rename it" + (", or use Simulation, which runs in its own folder."
+                   if mode == "Q" else
+                   ", or copy the forecast FileX and its inputs to their own folder."))
     else:
         message = (f"Cannot run FileX {name!r}: its filename has 11 characters; "
                    f"DSSAT's {label} mode ({mode}) accepts exactly 12. Rename the FileX "

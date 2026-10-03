@@ -184,8 +184,9 @@ def run(
         if (filex.parent / "DSSBatch.v48").exists():
             raise DSSATRunError(
                 f"Cannot run FileX {filex.name} in {label}: {filex.parent} already holds "
-                "DSSBatch.v48, which run() writes. Nothing was run. Move or rename it, "
-                "or use Simulation, which runs in its own folder."
+                "DSSBatch.v48, which run() writes. Nothing was run. Move or rename it"
+                + (", or use Simulation, which runs in its own folder." if mode == "Q" else
+                   ", or copy the forecast FileX and its inputs to their own folder.")
             )
         if len(filex.name) != 12:
             raise DSSATRunError(
