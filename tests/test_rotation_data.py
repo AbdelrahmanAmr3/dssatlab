@@ -113,6 +113,8 @@ def test_explicit_harvest_bound(sim, day, valid):
     else:
         text = sim.filex.read_text().replace(' 0  0  0  0  1\n', ' 0  0  0  3  1\n', 1)
         text = text.replace(' 2 79073 GS000', ' 3 78196 GS000   -99   -99   -99   -99 -99\n 2 79073 GS000')
+        text = text.replace(' 1 MA              R     R     R     N     M',
+                            ' 1 MA              R     R     R     N     R')
         sim.filex.write_text(text)
     edits(sim, {1: {'fertilizer': [fertilizer(day)]}})
     problems = sim.check(False)
@@ -306,3 +308,83 @@ def test_component_irrigation_replaces_inherited_guard(sim, component, irrigatio
     assert any('IPIRR' in p for p in problems) == (irrigation is None or component == 3)
     if irrigation is not None and component != 3:
         assert problems == []
+
+
+@pytest.mark.parametrize('section', ['planting', 'cultivar', 'fertilizer', 'irrigation'])
+def test_fallow_takes_only_field_operations(sim, section):
+    edits(sim, {2: {section: []}})
+    assert sim.check(False) == [
+        'Management data treatment 1, rotation component 2: is a fallow (FA). '
+        'Supply only residues, tillage and harvest sections; remove other sections.']
+
+
+def test_fallow_needs_scheduled_end(sim):
+    edits(sim, {2: {'harvest': []}})
+    assert sim.check(False) == [
+        'Management data treatment 1, rotation component 2, harvest: a fallow needs '
+        'its scheduled end. Supply harvest events, or omit harvest to keep the FileX Level.']
+
+
+@pytest.mark.parametrize('section,event,code,fix', [
+    ('residues', dict(date='1978-11-15', material='RE001', amount=1500), 'N',
+     'residue management "R" (reported dates), but it is "N". '
+     'Set controls residue to "R", or remove the residues events.'),
+    ('harvest', dict(date='1978-11-15'), 'D',
+     'harvest management "R" or "M", but it is "D". '
+     'Set controls harvest_management to "R" or "M", or remove the harvest events.'),
+])
+def test_component_operation_code_from_own_sm(sim, section, event, code, fix):
+    if sim.filex is None:
+        if section == 'harvest':
+            pytest.skip('HARVS D belongs to a copied FileX')
+    else:
+        # Component 1 accepts both operations; component 3 has a different SM level.
+        text = sim.filex.read_text().replace(' 1 MA              R     R     R     N     M',
+                                           ' 1 MA              R     R     R     R     R')
+        if section == 'harvest':
+            text = text.replace(' 3 MA              R     R     R     N     M',
+                                ' 3 MA              R     R     R     N     D')
+        sim.filex.write_text(text)
+    edits(sim, {3: {section: [event]}})
+    kind = 'residue' if section == 'residues' else 'harvest'
+    assert sim.check(False) == [
+        f'Management data treatment 1, rotation component 3, {section}: '
+        f'{kind} events need the {fix}']
+
+
+@pytest.mark.parametrize('section,event', [
+    ('residues', dict(date='1978-01-01', material='RE001', amount=1500)),
+    ('tillage', dict(date='1978-01-01', implement='TI005', depth=20)),
+    ('harvest', dict(date='1978-01-01')),
+])
+def test_component_operations_use_period_message(sim, section, event):
+    edits(sim, {2: {section: [event]}})
+    message = (
+        f"Management data treatment 1, rotation component 2, {section}, event 1, field 'date': "
+        "1978-01-01 is not after rotation component 1's end (1978-03-15). "
+        "DSSAT applies a component's events only while it runs and would skip this one "
+        "without a warning. Move the date into the component's period.")
+    assert message in sim.check(False)
+
+
+@pytest.mark.parametrize('day,valid', [('1978-11-20', False), ('1978-11-21', True)])
+def test_reported_harvest_moves_neighbor_bound(sim, day, valid):
+    edits(sim, {2: {'harvest': [{'date': '1978-11-16'}, {'date': '1978-11-20'}]},
+                3: {'fertilizer': [fertilizer(day)]}})
+    problems = sim.check(False)
+    assert (problems == []) == valid
+    if not valid:
+        assert len(problems) == 1
+        assert "is not after rotation component 2's end (1978-11-20)" in problems[0]
+
+
+def test_maturity_harvest_ignores_populated_hdate(sim, capsys):
+    if sim.filex is None:
+        pytest.skip('HARVS M with populated HDATE belongs to a copied FileX')
+    text = sim.filex.read_text().replace(' 2 MA              R     R     R     N     R',
+                                       ' 2 MA              R     R     R     N     M')
+    sim.filex.write_text(text)
+    edits(sim, {3: {'fertilizer': [fertilizer('1978-10-01')]}})
+    assert sim.check(True) == []
+    assert ('rotation component 2: period bound check was skipped for unreadable HDATE '
+            '(including -99) or unavailable simulation start.') in capsys.readouterr().out

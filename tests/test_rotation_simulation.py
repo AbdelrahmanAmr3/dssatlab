@@ -137,3 +137,30 @@ def test_missing_weather_warning(sim, installed):
     installed.outputs["WARNING.OUT"] = b"Weather record not found for YR DOY: 1978 111"
     with pytest.raises(DSSATRunError, match="1978-04-21"):
         sim.run()
+
+
+@pytest.mark.parametrize('last', ['1979-03-14', '1980-03-12', '1980-03-13'])
+def test_final_fallow_harvest_updates_cycle_weather(sim, last):
+    sim.management = {'treatments': {'01': {'rotation': {'04': {
+        'harvest': [{'date': '1980-03-13'}],
+    }}}}}
+    sim.weather = weather('1978-03-15', last)
+    problems = sim.check(False)
+    if last == '1980-03-13':
+        assert problems == []
+    else:
+        assert (f'FileX NYERS 2: the sequence runs from 1978-03-15 through 1980-03-13, '
+                f'after the weather data ends ({last}). Supply weather through 1980-03-13, '
+                'or fewer years.') in problems
+        assert any('rotation component 4' in p and 'outside weather range' in p for p in problems)
+
+
+def test_final_harvest_rechecks_cycle_closure(sim):
+    sim.weather = weather('1978-03-15', '1981-03-15')
+    sim.management = {'treatments': {1: {'rotation': {4: {
+        'harvest': [{'date': '1979-03-20'}],
+    }}}}}
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert ('rotation component 4, harvest: the last component ends on 1979-03-20 '
+            '(day 79 of the year), not before the first planting') in problems[0]

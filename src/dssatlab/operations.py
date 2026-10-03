@@ -76,6 +76,31 @@ def _check_operation(entry, treatment, section, where, text, weather_range=None)
     return _check_operation_events(entry[section], section, where, weather_range, code=code)
 
 
+def _component_management(text, row, column, default=None):
+    """Read the component's SM level, as for its irrigation events."""
+    from .filex import _section_row
+
+    if text is not None:
+        try:
+            return _section_row(text, 'SIMULATION CONTROLS', 'N', int(row['SM']),
+                                ('MANAGEMENT', column))[column]
+        except (ValueError, TypeError, KeyError):
+            pass  # Existing FileX checks report unavailable layouts.
+    return default
+
+
+def _harvest_end(entry, end, code):
+    """Reported harvests set the end; maturity ignores every scheduled date."""
+    if code == 'M':
+        return None
+    events = entry.get('harvest') if isinstance(entry, dict) else None
+    if code == 'R' and isinstance(events, list):
+        days = [date.fromisoformat(event['date']) for event in events
+                if isinstance(event, dict) and not _check_date(event.get('date'), '')]
+        return max(days) if days else None
+    return end
+
+
 def _check_operation_events(events, section, where, weather_range=None, *, code=None):
     """Check shapes, fields and non-descending dates; allow same-date events."""
     from .management import _check_weather_date, _report_lines

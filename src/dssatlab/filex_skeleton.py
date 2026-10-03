@@ -179,7 +179,7 @@ def _write_template_simulation(sim, experiment_data):
     if rotation:
         from .rotation import _write_rotation_controls
         from .rotation_data import _write_rotation_data
-        _write_rotation_controls(filex, experiment_data, start)
+        _write_rotation_controls(filex, experiment_data, start, data['rotation'])
         _write_rotation_data(filex, sim.treatment, experiment_data)
         return filex
     if isinstance(experiment_data, dict) and isinstance(experiment_data.get("treatments"), dict):

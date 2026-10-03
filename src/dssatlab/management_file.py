@@ -64,6 +64,8 @@ treatments:
     # For a sequence, replace the sections above with this rotation example.
     # R1 maize planted 1978-03-15; R2 fallow ends 1978-11-14;
     # R3 wheat planted 1978-11-15; R4 fallow ends 1979-03-14.
+    # Components also take residues, tillage and harvest; fallows take only these three.
+    # Codes come from each component's SM level. A fallow harvest cannot be [].
     # Events after maturity cannot be checked; leave a margin before the crop ends.
     # rotation:
     #   1:
@@ -71,6 +73,9 @@ treatments:
     #       - {date: "1978-03-15", material: FE005, application: AP001, depth: 5, n: 60}
     #     irrigation:
     #       - {date: "1978-05-01", amount: 25, method: IR001}
+    #   2:
+    #     tillage: [{date: "1978-08-01", implement: TI005, depth: 20}]
+    #     harvest: [{date: "1978-11-14"}]
     #   3:
     #     cultivar: {crop: WH, code: IB1500}
     #     fertilizer:
