@@ -7,7 +7,7 @@ from .weather import _dssat_date
 
 
 def _treatment_rows(text, problems=None):
-    """Read N/R once per text; valid repeated component rows select mode Q's layout.
+    """Return (line, (N, R)) pairs in file order, keeping identical rows.
 
     In a sequence FileX only the rows of a repeated N use the sequence columns: a one-row
     treatment runs in a normal mode, where DSSAT reads it with the normal columns.
@@ -29,12 +29,13 @@ def _treatment_rows(text, problems=None):
     sequence = len(numbers) == len(rows) and all(
         re.fullmatch(r" [1-9]|[1-9][0-9]", line[2:4]) for line in rows)
     repeated = {n for n in numbers if numbers.count(n) > 1} if sequence else set()
-    result = {}
+    result = []
     for line in rows:
         width = 2 if sequence and int(line[:2]) in repeated else 3
         n = line[:width].strip()
-        result[line] = (n if n.isascii() and n.isdigit() else "", line[width:4].strip())
-        if problems is not None and width == 3 and result[line][0] and int(n) in repeated:
+        number = n if n.isascii() and n.isdigit() else ""
+        result.append((line, (number, line[width:4].strip())))
+        if problems is not None and width == 3 and number and int(n) in repeated:
             sequence_row = next(row for row in rows if int(row[:2]) == int(n))
             problems.append(
                 f"TREATMENTS rows {line!r} (one-row treatment {int(n)}) and "
@@ -51,7 +52,7 @@ def _section_row(text, section, key, level, required):
 
 def _section_rows(text, section, key, level, required):
     """Yield all rows of a level across blocks with the needed columns."""
-    treatments = _treatment_rows(text) if section == "TREATMENTS" else {}
+    treatments = dict(_treatment_rows(text)) if section == "TREATMENTS" else {}
     in_section = False
     matching_header = False
     found = False
@@ -255,7 +256,7 @@ def read_treatment_numbers(source) -> list[int]:
         raise ValueError(f"Cannot read FileX {source}: {error}. Supply a readable FileX path.") from error
     in_section = found_section = has_header = False
     numbers = []
-    rows = _treatment_rows(text)
+    rows = dict(_treatment_rows(text))
     for line in text.splitlines():
         if line.startswith("*"):
             in_section = line[1:].strip().split(" ")[0] == "TREATMENTS"

@@ -21,7 +21,7 @@ def _rotation_components(source, treatment, *, text=None):
     except (OSError, ValueError, TypeError):
         return []
     collision_problems = []
-    treatments = _treatment_rows(text, collision_problems)
+    treatments = dict(_treatment_rows(text, collision_problems))
     # Keep a colliding normal row out of the selected sequence's components.
     sequence_rows = {line for line, (number, _) in treatments.items()
                      if collision_problems and number and int(number) == treatment

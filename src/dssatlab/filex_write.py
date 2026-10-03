@@ -158,7 +158,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
     """Repoint the first matching row, optionally selecting its R as well as N."""
     if rotation is None:
         _section_row("".join(lines), section, key, treatment, (column,))
-    treatments = _treatment_rows("".join(lines)) if section == "TREATMENTS" else {}
+    treatments = dict(_treatment_rows("".join(lines))) if section == "TREATMENTS" else {}
     start, end = _section_bounds(lines, section.split()[0]) or (0, 0)
     columns = {}
     for index in range(start + 1, end):
