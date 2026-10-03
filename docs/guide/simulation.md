@@ -234,8 +234,8 @@ FileX templates, including per-field sources, require weather data rows instead.
 
 `check()` reads the station from the first four filename characters (upper-case),
 and latitude, longitude and elevation by the `@ INSI` header. It reads daily
-DATE, SRAD, TMAX, TMIN and RAIN by their fixed header spans, plus PAR when present.
-One trailing letter flag on a number is accepted. Other daily columns are ignored
+DATE, SRAD, TMAX, TMIN and RAIN by their fixed header spans.
+One trailing letter flag on a number is accepted. Other daily columns, including PAR, are ignored
 by the checks and reach DSSAT unchanged. Required weather values of `-99` fail
 the usual range checks; nothing is filled or repaired.
 
@@ -243,9 +243,10 @@ Dates may be YYDDD (`@DATE`) or YYYYDDD (`@  DATE`). Five-digit weather dates us
 DSSAT's weather century rule, anchored to the simulation start, including a
 99-to-00 rollover. Files are checked together in the order supplied: daily dates
 must be ascending, unique and continuous across file boundaries. Coordinates,
-daily ranges and PAR use the [weather template checks](#prepare-the-weather-template).
+daily ranges use the [weather template checks](#prepare-the-weather-template).
 Start coverage, the last seasonal start and scheduled sequence ends use the same
-FileX checks as template weather. Supplied experiment-data event dates are
+FileX checks as template weather. Stock weather must also cover a fixed harvest
+(HARVS R), including the last season's inherited HDATE. Supplied experiment-data event dates are
 checked against the weather range; maturity-driven endings still need the
 post-run warning scan.
 
@@ -274,10 +275,10 @@ Stock weather file {path}, line {line}: invalid date {value!r}. Supply a valid Y
 ```
 
 `{label}` is LAT, LONG, ELEV, DATE, SRAD, TMAX, TMIN or RAIN. A station mismatch
-uses the existing FileX message even for a stock file:
+names the stock weather file:
 
 ```text
-FileX WSTA 'UFGA' expects station 'UFGA', but the weather template has station 'XYZZ'. Make the station codes exactly equal; filenames are case-sensitive on Linux.
+FileX WSTA 'UFGA' expects station 'UFGA', but stock weather file XYZZ8201.WTH has station 'XYZZ'. Make the station codes exactly equal; filenames are case-sensitive on Linux.
 ```
 
 On real DSSAT, stock UFGA7601.WTH matched DSSAT's reference on 6/6 Summary rows

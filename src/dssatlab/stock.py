@@ -8,7 +8,10 @@ import shutil
 from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
 from .filex import _filex_date, _weather_filename
-from .sequence import _sequence_end, _sequence_stop
+from .irrigation import _effective_management
+from .operations import _harvest_end
+from .rotation_data import _level_date
+from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
@@ -62,8 +65,11 @@ def _weather_names(station, start_date, end_date):
     """Names DSSAT looks up for measured weather during the given years."""
     # DSSAT-CSM v4.8.6.0, InputModule/MAKEFILEW.f90, MAKEFILEW:
     # WSTA4 + YY + '01.WTH', or an explicit WSTA8 + '.WTH'; fallback
-    # WSTA4 + '.WTH'. Weather/IPWTH_alt.for, IPWTH changes positions 5:6
-    # for yearly files at SEASINIT and when CurrentWeatherYear advances.
+    # WSTA4 + '.WTH'. WEATHR calls IPWTH at RATE; when YRDOY passes
+    # LastWeatherDay, IPWTH rewrites WFile(5:6) with CurrentWeatherYear
+    # for a single-year file, even within one season crossing New Year.
+    # https://github.com/DSSAT/dssat-csm-os/blob/v4.8.6.0/Weather/IPWTH_alt.for
+    # https://github.com/DSSAT/dssat-csm-os/blob/v4.8.6.0/Weather/weathr.for
     station = station.upper()
     names = [f"{station}.WTH"] if len(station) == 8 else []
     if len(station) == 4 or station[6:8] == "01":
@@ -119,9 +125,8 @@ def _read_weather_file(path):
         if line.startswith(("*", "$", "@")):
             break
         row = dict(metadata, station=path.name[:4].upper(), date=line[:width])
-        for label in ("SRAD", "TMAX", "TMIN", "RAIN", "PAR"):
-            if label in daily_columns:
-                row[label.lower()] = _stock_number(line[daily_columns[label]])
+        for label in ("SRAD", "TMAX", "TMIN", "RAIN"):
+            row[label.lower()] = _stock_number(line[daily_columns[label]])
         rows.append((index + 1, row))
     return rows, []
 
@@ -135,7 +140,7 @@ def _read_stock_weather(source, station, start_date, end_date=None, *,
     and defaults to start_date. Both are calendar dates supplied by the caller.
     Files and rows keep their given order, including duplicate days. Numbers
     remain uncorrected; pass the returned rows to _parse_weather for the usual
-    range, station, PAR, ordering, duplicate and gap checks. No files are written.
+    range, station, ordering, duplicate and gap checks. No files are written.
     """
     paths = source if isinstance(source, list) else [source]
     names = _weather_names(station, start_date, end_date or start_date)
@@ -209,6 +214,9 @@ def _simulation_weather(sim, values, experiment_data, components):
         return _parse_weather(sim.weather)
     start = (_controls_start_date(experiment_data, sim.treatment)
              or _filex_date(values.get("SDATE")))
+    if start is None and re.fullmatch(r"[0-9]{5}", values.get("SDATE", "")):
+        return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
+                    "Supply five digits: two-digit year followed by three-digit day of year."]
     if start is None or "WSTA" not in values:
         # The FileX checks explain what is missing; do not guess a weather century.
         return [], []
@@ -217,21 +225,44 @@ def _simulation_weather(sim, values, experiment_data, components):
         years = max(1, int(years))
     except (TypeError, ValueError, OverflowError):
         years = 1  # Ordinary controls checks report invalid years.
-    end = date(min(date.max.year, start.year + years - 1), 12, 31)
+    end = _sequence_stop(start, years) or date.max
+    harvest = None
+    if len(components) == 1:
+        entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
+        entry = next((value for key, value in entries.items()
+                      if str(key).isascii() and str(key).isdigit() and int(key) == int(sim.treatment)
+                      and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
+        text = Path(sim.filex).read_text(encoding="latin-1")
+        code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
+        if code == "R":
+            harvest = _harvest_end(entry, _level_date(
+                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
+            if harvest is not None:
+                try:
+                    harvest = _sequence_shift(harvest, harvest.year + years - 1)
+                except (ValueError, OverflowError):
+                    harvest = None  # The season checks report years outside the calendar.
+                if harvest is not None:
+                    end = harvest
     if len(components) > 1:
         stop = _sequence_stop(start, years)
         if stop is not None:
             end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
     station = values["WSTA"]
-    if _overrides_section(experiment_data, sim.treatment):
-        station = paths[0].name[:4].upper()  # The copied field gets this station.
-    # A station mismatch is reported by Simulation with the template wording;
+    if _overrides_section(experiment_data, sim.treatment) and station[:4] != paths[0].name[:4].upper():
+        station = paths[0].name[:4].upper()  # Match the copied field's new station.
+    # A station mismatch is reported by Simulation;
     # avoid a second name-lookup problem for the same mismatch.
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
     rows, problems = _read_stock_weather(paths, station, start, end, check_names=same_station)
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)
+    if harvest is not None and rows and harvest > max(row["date"] for row in rows if "date" in row):
+        label = "Controls years" if "years" in _selected_controls(experiment_data, sim.treatment) else "FileX NYERS"
+        problems.append(f"{label} {years}: the fixed harvest is on {harvest}, "
+                        f"after the weather data ends ({max(row['date'] for row in rows)}). "
+                        f"Supply weather through {harvest}, or fewer years.")
     return rows, problems + checks
 
 
@@ -272,9 +303,9 @@ def _read_stock_soil(path, soil_id):
         lines[-1] = lines[-1].removesuffix("\x1a")
     ids = []
     for line in lines:
-        if line.startswith("*") and not line.upper().startswith("*SOILS"):
+        if line.startswith("*"):
             tokens = line[1:].split()
-            if tokens and tokens[0] not in ids:
+            if tokens and tokens[0].upper() not in ("SOILS", "SOILS:") and tokens[0] not in ids:
                 ids.append(tokens[0])
     if not soil_id or soil_id == "-99":
         return ["FileX has no readable ID_SOIL in the selected treatment's FIELDS row. "

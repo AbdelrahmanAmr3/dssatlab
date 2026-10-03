@@ -127,8 +127,8 @@ The DSSAT `*.WTH` file generated from weather data. DSSAT finds it beside the Fi
 
 **Stock weather file**:
 A DSSAT `*.WTH` file the user already has (for example from DSSAT's own Weather folder), handed
-to a Simulation as its weather. It is copied unchanged, under its own name, into the simulation
-folder; the checks read only its station, dates and the four daily values they need.
+to a Simulation as its weather. It is copied unchanged, under its upper-case name, into the simulation
+folder; the checks read only its station, coordinates, dates and srad, tmax, tmin and rain.
 _Avoid_: raw weather, native weather
 
 **Daily PAR**:
