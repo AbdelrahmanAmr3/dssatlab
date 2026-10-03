@@ -16,12 +16,17 @@ modes Q and Y through a batch file. A Simulation already runs a sequence treatme
   treatment run. Forecast cannot be recognised from FileX content, and `.FCX` is DSSAT's
   forecast FileX extension.
 - Otherwise `run()` uses mode Q with a batch file when a treatment it runs is a sequence (several
-  TREATMENTS rows for one number, read as in 0018): one batch row per rotation component, for
-  every treatment when none is selected. This is the same reading a Simulation uses, so both agree
-  on what a sequence is whatever the extension.
+  TREATMENTS rows for one number, read as in 0018): one batch row per rotation component. This is
+  the same reading a Simulation uses, so both agree on what a sequence is whatever the extension.
+  Mode Q runs one continuous batch, so with no treatment selected `run()` refuses a FileX that has
+  a sequence and more than one treatment number and asks for `treatment=n`.
+- Modes Q and Y need the FileX name to be exactly 12 characters (8.3): DSSAT 4.8 crashes on a
+  shorter name in a batch file (probe 2026-10-02). `run()` refuses other lengths before running.
 - Otherwise mode A or C, as before.
 - `run()` writes `DSSBatch.v48` into the FileX folder and refuses to run when one already exists
-  there, instead of overwriting a user's file. The batch file ends up in the run directory.
+  there, instead of overwriting a user's file. It writes the batch file after taking the
+  before-run file list, so the file is moved into the run directory with the outputs whether DSSAT
+  succeeds or fails, and deletes it if DSSAT cannot be started.
 - A Simulation does not run forecasts: its check reports a `.FCX` FileX and points to `run()`.
 
 ## Alternatives considered
