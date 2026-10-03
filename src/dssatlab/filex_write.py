@@ -44,12 +44,14 @@ def _section_bounds(lines, section):
     return (start, len(lines)) if start is not None else None
 
 
-def _columns(header):
+def _columns(header, section=""):
     """Use the same header-token ends as the narrow FileX reader."""
     columns, start = {}, 0
     tokens = list(re.finditer(r"\S+", header))
     for index, token in enumerate(tokens):
         name, end = token.group().lstrip("@").rstrip("."), token.end()
+        if section == "FIELDS" and index == 0 and len(tokens) > 1:
+            end = tokens[1].start()  # I3 level, as in filex._section_rows.
         if name == "ID_SOIL":
             end = token.start() + 10
             if index + 1 < len(tokens):
@@ -164,7 +166,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
     for index in range(start + 1, end):
         line = lines[index]
         if line.startswith("@"):
-            columns = _columns(line)
+            columns = _columns(line, section)
         elif key in columns and (rotation is not None or column in columns):
             left, right = columns[key]
             try:

@@ -172,3 +172,13 @@ def test_automatic_planting_keeps_simulation_start_harvest_bound(tmp_path, code)
     assert len(problems) == 1
     assert 'simulation start date (1982-02-25)' in problems[0]
     assert 'planting date (' not in problems[0]
+
+
+def test_identity_edits_three_column_fields_level():
+    from pathlib import Path
+    from dssatlab.filex_write import _identity_text
+    text = (Path(__file__).parent / 'fixtures/filex_template/UFGA8201.MZX').read_text()
+    text = text.replace(' 1 UFGA0002 UFGA ', '  1UFGA0002 UFGA ')
+    row = next(line for line in _identity_text(text, 1, None, 'ABCD', 'XYZW000001').splitlines()
+               if 'UFGA0002' in line)
+    assert ' ABCD ' in row and 'XYZW000001' in row
