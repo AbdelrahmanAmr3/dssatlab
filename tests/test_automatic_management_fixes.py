@@ -43,9 +43,9 @@ def test_component_irrigation_checks_its_own_sm(tmp_path, code, events, rejected
 
 
 @pytest.mark.parametrize('first,last,start,rejected,first_date,last_date', [
-    ('99365', '00001', date(1999, 1, 1), True, '1999-12-31', '1900-01-01'),
+    ('99365', '00001', date(1999, 1, 1), False, '1999-12-31', '2000-01-01'),
     ('00001', '99365', date(2000, 1, 1), False, '2000-01-01', '2099-12-31'),
-    ('50001', '00001', date(1950, 1, 1), True, '1950-01-01', '1900-01-01'),
+    ('50001', '00001', date(1950, 1, 1), False, '1950-01-01', '2000-01-01'),
 ])
 def test_inherited_planting_window_uses_weather_century(
         tmp_path, first, last, start, rejected, first_date, last_date):

@@ -42,15 +42,18 @@ def _calendar_date(value):
     return None if _check_date(value, '') else date.fromisoformat(value)
 
 
-def _level_date(text, row, reference, section, key, column):
+def _level_date(text, row, reference, section, key, column, *, weather_dates=None):
     """Read dates of a level; harvest uses its latest valid date."""
+    from .sequence import _simulation_start_date
+
     try:
         rows = (_section_rows(text, section, key, int(row[reference]), (column,))
                 if reference == 'MH' else
                 [_section_row(text, section, key, int(row[reference]), (column,))])
         days = []
         for details in rows:
-            day = _filex_date(details[column])
+            day = (_filex_date(details[column]) if weather_dates is None else
+                   _simulation_start_date(details[column], weather_dates)[0])
             if day is not None:
                 days.append(day)
         return max(days, default=None)

@@ -359,7 +359,7 @@ def test_parse_sdate_and_simulation_start_date():
     assert reason is None
 
     d, reason = _simulation_start_date(sdate, [date(1990, 1, 1)])
-    assert d == date(1982, 2, 25)
+    assert d == date(2082, 2, 25)
     assert reason is None
 
     d, reason = _simulation_start_date(None, days_unique)

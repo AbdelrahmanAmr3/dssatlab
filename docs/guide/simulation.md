@@ -478,12 +478,12 @@ effective emergence date (`planting.emergence_date`, else EDATE).
 planting date under START P and the emergence date under START E; in a sequence,
 only the first rotation component uses this simulation start bound.
 
-SDATE's two-digit year uses the century of the first seven-digit `$WEATHER`
-date. If the initial SDATE falls before that weather year, it advances one
+FileX two-digit years use the century of the first seven-digit `$WEATHER`
+date. If a resolved year falls before that weather year, it advances one
 century. Without an explicit weather year, DSSAT uses crossover 35: years 00
 through 35 mean 2000 through 2035, and 36 through 99 mean 1936 through 1999.
-Generated weather uses this crossover rule. Irrigation and automatic planting
-dates use the same year rule.
+Generated weather uses this crossover rule. Simulation start, irrigation,
+automatic planting and harvest dates use the same year rule.
 
 Seasonal checks cover the last season's start; sequence checks require weather
 through the scheduled end of the component that crosses the stopping boundary

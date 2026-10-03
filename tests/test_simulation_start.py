@@ -214,3 +214,56 @@ def test_template_weather_uses_its_generated_legacy_date_format(filex, yy, year)
     other_year = year + 100 if year < 2000 else year - 100
     sim.weather = weather(f"{other_year}-02-25", f"{other_year}-02-26")
     start_problem(sim.check(False), date(year, 2, 25))
+
+
+def test_irrigation_advances_century_with_start(filex, tmp_path):
+    source = weather_file(tmp_path, 'UFGA0001.WTH',
+                          ['1999365', '2000001', '2000002', '2000003'], wide=True)
+    text = SAMPLE + IRRIGATION.replace('40057', '00002')
+    sim = Simulation(filex(sdate='00001', text=text), 1, source)
+    assert sim.check(False) == []
+    sim.management = experiment(controls={'start_date': '2000-01-03'})
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert 'first irrigation date 2000-01-02' in problems[0]
+
+
+def test_automatic_planting_advances_century_with_start(filex, tmp_path):
+    source = weather_file(tmp_path, 'UFGA0001.WTH',
+                          ['1999365', '2000001', '2000002', '2000003'], wide=True)
+    window = AUTOMATIC.replace('40057', '00002').replace('40070', '00003')
+    sim = Simulation(filex(sdate='00001', text=SAMPLE + window), 1, source,
+                     management=experiment(controls={'planting_management': 'A'}))
+    assert sim.check(False) == []
+    sim.management = experiment(controls={'auto_planting_first': '2000-01-04'})
+    problems = sim.check(False)
+    assert any("after auto_planting_last '2000-01-03'" in p for p in problems)
+
+
+@pytest.mark.parametrize('start', ['P', 'E'])
+def test_planting_emergence_start_advances_weather_century(filex, tmp_path, start):
+    source = weather_file(tmp_path, 'UFGA0001.WTH',
+                          ['1999365', '2000001', '2000002'], wide=True)
+    text = (SAMPLE + PLANTING).replace('82057', '00001').replace('82060', '00001')
+    sim = Simulation(filex(start=start, sdate='00001', text=text), 1, source)
+    assert sim.check(False) == []
+    source = weather_file(tmp_path, 'UFGA0001.WTH', ['1999365'], wide=True)
+    start_problem(sim.check(False), date(2000, 1, 1))
+
+
+@pytest.mark.parametrize('stock', [False, True], ids=['rows', 'stock'])
+def test_start_e_planting_override_requires_emergence_date(filex, tmp_path, stock):
+    source = (weather_file(tmp_path, 'UFGA8201.WTH',
+                           [f'1982{doy:03d}' for doy in range(56, 70)], wide=True)
+              if stock else weather('1982-02-25', '1982-03-10'))
+    planting = dict(date='1982-02-26', method='S', distribution='R',
+                    population=8, row_spacing=75, depth=3)
+    sim = Simulation(filex(start='E', text=SAMPLE + PLANTING), 1, source,
+                     management=experiment(planting=planting))
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert all(part in problems[0] for part in (
+        'simulation start is unknown', 'Checked', 'START E',
+        'planting.emergence_date', 'change START'))
+    planting['emergence_date'] = '1982-03-01'
+    assert sim.check(False) == []

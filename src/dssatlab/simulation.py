@@ -143,11 +143,19 @@ class Simulation:
         except (OSError, TypeError, ValueError):
             text = ""
         start_date = _simulation_start(text, self.treatment, experiment_data, date_context)
+        if (start_date is None and values.get("START") == "E"
+                and _overrides_section(experiment_data, self.treatment, "planting",
+                                       rotation=components[0]['R'] if len(components) > 1 else None)
+                and not any("simulation start is unknown" in problem for problem in weather_problems)):
+            filex_problems.append(
+                f"Treatment {self.treatment}: the simulation start is unknown. "
+                "Checked the effective planting section's emergence date under START E. "
+                "Add planting.emergence_date or change START.")
         skip_reason = None
         if not days:
             start_date, skip_reason = None, "weather unreadable"
         elif start_date is None:
-            _, skip_reason = _simulation_start_date(values.get("SDATE"), date_context, initial=True)
+            _, skip_reason = _simulation_start_date(values.get("SDATE"), date_context)
         if len(components) > 1:
             filex_problems.extend(_sequence_coverage(
                 experiment_data, self.treatment, start_date, days, values.get("NYERS"), filex=self.filex))
@@ -160,7 +168,7 @@ class Simulation:
                                  f"covered by weather data ({min(days)} to {max(days)}). "
                                  "Supply weather for the simulation's start date.")
         # e2e22: MAKEFILEW checks SDATE before START P/E selects its effective date.
-        prerequisite = override_start or _simulation_start_date(values.get("SDATE"), date_context, initial=True)[0]
+        prerequisite = override_start or _simulation_start_date(values.get("SDATE"), date_context)[0]
         if (_stock_weather_paths(self.weather) is not None and values.get("START") in ("P", "E")
                 and prerequisite is not None and date_context
                 and prerequisite.year == date_context[0].year and prerequisite < date_context[0]):

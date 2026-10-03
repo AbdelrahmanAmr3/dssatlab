@@ -95,9 +95,12 @@ def _simulation_weather(sim, values, experiment_data, components):
         return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
                     "Supply five digits: two-digit year followed by three-digit day of year."]
     if start is None:
+        fix = ("Under START E, add planting.emergence_date or change START. "
+               if values.get("START") == "E" else "")
         return [], [f"Stock weather {sim.weather}: cannot check weather dates because "
                     f"the simulation start is unknown. Checked START and "
                     f"SDATE/PDATE/EDATE for treatment {sim.treatment}. "
+                    f"{fix}"
                     "Supply a valid simulation start date, or pass the weather as rows."]
     years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
     try:
@@ -110,7 +113,8 @@ def _simulation_weather(sim, values, experiment_data, components):
         code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
         if code == "R":
             harvest = _harvest_end(entry, _level_date(
-                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
+                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE",
+                weather_dates=explicit), code)
             if harvest is not None:
                 try:
                     harvest = _sequence_shift(harvest, harvest.year + years - 1)

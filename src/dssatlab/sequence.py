@@ -242,8 +242,11 @@ def _parse_sdate(sdate):
     return None
 
 
-def _simulation_start_date(sdate, days, *, initial=False):
-    """Resolve YYDDD with e2e22's weather century or legacy crossover 35."""
+def _simulation_start_date(sdate, days):
+    """Resolve FileX YYDDD with the first explicit weather year or crossover 35.
+
+    A year before the first explicit weather year advances one century.
+    """
     if sdate is None:
         return None, "START is not S or SDATE is unavailable; check the FileX start controls"
     parsed = _parse_sdate(sdate)
@@ -251,8 +254,8 @@ def _simulation_start_date(sdate, days, *, initial=False):
         return None, f"SDATE {sdate!r} is not a DSSAT date (yyddd); correct SDATE"
     yy, doy = parsed
     year = (days[0].year // 100 * 100 if days else 2000 if yy <= 35 else 1900) + yy
-    # MAKEFILEW advances an initial start before the first explicit weather year.
-    if initial and days and year < days[0].year:
+    # All inherited calendar dates use the same weather context as the start.
+    if days and year < days[0].year:
         year += 100
     if not 1 <= year <= 9999:
         return None, "simulation start year is outside the calendar; correct the FileX date"
@@ -275,7 +278,7 @@ def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> dat
                                ("GENERAL", "START", "SDATE"))
         if general["START"] == "S":
             return (_controls_start_date(experiment_data, treatment)
-                    or _simulation_start_date(general["SDATE"], weather_dates, initial=True)[0])
+                    or _simulation_start_date(general["SDATE"], weather_dates)[0])
         field, column = {"P": ("date", "PDATE"), "E": ("emergence_date", "EDATE")}[general["START"]]
         entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
         entry = next((v for k, v in entries.items() if str(k).isascii() and str(k).isdigit()
@@ -286,8 +289,8 @@ def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> dat
             entry = next((v for k, v in edits.items() if str(k).isascii() and str(k).isdigit()
                           and int(k) == int(row["R"]) and isinstance(v, dict)), {}) if isinstance(edits, dict) else {}
         planting = entry.get("planting")
-        if isinstance(planting, dict) and field in planting:
-            value = planting[field]
+        if isinstance(planting, dict):
+            value = planting.get(field)
             return None if _check_date(value, field) else date.fromisoformat(value)
         details = _section_row(text, "PLANTING DETAILS", "P", int(row["MP"]), (column,))
         return _simulation_start_date(details[column], weather_dates)[0]

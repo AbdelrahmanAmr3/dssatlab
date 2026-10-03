@@ -186,3 +186,30 @@ def test_identity_edits_three_column_fields_level():
     row = next(line for line in _identity_text(text, 1, None, 'ABCD', 'XYZW000001').splitlines()
                if 'UFGA0002' in line)
     assert ' ABCD ' in row and 'XYZW000001' in row
+
+
+def test_stock_harvest_end_uses_start_weather_century(tmp_path):
+    sim = dated_simulation(tmp_path, '40056', '40057', '40060', '1940-02-25')
+    sim.weather = weather_file(tmp_path, 'UFGA4001.WTH',
+                               [f'1940{doy:03d}' for doy in range(56, 70)], wide=True)
+    assert sim.check(False) == []
+
+
+def test_harvest_bounds_keep_original_weather_context_across_century(tmp_path):
+    sim = dated_simulation(tmp_path, '00001', '99365', '00002', '1999-12-31')
+    sim.weather = weather_file(tmp_path, 'UFGA0001.WTH',
+                               ['1999365', '2000001', '2000002'], wide=True)
+    assert sim.check(False) == []
+
+
+@pytest.mark.parametrize('code', ['A', 'F'])
+def test_start_p_automatic_planting_keeps_harvest_start_bound(tmp_path, code):
+    sim = dated_simulation(tmp_path, '82056', '82079', '82074', '1982-01-01')
+    text = sim.filex.read_text().replace('     S 82056', '     P 82056')
+    sim.filex.write_text(text.replace(' 1 MA              R', f' 1 MA              {code}'))
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert all(part in problems[0] for part in (
+        "FileX HDATE '82074'", 'harvest level 1',
+        'simulation start date (1982-03-20)', 'Move HDATE on or after'))
+    assert 'planting date (' not in problems[0]

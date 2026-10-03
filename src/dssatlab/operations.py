@@ -110,7 +110,7 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True, weath
             ('MP', 'PLANTING DETAILS', 'P', 'PDATE')):
         try:
             details = _section_row(text, section, key, int(row[reference]), (column,))
-            if reference == 'SM' and first and details.get('START') in ('S', 'E'):
+            if reference == 'SM' and first and details.get('START') in ('S', 'P', 'E'):
                 start = _simulation_start(text, treatment, source, weather_dates)
             elif reference == 'MP' and 'planting' not in override:
                 planting = _simulation_start_date(details[column], weather_dates)[0]
@@ -130,7 +130,7 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None, weather
     """Require dated harvests at or after known bounds under effective HARVS R."""
     from .filex import _section_rows
     from .irrigation import _effective_management
-    from .sequence import _rotation_components, _simulation_start, _simulation_start_date
+    from .sequence import _rotation_components, _simulation_start_date
 
     entries = source.get('treatments', {}) if isinstance(source, dict) else {}
     entries = entries if isinstance(entries, dict) else {}
@@ -154,10 +154,6 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None, weather
         entry = entries.get(treatment, {})
         entry = entry if isinstance(entry, dict) else {}
         dates = weather_dates
-        if dates:
-            start = _simulation_start(text, treatment, source, dates)
-            if start is not None:
-                dates = [start]  # Keep a century advanced by MAKEFILEW for START S.
         components = _rotation_components(filex, treatment, text=text)
         sequence = len(components) > 1
         edits = entry.get('rotation', {})
