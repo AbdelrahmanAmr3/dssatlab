@@ -4,6 +4,7 @@ import pytest
 
 from test_harvest_required import simulation
 from test_season_coverage import weather
+from test_stock_weather import weather_file
 
 
 def dated_simulation(tmp_path, start, planting, harvest, first, *, sequence=False):
@@ -127,6 +128,9 @@ def test_filex_year_zero_leap_day_through_rotation(tmp_path):
 @pytest.mark.parametrize('year,first', [('40', '2040-01-01'), ('41', '1941-01-01')])
 def test_filex_cutoff_year_in_inherited_harvest(tmp_path, year, first):
     sim = dated_simulation(tmp_path, year + '002', year + '002', year + '001', first)
+    # Keep this harvest-bound test in its intended century with explicit weather.
+    sim.weather = weather_file(tmp_path, f'UFGA{year}01.WTH',
+                               [first[:4] + f'{doy:03d}' for doy in (1, 2, 3)], wide=True)
     problems = sim.check(False)
     assert len(problems) == 1
     assert first in problems[0] and first[:4] + '-01-02' in problems[0]

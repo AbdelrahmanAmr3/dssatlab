@@ -19,6 +19,11 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.18.1 adds `import_nasa_power()` for a downloaded daily CSV. Simulation
+start dates and stock weather selection now follow DSSAT's rules. START P uses
+the planting date and START E uses the emergence date for coverage and harvest
+bounds. See the [NASA POWER tutorial](docs/guide/simulation.md#import-a-nasa-power-file).
+
 Version 0.18.0 adds stock weather and soil files copied unchanged, optional daily PAR in the weather template, deeper initial conditions, and fixes sequence weather coverage, inherited harvest dates and identical treatment rows.
 
 Version 0.16.1 adds residue, tillage and harvest events per treatment or rotation component (including fallow), with RESID/HARVS checks and `harvest_management`.
@@ -29,7 +34,7 @@ Version 0.15.0 adds checked DSSAT simulation options, eight initial-condition de
 fields, and `initial_conditions: "off"` in experiment data. It also checks for a
 one-row treatment number colliding with a sequence number before a `Simulation` or
 `run_treatments` run (#168).
-Zero runtime dependencies are preserved. See the [changelog](CHANGELOG.md) and
+Zero runtime dependencies are preserved. See the [changelog](docs/changelog.md) and
 [experiment data guide](docs/guide/experiment.md).
 
 The project can get a working DSSAT into Python, run an existing experiment file, run a simulation from your own weather, soil, and management data, and read and plot the results. This part is done:

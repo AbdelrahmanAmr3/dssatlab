@@ -280,6 +280,8 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
         sequence.filex.write_text(text.replace(f" 1 GE          {years:5d}", " 1 GE             99")
                                  .replace(first.strftime("%y%j"), "78110"))
     sequence.weather = weather(start, end.isoformat())
+    # These synthetic years exercise coverage, not the inherited 1978 irrigation.
+    change_component(sequence, 0, "MI", "0")
     prefix = "Controls years" if override else "FileX NYERS"
     expected = ([f"{prefix} {years}: the sequence runs from {start} through {last}, "
                  f"after the weather data ends ({end}). Supply weather through {last}, "
@@ -306,10 +308,12 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
 
 
 @pytest.mark.parametrize("replacement", ["P 78110", "S XXXXX", "S 79110"])
-def test_sequence_unresolved_start_skips_coverage(sequence, replacement):
+def test_sequence_coverage_skipped_only_for_unreadable_start(sequence, replacement):
     sequence.filex.write_text(sequence.filex.read_text().replace("S 78110", replacement))
     sequence.weather = weather("1978-04-20", "1978-04-21")
-    assert not any("sequence runs from" in p or "season 1" in p for p in sequence.check(False))
+    problems = sequence.check(False)
+    assert any("sequence runs from" in p for p in problems) == (replacement != "S XXXXX")
+    assert not any("season 1" in p for p in problems)
 
 
 @pytest.mark.parametrize("override", [False, True])
@@ -317,7 +321,7 @@ def test_sequence_start_still_needs_weather(sequence, override):
     sequence.weather = weather("1978-04-21", "1979-04-19")
     if override:
         sequence.management = {"treatments": {1: {"controls": {"start_date": "1978-04-20"}}}}
-    expected = ("Controls start_date '1978-04-20'" if override else "FileX start year 78 day 110")
+    expected = ("Controls start_date '1978-04-20'" if override else "Simulation start date '1978-04-20'")
     problems = sequence.check(False)
     inherited = [p for p in problems if 'outside weather range' in p]
     assert len(inherited) == (2 if override else 0)

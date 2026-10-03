@@ -443,7 +443,7 @@ def test_planting_before_simulation_start_date_rejected(simulation, planting, ca
     assert simulation.check() == []
 
 
-def test_planting_start_date_check_skipped_note_for_unmatched_start_year(simulation, planting, capsys):
+def test_planting_compared_with_resolved_start_outside_weather(simulation, planting, capsys):
     simulation.weather = [
         dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
              date=f"1990-02-{day:02d}", srad=20, tmax=25, tmin=10, rain=0)
@@ -452,10 +452,10 @@ def test_planting_start_date_check_skipped_note_for_unmatched_start_year(simulat
     planting["date"] = "1990-02-25"
     problems = simulation.check()
     assert len(problems) == 1
-    assert "FileX start year 82 day 056 is not covered by weather data" in problems[0]
+    assert "Simulation start date '1982-02-25' is not covered by weather data" in problems[0]
     assert not any("planting" in p.lower() for p in problems)
     report = capsys.readouterr().out
-    assert "check was skipped (no weather year matches SDATE year 82" in report
+    assert "planting-date-versus-start-date check was skipped" not in report
     assert "planting: OK" in report
 
     # verbose=False prints nothing
@@ -481,7 +481,7 @@ def test_planting_start_date_check_skipped_note_for_weather_unreadable(simulatio
 @pytest.mark.parametrize("sdate,years,reason", [
     ("21xx1", [2021], "SDATE '21xx1' is not a DSSAT date (yyddd)"),
     ("21366", [2021], "day 366 does not exist in 2021"),
-    ("21001", [1921, 2021], "ambiguous start year"),
+    ("21366", [1921, 2021], "day 366 does not exist in 2021"),
 ])
 @pytest.mark.parametrize("planting_problem", ["none", "shape", "field", "entry", "writer"])
 def test_start_skip_reason_survives_other_problems(simulation, planting, capsys,
@@ -501,10 +501,7 @@ def test_start_skip_reason_survives_other_problems(simulation, planting, capsys,
     report = capsys.readouterr().out
     assert "check was skipped" in report
     assert reason in report
-    if len(years) > 1:
-        assert "1921, 2021" in report
-    else:
-        assert "ambiguous start year" not in report
+    assert "ambiguous start year" not in report
 
 
 def test_unselected_treatment_reports_start_check_skip(simulation, planting, capsys):
@@ -694,11 +691,11 @@ def test_unreadable_filex_or_start_skips_dependent_checks(simulation, tmp_path, 
     assert not any("before simulation start date" in p for p in problems)
 
 
-def test_ambiguous_weather_year_skips_start_date_check(simulation, planting):
+def test_resolved_start_year_outside_weather_still_checks_planting(simulation, planting):
     simulation.weather = [dict(station="UFGA", latitude=45, longitude=-100, elevation=200,
                                date="2024-05-10", srad=20, tmax=25, tmin=10, rain=0)]
     planting["date"] = "2024-05-10"
     problems = simulation.check()
     assert len(problems) == 1
-    assert "FileX start year 82 day 056 is not covered by weather data" in problems[0]
+    assert "Simulation start date '1982-02-25' is not covered by weather data" in problems[0]
     assert not any("before simulation start date" in p for p in problems)

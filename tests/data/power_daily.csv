@@ -1,0 +1,17 @@
+﻿-BEGIN HEADER-
+NASA/POWER Source Native Resolution Daily Data 
+Dates (month/day/year): 01/01/1984 through 01/15/1984 in LST
+Location: latitude  29.63   longitude -82.37 
+elevation from MERRA-2: Average for 0.5 x 0.625 degree lat/lon region = 25.35 meters
+The value for missing source data that cannot be computed or is outside of the sources availability range: -999 
+parameter(s): 
+ALLSKY_SFC_SW_DWN     CERES SYN1deg All Sky Surface Shortwave Downward Irradiance (MJ/m^2/day) 
+T2M_MAX               MERRA-2 Temperature at 2 Meters Maximum (C) 
+T2M_MIN               MERRA-2 Temperature at 2 Meters Minimum (C) 
+PRECTOTCORR           MERRA-2 Precipitation Corrected (mm/day) 
+RH2M                  MERRA-2 Relative Humidity at 2 Meters (%) 
+-END HEADER-
+YEAR,DOY,ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN,PRECTOTCORR,RH2M
+1984,1,13.3,11.39,-4.18,0.0,78.02
+1984,2,13.14,15.54,-0.7,0.0,83.07
+1984,3,13.26,13.27,-0.45,0.0,78.71
