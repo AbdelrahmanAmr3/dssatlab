@@ -165,7 +165,8 @@ def _write_template_simulation(sim, experiment_data):
     filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
     first = data["rotation"][0] if rotation else data
     start = (_controls_start_date(experiment_data, sim.treatment)
-             or date.fromisoformat(first["planting"]["date"]))
+             or date.fromisoformat(first["start_date"] if first["crop"] == "fallow"
+                                   else first["planting"]["date"]))
     stations, profiles = {}, {}
     for rows in weather.values():
         stations.setdefault(rows[0]["station"], rows)

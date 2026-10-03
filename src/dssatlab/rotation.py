@@ -43,14 +43,24 @@ def _check_rotation_template(data, data_dir):
             found.append(f"{location}: expected a dict. Supply a crop with cultivar and "
                          "planting, or a fallow with end_date.")
         elif component.get("crop") == "fallow":
-            found.extend(_check_fields(component, ("crop", "end_date"), (), location, "FileX"))
+            found.extend(_check_fields(component, ("crop", "end_date"), ("start_date",), location, "FileX"))
             if "end_date" in component:
                 found.extend(_check_date(component["end_date"], f"{location}, end_date"))
+            if number == 1:
+                if "start_date" not in component:
+                    found.append(f"{location}: a leading fallow needs start_date. "
+                                 "Supply start_date before end_date.")
+                else:
+                    found.extend(_check_date(component["start_date"], f"{location}, start_date"))
         else:
             found.extend(_check_fields(component, ("crop", "cultivar", "planting"),
+                                       ("harvest_date", "start_date") if number > 1 else
                                        ("harvest_date",), location, "FileX"))
             found.extend(p.replace(where, location, 1)
                          for p in _check_template_crop(component, data_dir))
+        if isinstance(component, dict) and number > 1 and "start_date" in component:
+            found.append(f"{location}, start_date: only a leading fallow takes start_date. "
+                         "Remove start_date from this component.")
         problems.extend(found)
         # Unrelated value problems must not hide rotation date problems.
         if not isinstance(component, dict):
@@ -58,6 +68,8 @@ def _check_rotation_template(data, data_dir):
         crop = component.get("crop")
         if crop == "fallow":
             dates = [component.get("end_date")]
+            if number == 1:
+                dates.append(component.get("start_date"))
         elif isinstance(crop, str) and crop in _CROPS:
             planting = component.get("planting")
             if not isinstance(planting, dict):
@@ -74,11 +86,13 @@ def _check_rotation_template(data, data_dir):
 
 
 def _check_rotation_dates(components, valid_components, where):
-    """Check components with valid dates: leading crop, end, order, closure."""
+    """Check components with valid dates: leading fallow, end, order, closure."""
     problems = []
     if 1 in valid_components and valid_components[1].get("crop") == "fallow":
-        problems.append(f"{where}, rotation[1]: the first component must be a crop; "
-                        "the simulation starts on its planting date. Move the fallow later in the rotation.")
+        first = valid_components[1]
+        if first["start_date"] >= first["end_date"]:
+            problems.append(f"{where}, rotation[1], start_date: {first['start_date']} is not "
+                            f"before end_date ({first['end_date']}). Supply start_date before end_date.")
     last_number = len(components)
     if last_number in valid_components:
         last = valid_components[last_number]
@@ -105,35 +119,42 @@ def _check_rotation_dates(components, valid_components, where):
                                 "DSSAT would move it a year later. Supply rotation dates in order.")
     if 1 in valid_components and last_number in valid_components:
         first, last = valid_components[1], valid_components[last_number]
-        if first.get("crop") != "fallow":
-            start_date = date.fromisoformat(first["planting"]["date"])
-            last_end = last.get("end_date") if last.get("crop") == "fallow" else last.get("harvest_date")
-            if last_end:
-                end_date = date.fromisoformat(last_end)
-                problems.extend(_check_cycle_closure(start_date, end_date, f"{where}, rotation"))
+        last_end = last.get("end_date") if last.get("crop") == "fallow" else last.get("harvest_date")
+        if last_end and (first.get("crop") != "fallow" or first["start_date"] < first["end_date"]):
+            problems.extend(_check_cycle_closure(
+                _rotation_start_date(components), date.fromisoformat(last_end), f"{where}, rotation",
+                leading_fallow=first.get("crop") == "fallow"))
     return problems
 
 
-def _check_cycle_closure(start_date, end_date, where):
+def _check_cycle_closure(start_date, end_date, where, *, leading_fallow=False):
     """Check DSSAT's day-of-year boundary between successive rotation cycles."""
     problems = []
+    label = "simulation start" if leading_fallow else "first planting"
+    fix = "Start the leading fallow after January 1." if leading_fallow else "Plant the first crop after January 1."
     first_doy, last_doy = start_date.timetuple().tm_yday, end_date.timetuple().tm_yday
     if first_doy == 1:
         problems.append(
-            f"{where}: the first planting is on day 1 of the year "
+            f"{where}: the {label} is on day 1 of the year "
             f"({start_date}), so the last component cannot end before it in the year; "
-            "DSSAT would start the next cycle a year late. Plant the first crop after January 1."
+            f"DSSAT would start the next cycle a year late. {fix}"
         )
     elif last_doy >= first_doy:
         example = date(end_date.year, 1, 1) + timedelta(days=first_doy - 2)
         problems.append(
             f"{where}: the last component ends on {end_date} "
-            f"(day {last_doy} of the year), not before the first planting's day of the year "
+            f"(day {last_doy} of the year), not before the {label}'s day of the year "
             f"(day {first_doy}, {start_date}); DSSAT would start the next cycle "
             f"a year late. End the last component before day {first_doy}, "
             f"for example on {example.isoformat()}."
         )
     return problems
+
+
+def _rotation_start_date(components):
+    """Return the checked leading fallow's start or first crop's planting date."""
+    first = components[0]
+    return date.fromisoformat(first["start_date"] if first["crop"] == "fallow" else first["planting"]["date"])
 
 
 def _rotation_cycle_years(components, experiment_data=None, start=None):
@@ -145,7 +166,7 @@ def _rotation_cycle_years(components, experiment_data=None, start=None):
     last = components[-1]
     end = last.get("end_date") if last["crop"] == "fallow" else last["harvest_date"]
     # SDATE stays put when the first planting is edited, so count years from it.
-    start = start or date.fromisoformat(components[0]["planting"]["date"])
+    start = start or _rotation_start_date(components)
     end = date.fromisoformat(end)
     from .rotation_data import _rotation_keys
     treatments = experiment_data.get('treatments', {}) if isinstance(experiment_data, dict) else {}
@@ -172,7 +193,7 @@ def _render_rotation(data, weather_rows, soil_rows):
     components, name = data["rotation"], data["treatment_name"]
     weather = weather_rows[1] if isinstance(weather_rows, dict) else weather_rows
     soil = soil_rows[1] if isinstance(soil_rows, dict) else soil_rows
-    start = date.fromisoformat(components[0]["planting"]["date"])
+    start = _rotation_start_date(components)
     day, station = _dssat_date(start), weather[0]["station"]
     stem = f"{station}{start.year % 100:02d}01"
     years = _rotation_cycle_years(components)
@@ -235,7 +256,7 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
                            f"components (R 1-{len(components)}: {crops}); "
                            "it runs in DSSAT's sequence mode."]
         start = (_controls_start_date(experiment_data, 1)
-                 or date.fromisoformat(data["rotation"][0]["planting"]["date"]))
+                 or _rotation_start_date(data["rotation"]))
         days = [row["date"] for row in weather.get(1, []) if "date" in row]
         template_problems.extend(_sequence_coverage(
             experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data, start)))

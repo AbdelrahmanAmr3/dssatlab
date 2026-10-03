@@ -1,4 +1,4 @@
-"""Tests for rotation date checks: first crop, last known end, order, and closure."""
+"""Tests for rotation date checks: simulation start, last known end, order, and closure."""
 
 from copy import deepcopy
 from pathlib import Path
@@ -37,8 +37,8 @@ def _mutated_rotation(base, case):
 
 _EXACT_CASES = [
     ("fallow_first",
-     "FileX template, rotation[1]: the first component must be a crop; "
-     "the simulation starts on its planting date. Move the fallow later in the rotation."),
+     "FileX template, rotation[1]: a leading fallow needs start_date. "
+     "Supply start_date before end_date."),
     ("last_no_end",
      "FileX template, rotation[4]: the last component needs a known end so the next cycle can start on time. "
      "Make it a fallow with end_date, or give it a harvest_date."),
