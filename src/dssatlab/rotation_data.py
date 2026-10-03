@@ -5,15 +5,17 @@ from pathlib import Path
 
 from .cultivar import _CROPS, _check_cultivar, _cultivar_text
 from .experiment import _check_date, _unknown_keys
-from .filex import _section_row
+from .filex import _section_row, _section_rows
 from .filex_write import _event_text, _planting_text
 from .irrigation import _check_irrigation_events
 from .management import (_check_events, _check_planting, _check_weather_date,
                          _report_lines)
+from .operations import (_OPERATION_FIELDS, _check_operation_events,
+                         _component_management, _harvest_end)
 from .sequence import _rotation_components
 
 
-_SECTIONS = ('planting', 'cultivar', 'fertilizer', 'irrigation')
+_SECTIONS = ('planting', 'cultivar', 'fertilizer', 'irrigation', *_OPERATION_FIELDS)
 
 
 def _rotation_text(text, treatment, rotation):
@@ -41,15 +43,23 @@ def _calendar_date(value):
 
 
 def _filex_date(text, row, reference, section, key, column, start):
-    """Resolve YYDDD to the first matching year on or after the start's year."""
+    """Resolve YYDDD dates; harvest uses the latest valid date of its level."""
     try:
-        value = _section_row(text, section, key, int(row[reference]), (column,))[column]
-        if start is None or len(value) != 5 or not value.isascii() or not value.isdigit():
+        if start is None:
             return None
-        year = start.year + (int(value[:2]) - start.year % 100) % 100
-        doy = int(value[2:])
-        if 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
-            return date(year, 1, 1) + timedelta(days=doy - 1)
+        rows = (_section_rows(text, section, key, int(row[reference]), (column,))
+                if reference == 'MH' else
+                [_section_row(text, section, key, int(row[reference]), (column,))])
+        days = []
+        for details in rows:
+            value = details[column]
+            if len(value) != 5 or not value.isascii() or not value.isdigit():
+                continue
+            year = start.year + (int(value[:2]) - start.year % 100) % 100
+            doy = int(value[2:])
+            if 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
+                days.append(date(year, 1, 1) + timedelta(days=doy - 1))
+        return max(days, default=None)
     except (ValueError, KeyError, TypeError):
         pass
     return None
@@ -59,6 +69,8 @@ def _known_dates(components, template, text, start, edits, where):
     known, notes = [], []
     for index, row in enumerate(components):
         number, planting, end = int(row['R']), None, None
+        entry = edits.get(number, {})
+        skipped = []
         if template is not None:
             component = template[index]
             planting = component.get('planting', {})
@@ -79,10 +91,21 @@ def _known_dates(components, template, text, start, edits, where):
                 else:
                     end = day
                 if day is None:
-                    notes.append(f"    Note: {where}, rotation component {number}: period bound "
-                                 f"check was skipped for unreadable {column} (including -99) "
-                                 "or unavailable simulation start. Correct the FileX date to check this bound.")
-        entry = edits.get(number, {})
+                    skipped.append(column)
+        code = _component_management(text, row, 'HARVS', 'R' if end is not None else 'M')
+        end = _harvest_end(entry, end, code)
+        if end is not None and 'HDATE' in skipped:
+            skipped.remove('HDATE')
+        if code == 'M':
+            if 'HDATE' in skipped:
+                skipped.remove('HDATE')
+            notes.append(f'    Note: {where}, rotation component {number}: period bound '
+                         'check was skipped because HARVS "M" harvests at maturity and ignores '
+                         'HDATE; the end bound is unknown and not checked.')
+        for column in skipped:
+            notes.append(f"    Note: {where}, rotation component {number}: period bound "
+                         f"check was skipped for unreadable {column} (including -99) "
+                         "or unavailable simulation start. Correct the FileX date to check this bound.")
         override = entry.get('planting') if isinstance(entry, dict) else None
         if isinstance(override, dict) and _calendar_date(override.get('date')) is not None:
             planting = _calendar_date(override['date'])
@@ -90,7 +113,7 @@ def _known_dates(components, template, text, start, edits, where):
     return known, notes
 
 
-def _period_problems(day, location, index, known, start):
+def _period_problems(day, location, index, known, start, *, check_end=True):
     number, planting, end, crop = known[index]
     bounds = []
     if index:
@@ -100,10 +123,10 @@ def _period_problems(day, location, index, known, start):
             bounds.append(f"is not after rotation component {previous}'s end ({lower})")
     elif start is not None and day < start:
         bounds.append(f"is before simulation start date ({start}); planting must be on or after it")
-    if end is not None:
+    if check_end and end is not None:
         if day > end:
             bounds.append(f"is after rotation component {number}'s harvest date ({end})")
-    elif index + 1 < len(known):
+    if index + 1 < len(known):
         following, next_planting, next_end, next_crop = known[index + 1]
         upper = next_end if next_crop == 'FA' else next_planting
         label = 'end date' if next_crop == 'FA' else 'planting date'
@@ -143,13 +166,13 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
                      start, weather_range, cultivar_path):
     number = int(row['R'])
     where = f'{where}, rotation component {number}'
-    if row['CR'] == 'FA':
-        found = [f'{where} is a fallow (FA); experiment data per component takes planting, '
-                 'cultivar, fertilizer and irrigation for crop components only. Remove it.']
-        return found, _report_lines(f'    rotation component {number}', found), text
     if not isinstance(entry, dict):
         found = [f'{where}: entry must be a dict. Supply optional planting, cultivar, '
-                 'fertilizer and irrigation sections.']
+                 'fertilizer, irrigation, residues, tillage and harvest sections.']
+        return found, _report_lines(f'    rotation component {number}', found), text
+    if row['CR'] == 'FA' and entry.keys() - _OPERATION_FIELDS.keys():
+        found = [f'{where}: is a fallow (FA). Supply only residues, tillage and harvest '
+                 'sections; remove other sections.']
         return found, _report_lines(f'    rotation component {number}', found), text
     shape_problems = _unknown_keys(entry, _SECTIONS, where, 'Experiment')
     problems, report = list(shape_problems), []
@@ -173,15 +196,17 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
         elif section == 'planting':
             found = _check_planting(value, f'{where}, planting', weather_range=weather_range)
         elif section == 'irrigation':
-            code = None
-            if text is not None:
-                try:
-                    code = _section_row(text, 'SIMULATION CONTROLS', 'N', int(row['SM']),
-                                        ('MANAGEMENT', 'IRRIG'))['IRRIG']
-                except (ValueError, TypeError, KeyError):
-                    pass  # Existing FileX checks report unavailable layouts.
+            code = _component_management(text, row, 'IRRIG')
             found, _ = _check_irrigation_events(value, where, weather_range,
                                                 code=code, date_only=True)
+        elif section in _OPERATION_FIELDS:
+            column = 'RESID' if section == 'residues' else 'HARVS'
+            code = _component_management(text, row, column)
+            found, _ = _check_operation_events(value, section, where, weather_range,
+                                                code=code, component=True)
+            if section == 'harvest' and row['CR'] == 'FA' and value == []:
+                found.append(f'{where}, harvest: a fallow needs its scheduled end. Supply '
+                             'harvest events, or omit harvest to keep the FileX Level.')
         else:
             found, _ = _check_events(value, section, where, weather_range)
         events = [value] if section == 'planting' else value
@@ -195,7 +220,9 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
                 day = _calendar_date(event.get(field))
                 if day is not None:
                     location_field = f"{location}, field {field!r}"
-                    found.extend(_period_problems(day, location_field, index, known, start))
+                    found.extend(_period_problems(
+                        day, location_field, index, known, start,
+                        check_end=not (section == 'planting' and field == 'date')))
                     if field == 'emergence_date':
                         found.extend(_check_weather_date(event[field], location_field, weather_range))
         if not found and text is not None:
@@ -217,7 +244,7 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
     where = f'Management data treatment {treatment}'
     components = _rotation_components(filex, treatment, text=text)
     if isinstance(template, list) and all(isinstance(c, dict) for c in template):
-        components = [dict(R=str(i), CR='FA' if c.get('crop') == 'fallow' else
+        components = [dict(R=str(i), SM=str(i), CR='FA' if c.get('crop') == 'fallow' else
                            _CROPS.get(str(c.get('crop')), ('?',))[0])
                       for i, c in enumerate(template, 1)]
     if len(components) < 2:
@@ -230,13 +257,13 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         return ordinary, [], []  # Sequence checks already report invalid R numbers.
     edits, problems = _rotation_keys(entry.get('rotation', {}), components, where)
     known, notes = _known_dates(components, template, text, start, edits, where)
-    if template is not None and 1 in edits and isinstance(edits[1], dict):
-        planting = edits[1].get('planting')
-        if (isinstance(planting, dict) and _calendar_date(planting.get('date')) is not None
-                and known[-1][2] is not None):
-            from .rotation import _check_cycle_closure
-            problems.extend(_check_cycle_closure(
-                known[0][1], known[-1][2], f'{where}, rotation component 1, planting'))
+    if template is not None and known[0][1] is not None and known[-1][2] is not None:
+        for number, section in ((1, 'planting'), (known[-1][0], 'harvest')):
+            if isinstance(edits.get(number), dict) and section in edits[number]:
+                from .rotation import _check_cycle_closure
+                problems.extend(_check_cycle_closure(
+                    known[0][1], known[-1][2], f'{where}, rotation component {number}, {section}'))
+                break
     report = _report_lines('    rotation', problems) if problems else []
     for index, row in enumerate(components):
         number = int(row['R'])
@@ -247,12 +274,27 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
                 cultivar_path = data_dir / 'Genotype' / f'{_CROPS[crop][2]}.CUL'
         override = edits.get(number, {})
         planting_override = isinstance(override, dict) and 'planting' in override
+        _, planting, end, crop = known[index]
+        if crop != 'FA' and planting is not None and end is not None and end <= planting:
+            component = template[index] if template is not None else {}
+            original_planting = component.get('planting')
+            # The template crop check already reports this pair if neither date changed.
+            already_checked = (isinstance(original_planting, dict)
+                               and original_planting.get('date') == planting.isoformat()
+                               and component.get('harvest_date') == end.isoformat())
+            if not already_checked:
+                problem = (f'{where}, rotation component {number}: harvest date {end} '
+                           f'is not after planting date {planting}. Move the harvest after '
+                           'planting or the planting before harvest.')
+                problems.append(problem)
+                report.append(f'      {problem}')
         # Supplied plantings are checked below; also check untouched known dates.
         for field, day in zip(('planting date', 'harvest/end date'), known[index][1:3]):
             if day is not None and not (field == 'planting date' and planting_override):
                 found = _check_weather_date(day.isoformat(), f'{where}, rotation component {number}, {field}', weather_range)
                 if index == 0 and field == 'planting date' and start is not None and day < start:
-                    found.extend(_period_problems(day, f'{where}, rotation component {number}, planting', index, known, start))
+                    found.extend(_period_problems(day, f'{where}, rotation component {number}, planting',
+                                                  index, known, start, check_end=False))
                 problems.extend(found)
                 report.extend(f'      {p}' for p in found)
         if number in edits:

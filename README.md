@@ -19,6 +19,8 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.16.1 adds residue, tillage and harvest events per treatment or rotation component (including fallow), with RESID/HARVS checks and `harvest_management`.
+
 Version 0.16.0 adds automatic irrigation and planting controls, irrigation in days after planting, and an irrigation efficiency dict with IRRIG/event checks.
 
 Version 0.15.0 adds checked DSSAT simulation options, eight initial-condition detail
@@ -42,7 +44,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 - [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
 - [x] Run multi-year seasonal analyses (`controls: years`), check weather coverage across seasons, and compute season statistics across treatments and scenarios (`summarize_seasons()`)
-- [x] Run multi-year crop rotations and sequence analyses in DSSAT's sequence mode (`Q`) from a sequence FileX or a FileX template (`rotation`), with experiment data per rotation component (planting, cultivar, fertilizer and irrigation), per-component summary statistics and continuous soil water series
+- [x] Run multi-year crop rotations and sequence analyses in DSSAT's sequence mode (`Q`) from a sequence FileX or a FileX template (`rotation`), with experiment data per rotation component (planting, cultivar, fertilizer, irrigation, residues, tillage and harvest; fallows take the last three), per-component summary statistics and continuous soil water series
 
 ```python
 import dssatlab as dl
@@ -98,19 +100,19 @@ Values are in DSSAT's own units and nothing is converted:
 
 - **Weather template**: comma-separated UTF-8 CSV with `station`, `latitude`, `longitude`, `elevation`, `date` (`YYYY-MM-DD`), `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`, `wndht` (default -99). Station and coordinates repeat on every row; one row per calendar day without gaps or duplicates.
 - **Soil template**: one soil profile, one row per layer. Required profile columns: `soil_id` (1 to 10 ASCII characters matching the FileX `ID_SOIL`), `salb`, `slro`, `sldr`, `slpf`. Required layer columns: `slb` (cm, strictly increasing), `slll`, `sdul`, `ssat` (strictly `slll < sdul < ssat`), `srgf`. Optional columns (`slnf`, `ssks`, `sbdm`, `sloc`, etc.) default to -99. Profile values repeat identically on every row.
-- **Management template**: YAML file or Python dict organized under `treatments -> {treatment_number: ...}` with optional `planting`, `irrigation`, `fertilizer`, `cultivar`, `initial_conditions`, and `controls` sections (`dl.write_experiment_template()` writes a commented file covering all six; the last three are checked and applied to a copy of your FileX, see the Guide). All dates must be quoted ISO strings (`"YYYY-MM-DD"`). Omitted sections keep the FileX's original levels; empty lists (`[]`) specify no events (level 0). PyYAML is optional (`pip install pyyaml` or `pip install dssatlab[yaml]`) and only imported when loading a YAML path; plain dictionaries require zero runtime dependencies.
+- **Management template**: YAML file or Python dict organized under `treatments -> {treatment_number: ...}` with optional `planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, `harvest`, `cultivar`, `initial_conditions`, and `controls` sections (`dl.write_experiment_template()` writes a commented file covering these sections; all are checked and applied to a copy of your FileX, see the Guide). All dates must be quoted ISO strings (`"YYYY-MM-DD"`). Omitted sections keep the FileX's original levels; empty lists (`[]`) specify no events (level 0). PyYAML is optional (`pip install pyyaml` or `pip install dssatlab[yaml]`) and only imported when loading a YAML path; plain dictionaries require zero runtime dependencies.
 
 Inputs for weather and soil can be given as a CSV path, a list of dicts, or a pandas DataFrame (pandas is never required). Management can be given as a YAML path or a plain dictionary.
 
 What happens:
 
-- `check()` reports every problem it finds: wrong or unknown columns/keys, empty or non-numeric values, bad dates or depths, gaps, impossible values (e.g. `tmax < tmin`, negative rain, non-increasing depths, water limits out of order, non-ascending event dates), and mismatches with the FileX (station code, start date coverage, case-sensitive `soil_id` match, planting date before start date). Nothing is fixed or filled in automatically. When management is supplied, a structured Checks report is printed.
+- `check()` reports every problem it finds: wrong or unknown columns/keys, empty or non-numeric values, bad dates or depths, gaps, impossible values (e.g. `tmax < tmin`, negative rain, non-increasing depths, water limits out of order, out-of-order event dates), and mismatches with the FileX (station code, start date coverage, case-sensitive `soil_id` match, planting date before start date). Nothing is fixed or filled in automatically. When management is supplied, a structured Checks report is printed.
 - `run()` raises one `DSSATCheckError` listing all problems if there are any, before writing anything.
 - Otherwise `run()` makes a new `dssat_sim_<date>` folder beside your FileX. With `soil`, it writes `SOIL.SOL` and does not copy sibling `.SOL` files (a local `.SOL` beats DSSAT's own Soil folder); `.CUL`, `.ECO`, and `.SPE` files are copied as before. Without `soil`, sibling `.SOL` files are copied. With `management`, it edits the copied FileX to append new management levels and repoints the selected treatment row. The generated weather file is written to the simulation folder, DSSAT runs there, and output files are collected into a `dssat_run_<date>` folder inside it. Your original files are never changed.
 - If DSSAT cannot use the soil profile, it exits with return code 99 and `run()` raises `DSSATRunError` with the `ERROR.OUT` message.
 - DSSAT does not fail when weather is missing: it exits normally and gives -99 results. After the run, `run()` looks for DSSAT's "weather record not found" warning and raises `DSSATRunError` naming the first missing date.
 
-Not built yet: other management operations (tillage, organic amendments, harvest, chemicals), unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a copied FileX with more than one field, or crops outside the ten template crops, and parallel or resumed runs.
+Not built yet: chemical applications and automatic residue or harvest blocks, unit converters, reading other output files (such as `ET.OUT` or `OVERVIEW.OUT`), choosing a soil profile from DSSAT's own soil files, a copied FileX with more than one field, or crops outside the ten template crops, and parallel or resumed runs.
 
 ## Multi-treatment and scenario runs
 

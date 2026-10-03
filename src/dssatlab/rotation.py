@@ -12,6 +12,7 @@ from .management import _check_management, _report_lines
 from .sequence import _sequence_coverage, _sequence_experiment_data
 from .filex_write import _columns, _planting_row, _PLANTING_HEADER, _repoint
 from .weather import _dssat_date, _show_value
+from .operations import _harvest_end
 
 
 def _check_rotation_template(data, data_dir):
@@ -135,19 +136,35 @@ def _check_cycle_closure(start_date, end_date, where):
     return problems
 
 
-def _rotation_cycle_years(components):
-    """Cycle years for checked components; the end plus one day gives the next cycle's year.
+def _rotation_cycle_years(components, experiment_data=None, start=None):
+    """Fewest cycle years from start (SDATE) whose DSSAT stopping day reaches the end.
 
     Date-order and cycle-closure checks belong to the caller. Do not clamp or
-    repair dates here: the end plus one day determines the next cycle's year.
+    repair dates here.
     """
     last = components[-1]
     end = last.get("end_date") if last["crop"] == "fallow" else last["harvest_date"]
-    start = date.fromisoformat(components[0]["planting"]["date"])
+    # SDATE stays put when the first planting is edited, so count years from it.
+    start = start or date.fromisoformat(components[0]["planting"]["date"])
     end = date.fromisoformat(end)
-    # Avoid overflowing datetime at 9999-12-31; only the resulting year is needed.
-    next_year = end.year + 1 if (end.month, end.day) == (12, 31) else (end + timedelta(days=1)).year
-    return next_year - start.year
+    from .rotation_data import _rotation_keys
+    treatments = experiment_data.get('treatments', {}) if isinstance(experiment_data, dict) else {}
+    if isinstance(treatments, dict):
+        for key, entry in treatments.items():
+            if (not isinstance(entry, dict) or not str(key).isascii()
+                    or not str(key).isdigit() or int(key) != 1):
+                continue
+            rows = [dict(R=str(i)) for i in range(1, len(components) + 1)]
+            edits, _ = _rotation_keys(entry.get('rotation', {}), rows, '')
+            end = _harvest_end(edits.get(len(components)), end, 'R') or end
+            break
+    # DSSAT stops the day before SDATE's day of year in year SDATE + NYERS
+    # (see sequence._sequence_coverage), so take the fewest years reaching the end.
+    years = 1
+    while (start.year + years <= date.max.year and
+           date(start.year + years, 1, 1) + timedelta(days=start.timetuple().tm_yday - 2) < end):
+        years += 1
+    return years
 
 
 def _render_rotation(data, weather_rows, soil_rows):
@@ -221,7 +238,7 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
                  or date.fromisoformat(data["rotation"][0]["planting"]["date"]))
         days = [row["date"] for row in weather.get(1, []) if "date" in row]
         template_problems.extend(_sequence_coverage(
-            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"])))
+            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data, start)))
         if days and start not in days:
             template_problems.append(f"Simulation start date {start} is not covered by weather "
                                      f"data ({min(days)} to {max(days)}). Supply weather for that date.")
@@ -247,14 +264,15 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
     return problems, report
 
 
-def _write_rotation_controls(filex, experiment_data, start):
+def _write_rotation_controls(filex, experiment_data, start, components):
     """Edit the checked sequence's first controls level, keeping component levels."""
     # The normal controls writer adds a new level and repoints SM; sequences
     # need NYERS/SDATE in level 1, so edit that level in this generated FileX.
     controls = _selected_controls(experiment_data, 1)
     lines = filex.read_text(encoding="ascii").splitlines(keepends=True)
-    for key, column, value in (("years", "NYERS", controls.get("years")),
+    years = controls.get('years', _rotation_cycle_years(components, experiment_data, start))
+    for key, column, value in (("years", "NYERS", years),
                                ("start_date", "SDATE", _dssat_date(start))):
-        if key in controls:
+        if key == 'years' or key in controls:
             _repoint(lines, 1, column, value, "SIMULATION CONTROLS", "N")
     filex.write_bytes("".join(lines).encode("ascii"))

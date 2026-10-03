@@ -24,6 +24,7 @@ _CONTROL_OPTIONS = {
     "soil_evaporation": ("METHODS", "MESEV", ("R", "S")),
     "soil_layers": ("METHODS", "MESOL", (1, 2, 3)),
     "residue": ("MANAGEMENT", "RESID", ("N", "R", "D")),
+    "harvest_management": ("MANAGEMENT", "HARVS", ("A", "M", "R", "D")),
     "irrigation_management": ("MANAGEMENT", "IRRIG", ("A", "N", "F", "R", "D", "P", "W")),
     "planting_management": ("MANAGEMENT", "PLANT", ("A", "F", "R")),
     "auto_irrigation_depth": ("IRRIGATION", "IMDEP", (0, None, True), "a number above 0"),

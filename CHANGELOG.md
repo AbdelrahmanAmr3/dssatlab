@@ -2,6 +2,20 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.16.1] - 2026-10-02
+
+### Added
+- Experiment data `residues` (RDATE, RCOD, RAMT, RESN, RESP, RESK, RINP, RDEP, RMET), `tillage` (TDATE, TIMPL, TDEP) and `harvest` (HDATE, HSTG, HCOM, HSIZE, HPC, HBPC) event lists, written as new MR/MT/MH levels in the FileX copy. Omitted optional fields write -99; omitted sections keep their levels and empty lists set level 0 ([ADR 0021](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0021-field-operations-as-event-sections.md)).
+- `controls.harvest_management` (HARVS: A, M, R, D) and event checks: non-empty residues need RESID R; harvest events need HARVS R or M. Codes are never changed for the user.
+- Field operations per rotation component, including fallows, with component period checks. Under HARVS R the latest harvest date sets the component end; under M the end is unknown. Same-date events are allowed in all three new sections; fertilizer and irrigation keep unique dates.
+- Guide field tables and tutorial Case 16 for a residue application.
+
+### Notes
+- Residues on UFGA7901 and tillage on MSKB8921/MSKB8902 rebuilt from stock matched stock FileX runs exactly on the same weather file.
+- On UFGA7601 peanut under HARVS M set through `controls.harvest_management`, harvest dates 1976-09-15 and 1976-10-01 gave identical Summary results (HDAT 1976-09-18). HPC 100 to 50 halved HWAH (4760 to 2380), while HWAM stayed 4760. HSTG GS003 to GS002 left HDAT unchanged. HBPC was held at 0 and HCOM/HSIZE at IBHCS, so this proof makes no claim about by-product removal, harvest component or size sensitivity.
+- Known follow-ups: [#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192) checks for HARVS R without a harvest event; [#193](https://github.com/AbdelrahmanAmr3/dssatlab/issues/193) addresses new levels running out at 99 in long sequences.
+- Zero runtime dependencies are preserved.
+
 ## [0.16.0] - 2026-10-02
 
 ### Added

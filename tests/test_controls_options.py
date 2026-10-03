@@ -31,6 +31,7 @@ OPTIONS = {
     "soil_evaporation": ("METHODS", "MESEV", ("R", "S")),
     "soil_layers": ("METHODS", "MESOL", (1, 2, 3)),
     "residue": ("MANAGEMENT", "RESID", ("N", "R", "D")),
+    "harvest_management": ("MANAGEMENT", "HARVS", ("A", "M", "R", "D")),
 }
 NEW_OPTIONS = {field: spec for field, spec in OPTIONS.items()
                if field not in ("water", "nitrogen")}
@@ -107,6 +108,15 @@ def test_water_and_nitrogen_keep_exact_messages(option_sim, field, bad):
     ]
 
 
+@pytest.mark.parametrize("bad", ["G", "junk"])
+def test_harvest_management_rejects_inactive_and_unknown_codes(option_sim, bad):
+    option_sim.management["treatments"][1]["controls"] = {"harvest_management": bad}
+    assert option_sim.check(verbose=False) == [
+        f"Management data treatment 1, controls, field 'harvest_management': found {bad!r}. "
+        'Supply one of "A", "M", "R", "D" (DSSAT HARVS).'
+    ]
+
+
 @pytest.mark.parametrize("field", NEW_OPTIONS)
 @pytest.mark.parametrize("bad", ["X", "lowercase", True, False, 1, 1.0, None, [], {}])
 def test_rejected_codes_have_exact_message_before_writing(option_sim, fake_dssat, field, bad):
@@ -165,15 +175,17 @@ def test_template_documents_options_and_loads_with_them(option_sim, tmp_path):
     path = tmp_path / "experiment.yaml"
     write_experiment_template(path)
     text = path.read_text(encoding="utf-8")
+    assert 'RESID "R"' in text and 'HARVS "R" or "M"' in text
+    assert 'controls tillage "Y" applies tillage (TILL)' in text
     for field, (_, column, codes) in NEW_OPTIONS.items():
-        line = next(line for line in text.splitlines() if f"# {field}:" in line)
+        line = next(line for line in text.splitlines() if f"# {field}:" in line and "DSSAT" in line)
         assert f"DSSAT {column}" in line
         assert all((f'"{code}"' if isinstance(code, str) else str(code)) in line for code in codes)
     sim.management = path
     assert sim.check(verbose=False) == []
     # The documented examples must also pass when a user uncomments them all.
     for field in NEW_OPTIONS:
-        text = text.replace(f"# {field}:", f"{field}:")
+        text = text.replace(f"      # {field}:", f"      {field}:")
     path.write_text(text, encoding="utf-8")
     assert sim.check(verbose=False) == []
 

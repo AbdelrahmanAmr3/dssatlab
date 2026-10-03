@@ -171,8 +171,8 @@ _Avoid_: experiment input, FileX template
 The one user-supplied dict of everything written into a copy of the FileX for a treatment:
 management data, and later cultivar, initial conditions and simulation controls. Management
 data is one part of it, not a synonym. For a sequence it holds the controls years and start
-date, and `rotation`: planting, cultivar, fertilizer and irrigation per rotation component,
-keyed by the component's R number.
+date, and `rotation`: planting, cultivar, fertilizer, irrigation, residues, tillage and harvest
+per rotation component, keyed by the component's R number (a fallow takes only the last three).
 _Avoid_: management (for the whole dict), FileX input
 
 **Simulation option**:
@@ -205,6 +205,20 @@ _Avoid_: DAP (in messages), relative date
 The share of applied irrigation water that reaches the soil (DSSAT EFIR, 0 to 1) for the
 treatment's reported irrigation events. Automatic irrigation has its own efficiency (IREFF).
 _Avoid_: application efficiency
+
+**Field operation**:
+A residue application, tillage pass or harvest on a reported date, given in experiment data
+`residues`, `tillage` or `harvest` (DSSAT RESIDUES AND ORGANIC FERTILIZER, TILLAGE AND
+ROTATIONS, HARVEST DETAILS). Events are in non-descending date order; several on one date are
+allowed. Residue events are checked against the RESID code and harvest events against the HARVS
+code (`harvest_management`), as irrigation events are against IRRIG (ADR 0021).
+_Avoid_: operation (alone, too broad), cultural practice
+
+**Harvest details**:
+A harvest event's date plus optional growth stage (HSTG), component (HCOM), size group (HSIZE)
+and the percent of product and by-product removed (HPC, HBPC). Under HARVS "M" the date is not
+used but the percents are, so the events are allowed.
+_Avoid_: harvest settings
 
 **Initial conditions off**:
 Experiment data `initial_conditions: "off"`: the treatment's IC factor level is set to 0 in the

@@ -64,6 +64,8 @@ treatments:
     # For a sequence, replace the sections above with this rotation example.
     # R1 maize planted 1978-03-15; R2 fallow ends 1978-11-14;
     # R3 wheat planted 1978-11-15; R4 fallow ends 1979-03-14.
+    # Components also take residues, tillage and harvest; fallows take only these three.
+    # Codes come from each component's SM level. A fallow harvest cannot be [].
     # Events after maturity cannot be checked; leave a margin before the crop ends.
     # rotation:
     #   1:
@@ -71,6 +73,9 @@ treatments:
     #       - {date: "1978-03-15", material: FE005, application: AP001, depth: 5, n: 60}
     #     irrigation:
     #       - {date: "1978-05-01", amount: 25, method: IR001}
+    #   2:
+    #     tillage: [{date: "1978-08-01", implement: TI005, depth: 20}]
+    #     harvest: [{date: "1978-11-14"}]
     #   3:
     #     cultivar: {crop: WH, code: IB1500}
     #     fertilizer:
@@ -79,7 +84,24 @@ treatments:
 
 
 _EXPERIMENT_SECTIONS_TEXT = """
-    # Omit a section to keep the FileX's own level.
+    # Field operations: lists; omit to keep MR/MT/MH, or [] for none for this treatment.
+    # Required date (RDATE/TDATE/HDATE): quoted ISO string in weather range, non-descending; same date allowed.
+    # Codes RCOD/RMET/TIMPL/HSTG: two ASCII letters + three digits; numbers finite, not booleans.
+    # Residues: required material (RCOD), amount (RAMT): kg/ha > 0.
+    # Optional n (RESN), p (RESP), k (RESK), incorporation (RINP): % from 0 to 100.
+    # Optional depth (RDEP): cm >= 0; method (RMET). Unknown keys rejected.
+    # Omitted optional fields and RENAME/TNAME/HNAME write -99.
+    # Residue events need RESID "R"; harvest events need HARVS "R" or "M".
+    # Set controls residue/harvest_management to those codes, or remove the events; codes are never changed for you.
+    # residues:
+    #   - {date: "1982-02-25", material: "RE001", amount: 1500}
+    # Tillage: required implement (TIMPL), depth (TDEP): cm >= 0; controls tillage "Y" applies tillage (TILL).
+    # tillage:
+    #   - {date: "1982-02-25", implement: "TI005", depth: 20}
+    # Harvest: optional stage (HSTG), component (HCOM), size (HSIZE): 1-5 printable ASCII characters without spaces.
+    # Optional product_percent (HPC), byproduct_percent (HBPC): % from 0 to 100.
+    # harvest:
+    #   - {date: "1982-02-25", stage: "GS003", component: "C", size: "A", product_percent: 100}
     # Cultivar adds a new CULTIVARS level in the copy and repoints this treatment.
     cultivar:
       crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
@@ -134,6 +156,7 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # Management codes are quoted, case-sensitive strings, not booleans or numbers.
       # irrigation_management: "R" # DSSAT IRRIG: "A", "N", "F", "R", "D", "P", "W"
       # planting_management: "R"   # DSSAT PLANT: "A", "F", "R"
+      # harvest_management: "R"    # DSSAT HARVS: "A", "M", "R", "D"
       # Automatic irrigation numbers are finite, not booleans; omitted values stay unchanged.
       # auto_irrigation_depth: 30       # DSSAT IMDEP, cm: a number above 0
       # auto_irrigation_threshold: 50   # DSSAT ITHRL, %: a number from 0 to 100 inclusive
@@ -173,15 +196,9 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
 
 
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
-    """Write commented YAML for management, cultivar, initial conditions and controls.
-
-    Cultivar, initial conditions and controls are checked and applied to the FileX copy.
-    EFIR applies to the irrigation level's events; controls auto_irrigation_efficiency
-    (IREFF) applies to automatic irrigation.
-    Dates are quoted ISO calendar strings; units and codes are DSSAT's.
-    With filex, use its treatment numbers in file order, keeping example values.
-    Without filex, write one example treatment numbered 1. No PyYAML is needed.
-    Raise DSSATError if the destination exists or FileX treatments cannot be read.
+    """Write commented experiment YAML with DSSAT units, codes and quoted ISO dates.
+    With filex, use its treatment numbers; otherwise use 1. No PyYAML is needed.
+    Raise DSSATError for an existing destination or unreadable FileX treatments.
     """
     title = "# DSSATLab Management Template"
     intro = "# Management operations (planting, irrigation, fertilizer) by treatment number."
@@ -191,7 +208,7 @@ def write_experiment_template(path: str | Path, filex: str | Path | None = None)
     text = text.replace(
         intro,
         "# Experiment data by treatment number: planting, irrigation, fertilizer,\n"
-        "# cultivar, initial_conditions and controls.", 1)
+        "# residues, tillage, harvest, cultivar, initial_conditions and controls.", 1)
     _write_template(path, text + _EXPERIMENT_SECTIONS_TEXT, "Experiment", filex)
 
 
@@ -216,11 +233,7 @@ def _write_template(path, text, label, filex):
 
 
 def _load_management(source):
-    """Load management data from a YAML path or pass through a dict.
-
-    Returns:
-        tuple[Any, list[str]]: (loaded_dict_or_source, list_of_problems).
-    """
+    """Return (loaded data, problems) from a YAML path or a passed-through dict."""
     return _load_yaml(source, "Management", "a 'treatments' key")
 
 

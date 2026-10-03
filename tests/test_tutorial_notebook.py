@@ -1,6 +1,12 @@
 """The tutorial notebook's editable cells must match the committed data files."""
+import ast
+from datetime import date, timedelta
 import json
 from pathlib import Path
+
+from dssatlab import Simulation
+from test_experiment_template import sim_inputs
+from test_management_file import sim_inputs as management_inputs
 
 NOTEBOOK = Path(__file__).resolve().parent.parent / "notebook" / "dssatlab_tutorial.ipynb"
 DATA = NOTEBOOK.parent / "tutorial_data"
@@ -24,3 +30,22 @@ def test_editable_cells_match_data_files():
 
 def test_weather_file_is_committed():
     assert (DATA / "my_weather.csv").is_file()
+
+
+def test_case16_residue_passes_checks(sim_inputs):
+    cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
+    values = {}
+    for cell in cells:
+        source = "".join(cell["source"])
+        if cell["cell_type"] != "code" or not source.startswith("experiment16 ="):
+            continue
+        # Read literal data only; never execute notebook cells or run DSSAT.
+        assignment = ast.parse(source).body[0]
+        values[assignment.targets[0].id] = ast.literal_eval(assignment.value)
+        assert cell["execution_count"] is None and cell["outputs"] == []
+    filex, weather = sim_inputs
+    weather = [dict(weather[0], date=(date(1982, 2, 25) + timedelta(days=i)).isoformat())
+               for i in range(140)]
+    assert Simulation(
+        filex, weather=weather, management=values["experiment16"],
+    ).check(False) == []

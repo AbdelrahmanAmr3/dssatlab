@@ -195,3 +195,87 @@ def test_run_consumes_checked_rotation(sim, installed, rotation_edits):
     else:
         assert levels == (
             [0, 0, 0, 0] if sim.filex is None else [1, 0, 1, 0])
+
+
+def test_fallow_operations_write_only_selected_component(sequence_copy, installed):
+    # Inline existing levels exercise allocation as well as component row targeting.
+    text = sequence_copy.read_text().replace('*HARVEST DETAILS', '''*RESIDUES AND ORGANIC FERTILIZER
+@R RDATE  RCOD  RAMT  RESN  RESP  RESK  RINP  RDEP  RMET RENAME
+ 1 78100 RE001  1000   -99   -99   -99   -99   -99   -99 -99
+
+*TILLAGE AND ROTATIONS
+@T TDATE TIMPL  TDEP TNAME
+ 1 78100 TI003    10 -99
+
+*HARVEST DETAILS''')
+    text = text.replace(' 2 MA              R     R     R     N     R',
+                        ' 2 MA              R     R     R     R     R')
+    sequence_copy.write_text(text)
+    sim = Simulation(sequence_copy, weather=weather('1978-03-15', '1981-03-15'),
+        management={'treatments': {1: {'rotation': {'2': {
+            'residues': [dict(date='1978-08-01', material='RE001', amount=1500)],
+            'tillage': [dict(date='1978-08-01', implement='TI005', depth=20),
+                        dict(date='1978-08-01', implement='TI003', depth=10)],
+            'harvest': [dict(date='1978-11-14', stage='GS000', byproduct_percent=90)],
+        }}}}})
+    assert sim.check(False) == []
+    result = sim.run()
+    written = (result.run_dir.parent / sequence_copy.name).read_text()
+    original_rows = text.split('*TREATMENTS')[1].split('*CULTIVARS')[0].splitlines()[2:6]
+    written_rows = written.split('*TREATMENTS')[1].split('*CULTIVARS')[0].splitlines()[2:6]
+    assert [written_rows[i] for i in (0, 2, 3)] == [original_rows[i] for i in (0, 2, 3)]
+    assert written_rows[1][55:58].strip() == '2'  # MR
+    assert written_rows[1][61:64].strip() == '2'  # MT
+    assert written_rows[1][67:70].strip() == '3'  # MH
+    assert _section_row(written, 'RESIDUES', 'R', 2, ('RDATE', 'RAMT'))['RAMT'] == '1500'
+    tillage = written.split('*TILLAGE AND ROTATIONS')[1].split('*')[0].splitlines()[2:]
+    assert [line.split() for line in tillage if line.strip()] == [
+        ['1', '78100', 'TI003', '10', '-99'],
+        ['2', '78213', 'TI005', '20', '-99'],
+        ['2', '78213', 'TI003', '10', '-99']]
+    harvest = _section_row(written, 'HARVEST DETAILS', 'H', 3, ('HDATE', 'HBPC', 'HNAME'))
+    assert (harvest['HDATE'], harvest['HBPC'], harvest['HNAME']) == ('78318', '90', '-99')
+    assert sequence_copy.read_text() == text
+
+
+def test_final_fallow_harvest_changes_default_cycle(sim, installed):
+    if sim.filex is not None:
+        pytest.skip('Generated NYERS belongs to a template FileX')
+    edits(sim, {4: {'harvest': [{'date': '1980-03-13'}]}})
+    result = sim.run()
+    written = next(result.run_dir.parent.glob('*.SQX')).read_text()
+    assert _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS',))['NYERS'] == '2'
+    assert _section_row(written, 'HARVEST DETAILS', 'H', 3, ('HDATE',))['HDATE'] == '80073'
+
+
+
+def test_later_first_planting_counts_years_from_sdate(rotation, rows, installed):
+    # The FileX keeps SDATE at the template's first planting, so NYERS counts from it.
+    rotation['rotation'][1]['end_date'] = '1979-11-14'
+    rotation['rotation'][2]['cultivar']['code'] = 'IB0488'
+    rotation['rotation'][2]['planting']['date'] = '1979-11-15'
+    rotation['rotation'][3]['end_date'] = '1980-03-13'
+    planting = dict(rotation['rotation'][0]['planting'], date='1979-03-15')
+    sim = Simulation(filex_template=rotation, soil=rows[1],
+                     weather=weather('1978-03-15', '1981-03-15'),
+                     management={'treatments': {1: {'rotation': {1: {'planting': planting}}}}})
+    assert sim.check(False) == []
+    result = sim.run()
+    written = next(result.run_dir.parent.glob('*.SQX')).read_text()
+    controls = _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS', 'SDATE'))
+    assert (controls['NYERS'], controls['SDATE']) == ('2', '78074')
+
+
+def test_later_planting_and_final_harvest_reach_dssat_stop(rotation, rows, installed):
+    # DSSAT stops the day before SDATE's day of year, so 1979-04-14 needs two years.
+    rotation['rotation'][2]['cultivar']['code'] = 'IB0488'
+    planting = dict(rotation['rotation'][0]['planting'], date='1978-04-15')
+    sim = Simulation(filex_template=rotation, soil=rows[1],
+                     weather=weather('1978-03-15', '1981-03-15'),
+                     management={'treatments': {1: {'rotation': {
+                         1: {'planting': planting}, 4: {'harvest': [{'date': '1979-04-14'}]}}}}})
+    assert sim.check(False) == []
+    result = sim.run()
+    written = next(result.run_dir.parent.glob('*.SQX')).read_text()
+    controls = _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS', 'SDATE'))
+    assert (controls['NYERS'], controls['SDATE']) == ('2', '78074')

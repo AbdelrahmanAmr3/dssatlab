@@ -6,6 +6,7 @@ import re
 
 from .filex import _section_row, _treatment_rows
 from .weather import _dssat_date
+from .operations import _OPERATION_FIELDS, _operation_values
 
 
 _PLANTING_HEADER = (
@@ -24,6 +25,9 @@ _IRRIGATION_HEADERS = (
     "@I IDATE  IROP IRVAL",
 )
 _FERTILIZER_HEADER = "@F FDATE  FMCD  FACD  FDEP  FAMN  FAMP  FAMK  FAMC  FAMO  FOCD FERNAME"
+_RESIDUES_HEADER = "@R RDATE  RCOD  RAMT  RESN  RESP  RESK  RINP  RDEP  RMET RENAME"
+_TILLAGE_HEADER = "@T TDATE TIMPL  TDEP TNAME"
+_HARVEST_HEADER = "@H HDATE  HSTG  HCOM HSIZE   HPC  HBPC HNAME"
 
 
 def _section_bounds(lines, section):
@@ -99,8 +103,8 @@ def _planting_row(columns, level, planting):
         if values[column] != -99:
             day = date.fromisoformat(values[column])
             values[column] = _dssat_date(day)
-    return "".join(_cell(values.get(column, -99), end - start,
-                         "PLANTING DETAILS", column, first_column=start == 0)
+    return "".join(_cell(values.get(column, -99), end - start, "PLANTING DETAILS",
+                         column, first_column=start == 0)
                    for column, (start, end) in columns.items())
 
 
@@ -229,8 +233,7 @@ def _event_blocks(lines, section, headers, *, optional_columns=()):
 
 
 def _event_row(columns, values, section):
-    return "".join(_cell(values.get(column, -99), end - start, section, column,
-                         first_column=start == 0)
+    return "".join(_cell(values.get(column, -99), end - start, section, column, first_column=start == 0)
                    for column, (start, end) in columns.items())
 
 
@@ -243,6 +246,12 @@ def _event_text(text, treatment, events, section="irrigation", *, rotation=None)
         has_level = True  # An empty dict schedule still writes its EFIR level.
     if section == "fertilizer":
         name, column, headers = "FERTILIZERS (INORGANIC)", "MF", (_FERTILIZER_HEADER,)
+    elif section == "residues":
+        name, column, headers = "RESIDUES AND ORGANIC FERTILIZER", "MR", (_RESIDUES_HEADER,)
+    elif section == "tillage":
+        name, column, headers = "TILLAGE AND ROTATIONS", "MT", (_TILLAGE_HEADER,)
+    elif section == "harvest":
+        name, column, headers = "HARVEST DETAILS", "MH", (_HARVEST_HEADER,)
     if rotation is None:
         _section_row(text, "TREATMENTS", "N", treatment, (column,))
     lines = text.splitlines(keepends=True)
@@ -255,10 +264,11 @@ def _event_text(text, treatment, events, section="irrigation", *, rotation=None)
     if section == "irrigation":
         rows.insert(0, [_event_row(blocks[0][0], {"I": level, "EFIR": efficiency}, name)])
     for event in events:
-        day_code = (event["days_after_planting"] if "days_after_planting" in event else
-                    _dssat_date(date.fromisoformat(event["date"])))
+        day_code = event["days_after_planting"] if "days_after_planting" in event else _dssat_date(date.fromisoformat(event["date"]))
         if section == "irrigation":
             values = {"I": level, "IDATE": day_code, "IROP": event["method"], "IRVAL": event["amount"]}
+        elif section in _OPERATION_FIELDS:
+            values = _operation_values(section, event, level)
         else:
             values = {"F": level, "FDATE": day_code, "FMCD": event["material"],
                       "FACD": event["application"], "FDEP": event["depth"], "FAMN": event["n"],
@@ -311,7 +321,7 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
                 text = _cultivar_text(text, int(treatment), _changed_cultivar(path, entry["cultivar"]))
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])
-            for section in ("irrigation", "fertilizer"):
+            for section in ("irrigation", "fertilizer", *_OPERATION_FIELDS):
                 if section in entry:
                     text = _event_text(text, int(treatment), entry[section], section)
             if "initial_conditions" in entry:

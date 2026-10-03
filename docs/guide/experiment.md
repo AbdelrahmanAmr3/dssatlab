@@ -1,9 +1,9 @@
 # Run with experiment data
 
 [Management data](management.md) lets you change planting, irrigation and fertilizer without
-editing the FileX. **Experiment data** is the same per-treatment YAML (or dict) with three more
-sections: which **cultivar** is grown, what the soil holds at the start (**initial conditions**),
-and how the simulation is **controlled**. dssatlab applies it to a copy of your FileX; the
+editing the FileX. **Experiment data** extends the same per-treatment YAML (or dict) with
+`residues`, `tillage`, `harvest`, which **cultivar** is grown, what the soil holds at the
+start (**initial conditions**), and how the simulation is **controlled**. dssatlab applies it to a copy of your FileX; the
 original is never changed. You still start from a FileX you already have.
 
 ## Generate the experiment template
@@ -26,13 +26,14 @@ section and the treatment keeps the FileX's own level.
 
 A sequence entry takes `controls` (`years` and `start_date`) and `rotation`, a dictionary
 keyed by the rotation component's R number. Each crop component can have its own planting,
-cultivar, fertilizer and irrigation. This works for copied sequence FileX files and rotation
+cultivar, fertilizer, irrigation, residues, tillage and harvest. Fallows take only the
+last three sections. This works for copied sequence FileX files and rotation
 FileX templates, including scenarios. The experiment template includes a commented example;
 replace its single-treatment sections when using it for a sequence. See
 [Experiment data per rotation component](sequence.md#experiment-data-per-rotation-component)
 for the YAML, component period checks and the maturity caveat.
 
-## The three new sections
+## Cultivar, initial conditions and controls
 
 ```yaml
 treatments:
@@ -71,6 +72,79 @@ at run time.
 A changed `controls` `start_date` replaces the FileX `SDATE` in the weather-coverage and
 planting-date checks. The FileX `START` setting is left as it is.
 
+## Residues, tillage and harvest
+
+```yaml
+treatments:
+  1:
+    controls: {residue: "R", tillage: "Y", harvest_management: "R"}
+    residues:
+      - {date: "1982-02-25", material: "RE001", amount: 1500, n: 0.8, depth: 15}
+    tillage:
+      - {date: "1982-02-25", implement: "TI005", depth: 20}
+      - {date: "1982-02-25", implement: "TI003", depth: 10}
+    harvest:
+      - {date: "1982-06-30", stage: "GS003", component: "IBHCS", size: "IBHCS", product_percent: 100, byproduct_percent: 100}
+```
+
+| Section | Field | DSSAT column | Required | Units / allowed values |
+|---|---|---|---|---|
+| `residues` | `date` | RDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `residues` | `material` | RCOD | Yes | `[A-Za-z]{2}[0-9]{3}`: two ASCII letters + three digits |
+| `residues` | `amount` | RAMT | Yes | kg/ha, strictly above 0 |
+| `residues` | `n` | RESN | No | %, 0 to 100 inclusive |
+| `residues` | `p` | RESP | No | %, 0 to 100 inclusive |
+| `residues` | `k` | RESK | No | %, 0 to 100 inclusive |
+| `residues` | `incorporation` | RINP | No | %, 0 to 100 inclusive |
+| `residues` | `depth` | RDEP | No | cm, at least 0 |
+| `residues` | `method` | RMET | No | `[A-Za-z]{2}[0-9]{3}` |
+| `tillage` | `date` | TDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `tillage` | `implement` | TIMPL | Yes | `[A-Za-z]{2}[0-9]{3}` |
+| `tillage` | `depth` | TDEP | Yes | cm, at least 0 |
+| `harvest` | `date` | HDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `harvest` | `stage` | HSTG | No | `[A-Za-z]{2}[0-9]{3}` |
+| `harvest` | `component` | HCOM | No | 1 to 5 printable ASCII characters without spaces (`[!-~]{1,5}`) |
+| `harvest` | `size` | HSIZE | No | 1 to 5 printable ASCII characters without spaces (`[!-~]{1,5}`) |
+| `harvest` | `product_percent` | HPC | No | %, 0 to 100 inclusive |
+| `harvest` | `byproduct_percent` | HBPC | No | %, 0 to 100 inclusive |
+
+Each section is a list of event dicts. Dates must be in non-descending order;
+several events on the same date are allowed and keep their supplied order.
+Irrigation and fertilizer still require unique, ascending dates. These field
+operations accept calendar dates only, with no `days_after_planting` field.
+Numbers must be finite Python integers or floats, never strings or booleans.
+Unknown keys are rejected, and every value must fit its FileX column.
+Omitted optional fields and the names RENAME, TNAME and HNAME write DSSAT's -99.
+
+Omit a section to keep the FileX level, or give `[]` to set MR (residues), MT
+(tillage) or MH (harvest) to 0. A fallow's `harvest: []` is rejected because it
+needs its scheduled end; omit `harvest` to keep that end.
+
+For a treatment, `check()` uses `controls.residue` (RESID) and
+`controls.harvest_management` (HARVS) when supplied, otherwise the treatment's
+SIMULATION CONTROLS level. Codes are quoted, case-sensitive strings:
+
+| Controls field | DSSAT column | Allowed codes | Allowed supplied events |
+|---|---|---|---|
+| `harvest_management` | HARVS | `"A"`, `"M"`, `"R"`, `"D"` | Quoted, case-sensitive letter |
+| `residue` | RESID | `"R"`, `"D"`, `"N"` | R accepts dated residue events; D and N reject non-empty `residues` |
+| `harvest_management` | HARVS | `"A"`, `"M"`, `"R"`, `"D"` | R and M accept dated harvest events; A and D reject non-empty `harvest` |
+| `tillage` | TILL | `"Y"`, `"N"` | Y applies tillage; there is no tillage/event code check |
+
+RESID D and HARVS D read days after planting, which these sections do not
+support. RESID N ignores residue events; HARVS A uses the automatic harvest
+block, which cannot yet be edited through experiment data. HARVS G is not
+accepted. Empty lists do not trigger RESID/HARVS code problems. The checks ask
+you to change the code or remove the events; dssatlab never changes a code for you.
+The check for HARVS R without any harvest event is still a follow-up
+([#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192)).
+
+For sequences, the codes come from each component's own SM level; component
+`controls` edits are not supported. See the
+[component period rules](sequence.md#keep-dates-inside-the-components-period).
+
+See [ADR 0021](../adr/0021-field-operations-as-event-sections.md).
+
 ## Simulation options
 
 Set these optional fields under `controls`. Omitted options keep the FileX value.
@@ -92,6 +166,7 @@ what each option does. The same fields apply when using a FileX template.
 | `soil_organic_matter` | MESOM | `"G"`, `"P"` | Quoted, case-sensitive letter |
 | `soil_evaporation` | MESEV | `"R"`, `"S"` | Quoted, case-sensitive letter |
 | `soil_layers` | MESOL | `1`, `2`, `3` | Integer, not a string or boolean |
+| `harvest_management` | HARVS | `"A"`, `"M"`, `"R"`, `"D"` | Quoted, case-sensitive letter |
 | `residue` | RESID | `"N"`, `"R"`, `"D"` | Quoted, case-sensitive letter |
 
 ## Automatic management
@@ -267,6 +342,17 @@ and N. P and W can be written and checked for dated events, but have not been
 proven on DSSAT. On UFGA8201 treatment 1, automatic irrigation with IREFF 1
 versus 0.5 gave IRCM 214 versus 330 mm. The EFIR 0.75 dict form matched a
 hand-edited FileX exactly: IRCM 110 mm and HWAM 2335 kg/ha.
+
+Residues on UFGA7901 and tillage on MSKB8921/MSKB8902 rebuilt from stock through
+experiment data matched the stock FileX runs exactly on the same weather file.
+
+On UFGA7601 peanut under HARVS M set through `controls.harvest_management`,
+harvest event dates `"1976-09-15"` and
+`"1976-10-01"` gave identical Summary results: HDAT stayed `1976-09-18`.
+Changing HPC from 100 to 50 halved HWAH (4760 to 2380 kg/ha), while HWAM
+stayed 4760 kg/ha. Changing HSTG from GS003 to GS002 left HDAT unchanged.
+HBPC was held at 0 and HCOM/HSIZE at IBHCS, so this proof makes no claim
+about by-product removal, harvest component or size sensitivity.
 
 ## Not included
 

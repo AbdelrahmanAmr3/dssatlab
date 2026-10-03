@@ -67,7 +67,7 @@ def test_grid_merge_and_rows(batch_inputs, fake_dssat, monkeypatch, tmp_path, so
 @pytest.mark.parametrize("factors,message", [
     (None, "Sweep factors: supply a non-empty dict of experiment data sections to labelled values, such as {'fertilizer': {0: [], 60: [...]}}."),
     ({}, "Sweep factors: supply a non-empty dict of experiment data sections to labelled values, such as {'fertilizer': {0: [], 60: [...]}}."),
-    ({"weather": {"x": []}}, "Sweep factor 'weather' is not an experiment data section. Use one of: planting, irrigation, fertilizer, cultivar, initial_conditions, controls, rotation."),
+    ({"weather": {"x": []}}, "Sweep factor 'weather' is not an experiment data section. Use one of: planting, irrigation, fertilizer, residues, tillage, harvest, cultivar, initial_conditions, controls, rotation."),
     ({"fertilizer": {}}, "Sweep factor 'fertilizer': supply a non-empty dict of labels to complete section values."),
     ({"fertilizer": []}, "Sweep factor 'fertilizer': supply a non-empty dict of labels to complete section values."),
     ({"controls": {"base": {}}}, "Sweep scenario name 'base' is reserved for the unchanged inputs. Use another label."),
