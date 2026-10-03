@@ -39,8 +39,8 @@ _Avoid_: experiment file, input file
 
 **FileX date**:
 A five-digit YYDDD date in a FileX (SDATE, PDATE, EDATE, HDATE, irrigation and automatic planting
-dates). Always read with DSSAT's rule: years 00-40 are 2000-2040, 41-99 are 1941-1999. The weather
-never chooses its century.
+dates). Always read with DSSAT's rule: years 00-35 are 2000-2035, 36-99 are 1936-1999. Weather written by
+dssatlab never chooses its century.
 
 **Treatment**:
 One numbered row of a FileX. A run covers all treatments or a single one. Its number is the
