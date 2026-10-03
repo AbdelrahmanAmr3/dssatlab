@@ -28,7 +28,9 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.14.1 | Cultivar coefficient sweeps: optional `cultivar.coefficients`, a changed cultivar line with a new `DLnnnn` code in each simulation folder's `.CUL` copy, and unchanged source files (ADR 0017). |
 | 0.14.2 | Bug fixes for DSSAT course files: fixed-column treatment rows (ADR 0018), stock FileA/FileT headers, soil text codes and optional `scom`, and experiment-named outputs with FNAME=Y. |
 | 0.15.0 | Checked simulation options in experiment data controls, eight initial-condition detail fields, initial conditions off (ADR 0019), and a check for one-row treatment numbers colliding with a sequence number (#168). |
-| 0.16.0 (current) | Automatic management in experiment data controls: irrigation and planting management codes, automatic irrigation and planting window fields, irrigation in days after planting, irrigation efficiency, and events checked against the irrigation code (ADR 0020). |
+| 0.16.0 | Automatic management in experiment data controls: irrigation and planting management codes, automatic irrigation and planting window fields, irrigation in days after planting, irrigation efficiency, and events checked against the irrigation code (ADR 0020). |
+
+| 0.16.1 (unreleased) | Residue, tillage and harvest events per treatment and rotation component, including fallows; same-date events, RESID/HARVS checks and harvest_management (ADR 0021). See the [field tables](../guide/experiment.md#residues-tillage-and-harvest). |
 
 ## Deliberately not built yet
 
@@ -38,7 +40,7 @@ Each of these is a later phase, kept out so the package stays small and each ste
 |---|---|
 | Full FileX or other output parsing | Six output files (Summary.OUT, PlantGro.OUT, SoilWat.OUT, PlantN.OUT, Weather.OUT, Evaluate.OUT) are read as of 0.9; reading other output files (ET.OUT, OVERVIEW.OUT, etc.) and full FileX parsing wait for later phases. |
 | Multi-field FileX with copied FileX, more crops | Several fields from scratch are supported as of 0.11.1; multiple fields for copied FileX and further crops wait for later phases. |
-| Other management operations | Planting, irrigation, and inorganic fertilizer are supported; operations like tillage, organic amendments, harvest, and chemical applications wait for later phases. |
+| Other management operations | Planting, irrigation, inorganic fertilizer, residue, tillage and harvest events are supported; chemical applications, day-based residue/harvest events and automatic residue/harvest blocks wait for later phases. |
 | Choosing a soil profile from DSSAT's own soil files | Only the user's own single-profile soil template is supported; selecting from existing `.SOL` libraries is a later step. |
 | Unit converters | The weather template is in DSSAT's own units, and nothing is converted silently. |
 | Gap filling or any automatic repair | `check()` reports problems and the user decides how to treat missing data. |

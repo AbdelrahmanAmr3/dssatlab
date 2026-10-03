@@ -82,7 +82,7 @@ treatments:
 
 Treatments are numbered 1..N in the order listed. In the written FileX, `EXP.DETAILS` and simulation controls (`SNAME`) use the first treatment name. Every treatment starts from the template's cultivar, planting details, and optional harvest date.
 
-To vary treatments, supply **experiment data** keyed by treatment number (`treatments: {2: {...}, 3: {...}}`). Any section you give—such as `fertilizer`, `irrigation`, `cultivar`, `planting`, `initial_conditions`, or `controls`—adds a new level and points that treatment to it:
+To vary treatments, supply **experiment data** keyed by treatment number (`treatments: {2: {...}, 3: {...}}`). Any section you give—such as `fertilizer`, `irrigation`, `cultivar`, `planting`, `residues`, `tillage`, `harvest`, `initial_conditions`, or `controls`—adds a new level and points that treatment to it:
 
 ```yaml
 # experiment.yaml
@@ -101,6 +101,7 @@ treatments:
 ```
 
 - A treatment with no entry (like treatment 1, `"Control"`) remains the unchanged base.
+- Residue, tillage and harvest events use the [field operation fields](experiment.md#residues-tillage-and-harvest), including RESID/HARVS checks and `controls.harvest_management` (HARVS: `"A"`, `"M"`, `"R"`, `"D"`).
 - Automatic irrigation and planting use the [controls fields](experiment.md#automatic-management); the template's IRRIG R and PLANT R defaults stay unchanged until overridden. Irrigation also accepts [day events and an efficiency dict](management.md#irrigation-timing-and-efficiency), checked against IRRIG.
 - `initial_conditions: "off"` points the treatment at IC 0 instead of adding a level; DSSAT supplies initial soil water and nitrogen. See [simulation options and initial-condition details](experiment.md).
 - Each entry receives its own new level; equal levels are not shared (ADR 0010).

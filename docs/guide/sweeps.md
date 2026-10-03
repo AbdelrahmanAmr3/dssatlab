@@ -32,10 +32,11 @@ both planting dates; the sweep does not move event dates automatically.
 ## Factors and labels
 
 `factors` must be a non-empty Python dict. Its keys are experiment data sections:
-`planting`, `irrigation`, `fertilizer`, `cultivar`, `initial_conditions`,
+`planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, `harvest`, `cultivar`, `initial_conditions`,
 `controls` or `rotation`. Each maps a non-empty dict of labels to complete
 section values, using the same fields and checks as
-[experiment data](experiment.md). For `rotation`, supply the whole section keyed
+[experiment data](experiment.md), including the
+[field operation columns and ranges](experiment.md#residues-tillage-and-harvest). For `rotation`, supply the whole section keyed
 by rotation component R number, as in [sequence analysis](sequence.md).
 
 `controls` factors can vary the [automatic irrigation and planting fields](experiment.md#automatic-management).

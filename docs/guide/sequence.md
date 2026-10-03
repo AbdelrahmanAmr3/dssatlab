@@ -75,7 +75,7 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    FileX NYERS 10: the sequence runs from 1978-04-20 through 1988-04-18, after the weather data ends (1987-12-31). Supply weather through 1988-04-18, or fewer years.
    ```
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
-6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
+6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop or fallow components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
 ## Weather and replicate settings in DSSAT sample sequence files
 
@@ -221,7 +221,8 @@ When a crop is harvested at maturity (`harvest_date` omitted), DSSAT determines 
 
 ## Experiment data per rotation component
 
-Give each crop its own planting, cultivar, fertilizer or irrigation in experiment data. Put
+Give each crop its own planting, cultivar, fertilizer, irrigation, residues, tillage or
+harvest in experiment data; fallows take residues, tillage and harvest. Put
 `rotation` beside `controls` under the treatment number: it is a dictionary keyed by the
 rotation component's **R number**, as shown in the FileX TREATMENTS row and Summary's `R#`.
 For a rotation FileX template, R 1 is the first entry of the template's `rotation` list,
@@ -240,17 +241,24 @@ treatments:
           - {date: "1978-04-20", material: FE005, application: AP001, depth: 5, n: 60}
         irrigation:
           - {date: "1978-05-01", amount: 25, method: IR001}
+      2:
+        tillage:
+          - {date: "1978-08-01", implement: "TI005", depth: 20}
+          - {date: "1978-08-01", implement: "TI003", depth: 10}
+        harvest:
+          - {date: "1978-11-14"}
       3:
         cultivar: {crop: WH, code: IB1500}
         fertilizer:
           - {date: "1978-11-15", material: FE005, application: AP001, depth: 5, n: 40}
 ```
 
-Each component takes optional `planting`, `cultivar`, `fertilizer` and `irrigation` with the
+Each crop component takes optional `planting`, `cultivar`, `fertilizer`, `irrigation`,
+`residues`, `tillage` and `harvest` with the
 same fields, units and checks as a [single treatment](experiment.md), except that
 irrigation accepts dated events in list form only. `days_after_planting` (IDATE)
 and the `{efficiency, events}` dict (EFIR) are rejected per component; irrigation
-management belongs to the treatment. Pass the YAML path or
+management is read from each component's SM level. Pass the YAML path or
 an equivalent Python dict through `management=`:
 
 ```python
@@ -272,17 +280,66 @@ cycle, with DSSAT advancing the dates along with the component.
 
 `write_experiment_template()` includes a commented `rotation` example. For a sequence,
 replace the single-treatment sections with that example and keep only `years` and
-`start_date` in `controls`. Initial conditions, harvest and controls per component are
-not supported. Fallow components take no edits, and a cultivar must keep the component's
-crop. `check()` rejects `rotation` on a non-sequence treatment and unknown R numbers, for
+`start_date` in `controls`. Initial conditions and controls per component are not
+supported. Fallow components take only `residues`, `tillage` and `harvest`; planting,
+cultivar, fertilizer and irrigation are rejected. A fallow's `harvest: []` is rejected
+because it needs its scheduled end; omit `harvest` to keep the FileX end. A cultivar
+must keep the component's crop. `check()` rejects `rotation` on a non-sequence treatment and unknown R numbers, for
 example: "the sequence has rotation components R 1-4. Use one of those numbers."
+
+### Field operation fields per component
+
+| Section | Field | DSSAT column | Required | Units / allowed values |
+|---|---|---|---|---|
+| `residues` | `date` | RDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `residues` | `material` | RCOD | Yes | `[A-Za-z]{2}[0-9]{3}`: two ASCII letters + three digits |
+| `residues` | `amount` | RAMT | Yes | kg/ha, strictly above 0 |
+| `residues` | `n` | RESN | No | %, 0 to 100 inclusive |
+| `residues` | `p` | RESP | No | %, 0 to 100 inclusive |
+| `residues` | `k` | RESK | No | %, 0 to 100 inclusive |
+| `residues` | `incorporation` | RINP | No | %, 0 to 100 inclusive |
+| `residues` | `depth` | RDEP | No | cm, at least 0 |
+| `residues` | `method` | RMET | No | `[A-Za-z]{2}[0-9]{3}` |
+| `tillage` | `date` | TDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `tillage` | `implement` | TIMPL | Yes | `[A-Za-z]{2}[0-9]{3}` |
+| `tillage` | `depth` | TDEP | Yes | cm, at least 0 |
+| `harvest` | `date` | HDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `harvest` | `stage` | HSTG | No | `[A-Za-z]{2}[0-9]{3}` |
+| `harvest` | `component` | HCOM | No | 1 to 5 printable ASCII characters without spaces (`[!-~]{1,5}`) |
+| `harvest` | `size` | HSIZE | No | 1 to 5 printable ASCII characters without spaces (`[!-~]{1,5}`) |
+| `harvest` | `product_percent` | HPC | No | %, 0 to 100 inclusive |
+| `harvest` | `byproduct_percent` | HBPC | No | %, 0 to 100 inclusive |
+
+Each section is a list of event dicts. Dates must be in non-descending order;
+several events on the same date are allowed and keep their supplied order.
+Irrigation and fertilizer still require unique, ascending dates. These field
+operations accept calendar dates only, with no `days_after_planting` field.
+Numbers must be finite Python integers or floats, never strings or booleans.
+Unknown keys are rejected, and every value must fit its FileX column.
+Omitted optional fields and the names RENAME, TNAME and HNAME write DSSAT's -99.
+
+Omit a section to keep the FileX level, or give `[]` to set MR (residues), MT
+(tillage) or MH (harvest) to 0. A fallow's `harvest: []` is rejected because it
+needs its scheduled end; omit `harvest` to keep that end.
+
+Residue events need the component's RESID `"R"`; `"D"` and `"N"` reject non-empty
+`residues`. Harvest events need its HARVS `"R"` or `"M"`; `"A"` and `"D"`
+reject non-empty `harvest`. Empty lists do not trigger code problems. Tillage
+has no code check; the component's TILL `"Y"` applies tillage. Generated templates
+keep TILL `"N"`, so the tillage example above writes events but applying them
+requires a copied FileX with that component at TILL `"Y"`. The codes are
+never changed for you. For a single treatment, `controls.harvest_management`
+sets HARVS (`"A"`, `"M"`, `"R"`, `"D"`); a sequence accepts only `years` and
+`start_date` in treatment controls, so change component codes in the copied
+FileX itself. See the [code rules and measured harvest behaviour](experiment.md#residues-tillage-and-harvest)
+and [ADR 0021](../adr/0021-field-operations-as-event-sections.md).
 
 ### Keep dates inside the component's period
 
-DSSAT applies a component's fertilizer and irrigation only while that component runs.
-It silently skips events outside that period. Before writing files, `check()` checks
-planting overrides and every event date against the known dates in the **first cycle**,
-including planting overrides:
+DSSAT can silently skip fertilizer and irrigation outside a component's period.
+Before writing files, `check()` checks planting overrides and every supplied fertilizer,
+irrigation, residue, tillage and harvest event date against the known dates in the
+**first cycle**, including planting overrides:
 
 - The lower bound is strictly after the previous component's last known date: its harvest
   or fallow end, otherwise its planting date. For the first component, dates must be on
@@ -296,6 +353,14 @@ For example, wheat fertilizer on October 1 falls before the preceding fallow end
 ```text
 Management data treatment 1, rotation component 3, fertilizer, event 1, field 'date': 1978-10-01 is not after rotation component 2's end (1978-11-14). DSSAT applies a component's events only while it runs and would skip this one without a warning. Move the date into the component's period.
 ```
+
+Under effective HARVS `"R"`, the latest supplied `harvest` event date replaces the
+component's known end, including a fallow's `end_date`. The following component's
+checks use that end. For a rotation FileX template, editing the final component's
+harvest also updates the default cycle length, cycle-closure and weather coverage
+checks. Under HARVS `"M"`, HDATE supplies no end bound even if populated: the report
+prints the existing skipped-bound note, and the next known component date may still
+give an upper bound. The actual maturity date remains unknown before the run.
 
 An unreadable or `-99` FileX date supplies no bound; the check report notes which bound
 could not be checked. Dates are also checked against the supplied weather range.

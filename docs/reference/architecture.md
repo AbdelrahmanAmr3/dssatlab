@@ -18,10 +18,11 @@ The codebase under `src/dssatlab/` includes these modules:
 - `filex.py`: Reads a FileX to extract field station codes (`WSTA`), field soil profile IDs (`ID_SOIL`), and simulation controls (`START`, `SDATE`) for a treatment.
 - `filex_skeleton.py`: Formats and writes a minimal FileX from scratch for template simulations.
 - `filex_template.py`: Writes the FileX template YAML (`write_filex_template`), validates template structure and cultivar codes, resolves the DSSAT data directory, and lists installed template crops and cultivars (`list_crops`, `list_cultivars`).
-- `filex_write.py`: Modifies FileX text to append new management levels (planting details, irrigation schedules, fertilizer applications) and repoints treatment entries without altering other sections.
+- `filex_write.py`: Modifies FileX text to append new management levels (planting details, irrigation schedules, fertilizer applications, residues, tillage and harvest) and repoints treatment entries without altering other sections.
 - `initial_conditions.py`: Checks the experiment `initial_conditions` section (depths, ranges, soil depth) and writes a new `INITIAL CONDITIONS` level in the copied FileX.
 - `installer.py`: Builds and installs DSSAT from source on Linux within a short cache prefix using Git, CMake, and gfortran.
 - `management.py`: Validates management dictionary shape, field keys, numeric bounds, date order, and start date / weather bounds; formats structured check report lines.
+- `operations.py`: Holds residue, tillage and harvest field tables, event checks (including RESID/HARVS), component harvest end rules and FileX row values ([fields and columns](../guide/experiment.md#residues-tillage-and-harvest)).
 - `management_file.py`: Writes the YAML management template (`write_management_template`) and provides strict YAML loading (`_load_management`) using PyYAML SafeLoader with duplicate key rejection.
 - `observed.py`: Writes the commented observed data template (`write_observed_template`) and privately loads and checks CSV/DataFrame/list-of-dict measurements in DSSAT's own units.
 - `outputs.py`: Reads Summary, Plant growth, soil water, plant nitrogen and weather using fixed-width headers, and the DSSAT evaluation (`Evaluate.OUT`) using whitespace-separated columns. Converts missing values to `None`; DSSAT evaluation dates stay as days after planting. Also builds DataFrames (`to_dataframe`).

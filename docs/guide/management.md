@@ -2,7 +2,7 @@
 
 A `Simulation` can combine one treatment of an existing FileX with your daily
 weather data, your soil profile, and your own management operations (planting,
-irrigation schedules, and fertilizer applications). Prepare the FileX and its
+irrigation schedules, fertilizer applications, residues, tillage and harvest). Prepare the FileX and its
 supporting files, then [find or install a DSSAT executable](install.md). The examples use
 `UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
 
@@ -70,6 +70,10 @@ treatments:
         p: 20.0                   # Elemental phosphorus applied, kg/ha (must be >= 0)
         k: 10.0                   # Elemental potassium applied, kg/ha (must be >= 0)
 ```
+
+For residue, tillage and harvest comments too, use
+`dl.write_experiment_template("experiment.yaml")`; `write_management_template()`
+continues to cover planting, irrigation and fertilizer.
 
 ### Quoted ISO dates
 
@@ -166,6 +170,80 @@ the FileX. Rotation components accept dated events in list form only; day events
 and the efficiency dict are rejected. Values must also fit their FileX columns.
 See [ADR 0020](../adr/0020-automatic-management-as-controls-fields.md).
 
+## Residue, tillage and harvest events
+
+```yaml
+treatments:
+  1:
+    controls: {residue: "R", tillage: "Y", harvest_management: "R"}
+    residues:
+      - {date: "1982-02-25", material: "RE001", amount: 1500, n: 0.8, depth: 15}
+    tillage:
+      - {date: "1982-02-25", implement: "TI005", depth: 20}
+      - {date: "1982-02-25", implement: "TI003", depth: 10}
+    harvest:
+      - {date: "1982-06-30", stage: "GS003", component: "IBHCS", size: "IBHCS", product_percent: 100, byproduct_percent: 100}
+```
+
+| Section | Field | DSSAT column | Required | Units / allowed values |
+|---|---|---|---|---|
+| `residues` | `date` | RDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `residues` | `material` | RCOD | Yes | `[A-Za-z]{2}[0-9]{3}`: two ASCII letters + three digits |
+| `residues` | `amount` | RAMT | Yes | kg/ha, strictly above 0 |
+| `residues` | `n` | RESN | No | %, 0 to 100 inclusive |
+| `residues` | `p` | RESP | No | %, 0 to 100 inclusive |
+| `residues` | `k` | RESK | No | %, 0 to 100 inclusive |
+| `residues` | `incorporation` | RINP | No | %, 0 to 100 inclusive |
+| `residues` | `depth` | RDEP | No | cm, at least 0 |
+| `residues` | `method` | RMET | No | `[A-Za-z]{2}[0-9]{3}` |
+| `tillage` | `date` | TDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `tillage` | `implement` | TIMPL | Yes | `[A-Za-z]{2}[0-9]{3}` |
+| `tillage` | `depth` | TDEP | Yes | cm, at least 0 |
+| `harvest` | `date` | HDATE | Yes | Valid quoted `"YYYY-MM-DD"` string, within weather range |
+| `harvest` | `stage` | HSTG | No | `[A-Za-z]{2}[0-9]{3}` |
+| `harvest` | `component` | HCOM | No | 1 to 5 printable ASCII characters without spaces (`[!-~]{1,5}`) |
+| `harvest` | `size` | HSIZE | No | 1 to 5 printable ASCII characters without spaces (`[!-~]{1,5}`) |
+| `harvest` | `product_percent` | HPC | No | %, 0 to 100 inclusive |
+| `harvest` | `byproduct_percent` | HBPC | No | %, 0 to 100 inclusive |
+
+Each section is a list of event dicts. Dates must be in non-descending order;
+several events on the same date are allowed and keep their supplied order.
+Irrigation and fertilizer still require unique, ascending dates. These field
+operations accept calendar dates only, with no `days_after_planting` field.
+Numbers must be finite Python integers or floats, never strings or booleans.
+Unknown keys are rejected, and every value must fit its FileX column.
+Omitted optional fields and the names RENAME, TNAME and HNAME write DSSAT's -99.
+
+Omit a section to keep the FileX level, or give `[]` to set MR (residues), MT
+(tillage) or MH (harvest) to 0. A fallow's `harvest: []` is rejected because it
+needs its scheduled end; omit `harvest` to keep that end.
+
+For a treatment, `check()` uses `controls.residue` (RESID) and
+`controls.harvest_management` (HARVS) when supplied, otherwise the treatment's
+SIMULATION CONTROLS level. Codes are quoted, case-sensitive strings:
+
+| Controls field | DSSAT column | Allowed codes | Allowed supplied events |
+|---|---|---|---|
+| `residue` | RESID | `"R"`, `"D"`, `"N"` | R accepts dated residue events; D and N reject non-empty `residues` |
+| `harvest_management` | HARVS | `"A"`, `"M"`, `"R"`, `"D"` | R and M accept dated harvest events; A and D reject non-empty `harvest` |
+| `tillage` | TILL | `"Y"`, `"N"` | Y applies tillage; there is no tillage/event code check |
+
+RESID D and HARVS D read days after planting, which these sections do not
+support. RESID N ignores residue events; HARVS A uses the automatic harvest
+block, which cannot yet be edited through experiment data. HARVS G is not
+accepted. Empty lists do not trigger RESID/HARVS code problems. The checks ask
+you to change the code or remove the events; dssatlab never changes a code for you.
+The check for HARVS R without any harvest event is still a follow-up
+([#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192)).
+
+For sequences, the codes come from each component's own SM level; component
+`controls` edits are not supported. See the
+[component period rules](sequence.md#keep-dates-inside-the-components-period).
+
+For the measured harvest behaviour, see
+[Checked on real DSSAT](experiment.md#checked-on-real-dssat) and
+[ADR 0021](../adr/0021-field-operations-as-event-sections.md).
+
 ## The check() report and rules
 
 Instantiate `Simulation` with your management YAML file or dictionary:
@@ -203,12 +281,12 @@ raising an exception.
 ### Validation rules
 
 1. **Unknown keys are rejected**: Only documented template fields are accepted. Misspelled or extra keys fail immediately without guessing.
-2. **Dates within weather range**: Every event date (planting, irrigation, fertilizer) for the selected treatment must fall within the range of dates provided in your weather data.
+2. **Dates within weather range**: Every event date (planting, irrigation, fertilizer, residues, tillage, harvest) for the selected treatment must fall within the range of dates provided in your weather data.
 3. **Planting on or after simulation start date**: Planting date cannot precede the simulation start date (`SDATE` when `START == "S"` in the FileX).
-4. **Ascending and unique event timing**: Irrigation and fertilizer event lists must be strictly ordered without duplicates. Irrigation uses either dates or days after planting throughout the list, matching the effective IRRIG code above.
+4. **Ascending and unique event timing**: Irrigation and fertilizer event lists must be strictly ordered without duplicates. Irrigation uses either dates or days after planting throughout the list, matching the effective IRRIG code above. Residue, tillage and harvest lists allow several events on the same date, in non-descending order.
 5. **Empty list versus omitted section**:
-   - **Omitted section**: If `planting`, `irrigation`, or `fertilizer` is omitted for a treatment, the FileX's original Level for that section is kept unchanged.
-   - **Empty list (`[]`)**: If `irrigation: []` or `fertilizer: []` is supplied, it explicitly requests **no events** for that treatment (repointed to Level 0).
+   - **Omitted section**: If `planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, or `harvest` is omitted for a treatment, the FileX's original Level for that section is kept unchanged.
+   - **Empty list (`[]`)**: If `irrigation: []`, `fertilizer: []`, `residues: []`, `tillage: []`, or `harvest: []` is supplied, it explicitly requests **no events** for that treatment (repointed to Level 0).
 6. **One rejected item stops the run**: `sim.run()` repeats all checks. If any problem is found anywhere in weather, soil, FileX, or management, execution halts and raises `DSSATCheckError`. No files or folders are written.
 7. **User's FileX is never edited**: dssatlab copies the FileX into the dated simulation folder and applies changes only to the copy. The original FileX on disk is never modified.
 
@@ -233,8 +311,8 @@ else:
 `sim.run()` creates a dated simulation folder (`dssat_sim_YYYY-MM-DD_HHMMSS`) beside the FileX.
 Inside the simulation folder, it copies supporting files (`.CUL`, `.ECO`, `.SPE`, and `.SOL`
 if no custom soil was provided), generates the weather file, and edits the copied FileX:
-it appends new levels for your planting, irrigation, or fertilizer schedules, and repoints
-the selected treatment row (`MP`, `MI`, or `MF`). DSSAT then executes against this isolated
+it appends new levels for your planting, irrigation, fertilizer, residue, tillage or harvest
+schedules, and repoints the selected treatment row (`MP`, `MI`, `MF`, `MR`, `MT` or `MH`). DSSAT then executes against this isolated
 copy.
 
 A successful call returns a [RunResult](run-filex.md#inspect-the-run-result).
