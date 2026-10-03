@@ -29,8 +29,7 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.14.2 | Bug fixes for DSSAT course files: fixed-column treatment rows (ADR 0018), stock FileA/FileT headers, soil text codes and optional `scom`, and experiment-named outputs with FNAME=Y. |
 | 0.15.0 | Checked simulation options in experiment data controls, eight initial-condition detail fields, initial conditions off (ADR 0019), and a check for one-row treatment numbers colliding with a sequence number (#168). |
 | 0.16.0 | Automatic management in experiment data controls: irrigation and planting management codes, automatic irrigation and planting window fields, irrigation in days after planting, irrigation efficiency, and events checked against the irrigation code (ADR 0020). |
-
-| 0.16.1 (unreleased) | Residue, tillage and harvest events per treatment and rotation component, including fallows; same-date events, RESID/HARVS checks and harvest_management (ADR 0021). See the [field tables](../guide/experiment.md#residues-tillage-and-harvest). |
+| 0.16.1 (current) | Residue, tillage and harvest events per treatment and rotation component, including fallows; same-date events, RESID/HARVS checks and harvest_management (ADR 0021). See the [field tables](../guide/experiment.md#residues-tillage-and-harvest). |
 
 ## Deliberately not built yet
 
