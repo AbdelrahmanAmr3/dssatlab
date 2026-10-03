@@ -9,6 +9,7 @@ from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
 from .filex import _filex_date, _weather_filename
 from .sequence import _sequence_end, _sequence_stop
+from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
 
@@ -239,3 +240,91 @@ def _write_simulation_weather(source, rows, folder, values):
             shutil.copy2(path, folder / path.name.upper())
     else:
         write_weather_file(rows, folder / _weather_filename(values["WSTA"], values["SDATE"]))
+
+
+def _stock_soil_path(source):
+    """Return a stock path, or None for a soil-template source."""
+    if isinstance(source, (str, Path)) and Path(source).suffix.upper() == ".SOL":
+        return Path(source)
+    return None
+
+
+def _soil_source_problems(source, *, template=False):
+    """Reject stock soil for a FileX template before reading any field source."""
+    sources = source.values() if isinstance(source, dict) else [source]
+    if template and any(_stock_soil_path(value) is not None for value in sources):
+        return ["A stock soil file needs a copied FileX. "
+                "Supply soil data rows for a FileX template."]
+    return []
+
+
+def _read_stock_soil(path, soil_id):
+    """Check only profile IDs and the filename DSSAT opens, without layer parsing."""
+    try:
+        lines = path.read_text(encoding="latin-1").splitlines()
+    except (OSError, ValueError) as error:
+        return [f"Cannot read stock soil file {path}: {error}. "
+                "Supply a readable stock soil file path."]
+    ids = []
+    for line in lines:
+        if line.startswith("*") and not line.upper().startswith("*SOILS"):
+            tokens = line[1:].split()
+            if tokens and tokens[0] not in ids:
+                ids.append(tokens[0])
+    if not soil_id or soil_id == "-99":
+        return ["FileX has no readable ID_SOIL in the selected treatment's FIELDS row. "
+                f"Supply ID_SOIL matching a profile in stock soil file {path}. "
+                f"IDs found: {', '.join(ids) or 'none'}."]
+    problems = []
+    if soil_id not in ids:
+        problems.append(f"Stock soil file {path}: FileX ID_SOIL {soil_id!r} is not in the file. "
+                        f"IDs found: {', '.join(ids) or 'none'}. "
+                        "Supply a file containing that ID or correct the FileX ID_SOIL.")
+    # DSSAT-CSM, InputModule/ipexp.for, IPEXP (soil profile input selection):
+    # FILES_a = 'SOIL.SOL'; FILES_b = SLNO(1:2)//'.SOL '. INQUIRE checks
+    # these exact names in the current directory before the data directory.
+    # https://github.com/DSSAT/dssat-csm-os/blob/develop/InputModule/ipexp.for
+    names = (f"{soil_id[:2]}.SOL", "SOIL.SOL")
+    if path.name not in names:
+        problems.append(f"Stock soil file {path}: DSSAT does not look up this name "
+                        f"for ID_SOIL {soil_id!r}. Expected {', '.join(names)}. "
+                        "Rename the file or correct the FileX ID_SOIL; "
+                        "filenames are case-sensitive on Linux.")
+    return problems
+
+
+def _simulation_soil(sim, values, edit_identity):
+    """Read either soil source; stock profiles keep the copied FileX's ID_SOIL."""
+    if sim.soil is None:
+        return [], [], None
+    path = _stock_soil_path(sim.soil)
+    soil_id = values.get("ID_SOIL")
+    if path is not None:
+        return [], _read_stock_soil(path, soil_id), None
+    rows, problems = _parse_soil(sim.soil)
+    if isinstance(sim.soil, dict):
+        problems.append("Soil data per field needs a FileX template. "
+                        "Supply one soil source for a FileX.")
+    template_id = rows[0]["soil_id"] if not problems else None
+    soil_ids = {row["soil_id"] for row in rows if "soil_id" in row}
+    if not edit_identity and (not soil_id or soil_id == "-99"):
+        problems.append("FileX has no readable ID_SOIL in the selected "
+                        "treatment's FIELDS row. Supply ID_SOIL "
+                        "equal to the soil template's soil_id.")
+    elif not edit_identity and len(soil_ids) == 1:
+        template_id = soil_ids.pop()
+        if soil_id != template_id:
+            problems.append(f"FileX ID_SOIL {soil_id!r} for treatment "
+                            f"{sim.treatment} differs from the soil template's "
+                            f"soil_id {template_id!r}. Make the IDs exactly equal; "
+                            "filenames are case-sensitive on Linux.")
+    return rows, problems, template_id
+
+
+def _write_simulation_soil(source, rows, folder):
+    """Copy stock bytes under their own name, or write template soil."""
+    path = _stock_soil_path(source)
+    if path is not None:
+        shutil.copy2(path, folder / path.name)
+    elif source is not None:
+        write_soil_file(rows, folder / "SOIL.SOL")

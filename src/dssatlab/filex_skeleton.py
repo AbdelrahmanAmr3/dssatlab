@@ -16,7 +16,7 @@ from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .management import _check_management, _report_lines
 from .runner import _create_dated_folder
 from .soil import _parse_soil, _write_soil_profiles
-from .stock import _parse_template_weather, _weather_source_problems
+from .stock import _parse_template_weather, _soil_source_problems, _weather_source_problems
 from .weather import _dssat_date, write_weather_file
 
 
@@ -24,7 +24,8 @@ def _parse_field_data(source, count, kind):
     """Check field keys against fields 1..count (any keys if count is None) and parse each source."""
     label = f"{kind.capitalize()} data"
     parser = _parse_template_weather if kind == "weather" else _parse_soil
-    if kind == "weather" and (problems := _weather_source_problems(source, template=True)):
+    source_problems = _weather_source_problems if kind == "weather" else _soil_source_problems
+    if problems := source_problems(source, template=True):
         return {}, problems, _report_lines(label, problems)
     if source is None and kind == "soil":
         problems = ["Soil data is required with a FileX template. Supply soil=..."]
@@ -136,7 +137,6 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         else:
             found, lines = _check_management(
                 experiment_data, None, sim.treatment, weather, start,
-                max(row["slb"] for row in soil) if soil and not soil_problems else None,
                 text=text, cultivar_path=cultivar_path)
             problems.extend(found)
             report.extend(lines)
