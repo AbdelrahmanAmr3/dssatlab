@@ -3,6 +3,13 @@
 from datetime import date, timedelta
 from pathlib import Path
 import re
+import shutil
+
+from .controls import _controls_start_date, _selected_controls
+from .experiment import _overrides_section
+from .filex import _filex_date, _weather_filename
+from .sequence import _sequence_end, _sequence_stop
+from .weather import _parse_weather, write_weather_file
 
 
 def _header_spans(header):
@@ -115,7 +122,8 @@ def _read_weather_file(path):
     return rows, []
 
 
-def _read_stock_weather(source, station, start_date, end_date=None) -> tuple[list[dict], list[str]]:
+def _read_stock_weather(source, station, start_date, end_date=None, *,
+                        check_names=True) -> tuple[list[dict], list[str]]:
     """Read a stock path or list of paths into weather template rows and problems.
 
     station is the checked FileX WSTA (four or eight characters). start_date
@@ -142,7 +150,7 @@ def _read_stock_weather(source, station, start_date, end_date=None) -> tuple[lis
         problems.extend(read_problems)
         if read_problems:
             continue
-        if name not in names:
+        if check_names and name not in names:
             problems.append(f"Stock weather file {path}: DSSAT does not look up this name "
                             f"for WSTA {station!r} in the simulated years. Expected "
                             f"{', '.join(names)}. Rename the file or correct the FileX WSTA.")
@@ -157,3 +165,77 @@ def _read_stock_weather(source, station, start_date, end_date=None) -> tuple[lis
             previous_year = day.year
             rows.append(row)
     return rows, problems
+
+
+def _stock_weather_paths(source):
+    """Return stock paths, or None for a weather-template source."""
+    paths = source if isinstance(source, list) else [source]
+    if paths and all(isinstance(path, (str, Path)) and Path(path).suffix.upper() == ".WTH"
+                     for path in paths):
+        return [Path(path) for path in paths]
+    return None
+
+
+def _weather_source_problems(source, *, template=False):
+    """Reject mixed lists and stock sources for a FileX template before reading."""
+    if isinstance(source, list):
+        paths = [isinstance(item, (str, Path)) for item in source]
+        if any(paths) and not all(paths):
+            return ["Weather data mixes file paths and data rows. Supply only stock "
+                    "weather file paths, or only weather data rows or a DataFrame."]
+    sources = source.values() if isinstance(source, dict) else [source]
+    if template and any(_stock_weather_paths(value) for value in sources):
+        return ["A stock weather file needs a copied FileX. "
+                "Supply weather data rows for a FileX template."]
+    return []
+
+
+def _parse_template_weather(source):
+    problems = _weather_source_problems(source, template=True)
+    return ([], problems) if problems else _parse_weather(source)
+
+
+def _simulation_weather(sim, values, experiment_data, components):
+    """Read either weather source, sharing checks and the sequence end rule."""
+    problems = _weather_source_problems(sim.weather)
+    if problems:
+        return [], problems
+    paths = _stock_weather_paths(sim.weather)
+    if paths is None:
+        return _parse_weather(sim.weather)
+    start = (_controls_start_date(experiment_data, sim.treatment)
+             or _filex_date(values.get("SDATE")))
+    if start is None or "WSTA" not in values:
+        # The FileX checks explain what is missing; do not guess a weather century.
+        return [], []
+    years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
+    try:
+        years = max(1, int(years))
+    except (TypeError, ValueError, OverflowError):
+        years = 1  # Ordinary controls checks report invalid years.
+    end = date(min(date.max.year, start.year + years - 1), 12, 31)
+    if len(components) > 1:
+        stop = _sequence_stop(start, years)
+        if stop is not None:
+            end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
+    station = values["WSTA"]
+    if _overrides_section(experiment_data, sim.treatment):
+        station = paths[0].name[:4].upper()  # The copied field gets this station.
+    # A station mismatch is reported by Simulation with the template wording;
+    # avoid a second name-lookup problem for the same mismatch.
+    same_station = all(path.name[:4].upper() == station[:4] for path in paths)
+    rows, problems = _read_stock_weather(paths, station, start, end, check_names=same_station)
+    if not rows and problems:
+        return [], problems  # Do not add "no daily rows" for unreadable stock files.
+    rows, checks = _parse_weather(rows)
+    return rows, problems + checks
+
+
+def _write_simulation_weather(source, rows, folder, values):
+    """Copy stock bytes under uppercase names, or write template weather."""
+    paths = _stock_weather_paths(source)
+    if paths is not None:
+        for path in paths:
+            shutil.copy2(path, folder / path.name.upper())
+    else:
+        write_weather_file(rows, folder / _weather_filename(values["WSTA"], values["SDATE"]))

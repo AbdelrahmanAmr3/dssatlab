@@ -265,7 +265,7 @@ def test_all_problems_stop_before_writing_or_running(
     listing = set(inputs.filex.parent.iterdir())
     forbidden = Mock(side_effect=AssertionError("checks must finish before writing"))
     monkeypatch.setattr(Path, "mkdir", forbidden)
-    monkeypatch.setattr(simulation_module, "write_weather_file", forbidden)
+    monkeypatch.setattr("dssatlab.stock.write_weather_file", forbidden)
 
     with pytest.raises(DSSATCheckError) as error:
         sim.run()
