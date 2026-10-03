@@ -40,6 +40,10 @@ def test_experiment_template_documents_and_checks_residue_example(sim, tmp_path,
              "@N OUTPUTS     FROPT\n 1 OU              1\n")
     text = text.replace("*FIELDS", "*CULTIVARS\n@C CR INGENO CNAME\n 1 MZ IB0035 Example\n\n*FIELDS")
     sim.filex.write_text(text, encoding="latin-1")
+    # The shared fixture adds an odd-cased MZCER048.cUl; two .CUL files for one crop are rejected.
+    for old in sim.filex.parent.iterdir():
+        if old.suffix.lower() == ".cul":
+            old.unlink()
     (sim.filex.parent / "MZCER048.CUL").write_text("@VAR#  NAME\nIB0035 Example\n")
     start = date(1982, 2, 24)
     sim.weather = [dict(sim.weather[0], date=(start + timedelta(days=i)).isoformat()) for i in range(40)]
