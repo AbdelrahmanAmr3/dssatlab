@@ -171,7 +171,7 @@ def _check_treatment_key(key, seen_numbers, text, filex):
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
                  soil_depth, cultivar_path, *, start_date_note=None):
     from .irrigation import _check_irrigation
-    from .operations import _OPERATION_FIELDS, _check_operation_events
+    from .operations import _OPERATION_FIELDS, _check_operation
 
     sections = ("planting", "irrigation", "fertilizer", *_OPERATION_FIELDS,
                 "cultivar", "initial_conditions", "controls")
@@ -193,7 +193,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
             section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
             lines = _report_lines(label, section_problems)
         elif section in _OPERATION_FIELDS:
-            section_problems, lines = _check_operation_events(entry[section], section, where, weather_range)
+            section_problems, lines = _check_operation(entry, number, section, where, text, weather_range)
         else:
             section_problems, lines = _check_events(entry[section], section, where, weather_range)
         if section in entry and not section_problems and not entry_problems and text is not None:

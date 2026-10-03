@@ -86,6 +86,8 @@ _EXPERIMENT_SECTIONS_TEXT = """
     # Optional n (RESN), p (RESP), k (RESK), incorporation (RINP): % from 0 to 100.
     # Optional depth (RDEP): cm >= 0; method (RMET). Unknown keys rejected.
     # Omitted optional fields and RENAME/TNAME/HNAME write -99.
+    # Residue events need RESID "R"; harvest events need HARVS "R" or "M".
+    # Set controls residue/harvest_management to those codes, or remove the events; codes are never changed for you.
     # residues:
     #   - {date: "1982-02-25", material: "RE001", amount: 1500}
     # Tillage: required implement (TIMPL), depth (TDEP): cm >= 0; controls tillage "Y" applies tillage (TILL).
@@ -149,6 +151,7 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # Management codes are quoted, case-sensitive strings, not booleans or numbers.
       # irrigation_management: "R" # DSSAT IRRIG: "A", "N", "F", "R", "D", "P", "W"
       # planting_management: "R"   # DSSAT PLANT: "A", "F", "R"
+      # harvest_management: "R"    # DSSAT HARVS: "A", "M", "R", "D"
       # Automatic irrigation numbers are finite, not booleans; omitted values stay unchanged.
       # auto_irrigation_depth: 30       # DSSAT IMDEP, cm: a number above 0
       # auto_irrigation_threshold: 50   # DSSAT ITHRL, %: a number from 0 to 100 inclusive
@@ -225,11 +228,7 @@ def _write_template(path, text, label, filex):
 
 
 def _load_management(source):
-    """Load management data from a YAML path or pass through a dict.
-
-    Returns:
-        tuple[Any, list[str]]: (loaded_dict_or_source, list_of_problems).
-    """
+    """Return (loaded data, problems) from a YAML path or a passed-through dict."""
     return _load_yaml(source, "Management", "a 'treatments' key")
 
 

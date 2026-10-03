@@ -6,6 +6,8 @@ from datetime import date
 import pytest
 
 from dssatlab import DSSATCheckError
+from test_controls_options import option_sim
+from test_management_file import sim_inputs
 from test_planting_run import TREATMENT, seen
 from test_residues import SECTION, sim
 from test_simulation_run import fake_dssat, inputs, snapshot
@@ -239,3 +241,37 @@ def test_column_overflow_prevents_run(sim, seen, section, field, value):
     with pytest.raises(DSSATCheckError):
         sim.run()
     assert seen == []
+
+
+@pytest.mark.parametrize("filex_code,override", [
+    ("D", None), ("A", None), ("R", None), ("M", None),
+    ("M", "D"), ("M", "A"), ("D", "R"), ("A", "M"),
+])
+@pytest.mark.parametrize("empty", [False, True])
+def test_harvest_uses_effective_management_code(option_sim, capsys, filex_code, override, empty):
+    sim = option_sim
+    text = sim.filex.read_text(encoding="latin-1").replace(
+        " 1 MA              R     R     R     N     M",
+        f" 1 MA              R     R     R     N     {filex_code}")
+    text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 7 MA              R     R     R     N     D\n"
+    sim.filex.write_text(text, encoding="latin-1")
+    entry = sim.management["treatments"][1]
+    entry["harvest"] = [] if empty else [dict(CASES["harvest"]["event"])] * 2
+    if override is not None:
+        entry["controls"] = {"harvest_management": override}
+    original, management = sim.filex.read_bytes(), deepcopy(sim.management)
+    code = override or filex_code
+    expected = [] if empty or code in ("R", "M") else [
+        'Management data treatment 1, harvest: harvest events need the controls harvest_management '
+        f'"R" or "M", but it is "{code}". Set controls harvest_management to "R" or "M", '
+        'or remove the harvest events.']
+    assert sim.check() == expected
+    report = capsys.readouterr().out
+    assert f"harvest: {'REJECTED' if expected else 'OK'}" in report
+    assert all(problem in report for problem in expected)
+    assert sim.filex.read_bytes() == original and sim.management == management
+
+
+def test_tillage_has_no_management_code_check(option_sim):
+    option_sim.management["treatments"][1]["tillage"] = [dict(CASES["tillage"]["event"])]
+    assert option_sim.check(verbose=False) == []

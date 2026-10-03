@@ -6,6 +6,8 @@ from datetime import date
 import pytest
 
 from dssatlab import DSSATCheckError, Simulation
+from test_controls_options import option_sim
+from test_management_file import sim_inputs
 from test_planting_run import TREATMENT, seen
 from test_simulation_run import SAMPLE, fake_dssat, inputs, snapshot
 
@@ -198,3 +200,32 @@ def test_column_overflow_is_a_prewrite_problem(sim, seen, field, value):
     with pytest.raises(DSSATCheckError):
         sim.run()
     assert seen == []
+
+
+@pytest.mark.parametrize("filex_code,override", [
+    ("R", None), ("D", None), ("N", None), ("N", "R"), ("R", "D"), ("R", "N"),
+])
+@pytest.mark.parametrize("empty", [False, True])
+def test_residues_use_effective_management_code(option_sim, capsys, filex_code, override, empty):
+    sim = option_sim
+    text = sim.filex.read_text(encoding="latin-1").replace(
+        " 1 MA              R     R     R     N     M",
+        f" 1 MA              R     R     R     {filex_code}     M")
+    # A different SM level must not determine this treatment's code.
+    text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 7 MA              R     R     R     D     D\n"
+    sim.filex.write_text(text, encoding="latin-1")
+    entry = sim.management["treatments"][1]
+    entry["residues"] = [] if empty else [dict(EVENT), dict(EVENT)]
+    if override is not None:
+        entry["controls"] = {"residue": override}
+    original, management = sim.filex.read_bytes(), deepcopy(sim.management)
+    code = override or filex_code
+    expected = [] if empty or code == "R" else [
+        'Management data treatment 1, residues: residues events need the controls residue '
+        f'"R", but it is "{code}". Set controls residue to "R", '
+        'or remove the residues events.']
+    assert sim.check() == expected
+    report = capsys.readouterr().out
+    assert f"residues: {'REJECTED' if expected else 'OK'}" in report
+    assert all(problem in report for problem in expected)
+    assert sim.filex.read_bytes() == original and sim.management == management
