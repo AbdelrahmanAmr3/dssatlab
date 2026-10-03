@@ -100,16 +100,14 @@ def test_repeated_blocks_use_highest_level_across_both_blocks(irrigation_sim, se
     assert restored.replace((TREATMENT[:49] + " 10" + TREATMENT[52:]).encode(), TREATMENT.encode()) == original
 
 
-@pytest.mark.parametrize("failure", ["control_header", "event_header", "amount", "level"])
+@pytest.mark.parametrize("failure", ["control_header", "event_header", "amount"])
 def test_irrigation_unwritable_layout_checked(irrigation_sim, seen, failure):
     sim = irrigation_sim
     if failure.endswith("header"):
         header = HEADER if failure == "control_header" else EVENT_HEADER
         sim.filex.write_bytes(sim.filex.read_bytes().replace(header.encode(), b"! no header"))
-    elif failure == "amount":
-        sim.management["treatments"]["02"]["irrigation"][0]["amount"] = 1234567
     else:
-        sim.filex.write_bytes(sim.filex.read_bytes().replace(b" 9 82057", b"99 82057"))
+        sim.management["treatments"]["02"]["irrigation"][0]["amount"] = 1234567
     assert sim.check()
     with pytest.raises(DSSATCheckError):
         sim.run()

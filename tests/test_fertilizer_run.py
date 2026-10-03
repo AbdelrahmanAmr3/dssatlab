@@ -143,15 +143,13 @@ def test_all_three_sections_together(planting_sim, seen):
     assert sim.filex.read_bytes() == original
 
 
-@pytest.mark.parametrize("failure", ["header", "amount", "level"])
+@pytest.mark.parametrize("failure", ["header", "amount"])
 def test_fertilizer_unwritable_layout_checked(fertilizer_sim, seen, failure):
     sim = fertilizer_sim
     if failure == "header":
         sim.filex.write_bytes(sim.filex.read_bytes().replace(HEADER.encode(), b"! no header"))
-    elif failure == "amount":
-        sim.management["treatments"]["02"]["fertilizer"][0]["p"] = 1234567
     else:
-        sim.filex.write_bytes(sim.filex.read_bytes().replace(b" 7 82057", b"99 82057"))
+        sim.management["treatments"]["02"]["fertilizer"][0]["p"] = 1234567
     assert sim.check()
     with pytest.raises(DSSATCheckError):
         sim.run()

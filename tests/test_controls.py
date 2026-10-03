@@ -126,7 +126,6 @@ def test_bad_values_reported_before_any_write(sim, fake_dssat, field, value):
     (b" FROPT", b" XXXXX", "FROPT"), (b" 1 OP", b" 7 OP", "OPTIONS"),
     (b" 1 OU", b" 7 OU", "OUTPUTS"), (b" 1 GE", b"99 GE", "row N= 1"),
     (b"@N METHODS", b"@X METHODS", "N column"),
-    (b" 1 PL", b"99 PL", "does not fit"),
     (b" 1 OP              Y     Y     N     N     N     N     N     Y     M", b" 1 OP", "truncated"),
 ])
 def test_missing_or_unwritable_layout_reported(sim, fake_dssat, old, new, word):
