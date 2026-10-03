@@ -257,12 +257,15 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         return ordinary, [], []  # Sequence checks already report invalid R numbers.
     edits, problems = _rotation_keys(entry.get('rotation', {}), components, where)
     known, notes = _known_dates(components, template, text, start, edits, where)
-    if template is not None and known[0][1] is not None and known[-1][2] is not None:
+    cycle_start = (known[0][1] or _calendar_date(template[0].get('start_date'))
+                   if template is not None else None)
+    if cycle_start is not None and known[-1][2] is not None:
         for number, section in ((1, 'planting'), (known[-1][0], 'harvest')):
             if isinstance(edits.get(number), dict) and section in edits[number]:
                 from .rotation import _check_cycle_closure
                 problems.extend(_check_cycle_closure(
-                    known[0][1], known[-1][2], f'{where}, rotation component {number}, {section}'))
+                    cycle_start, known[-1][2], f'{where}, rotation component {number}, {section}',
+                    leading_fallow=known[0][3] == 'FA'))
                 break
     report = _report_lines('    rotation', problems) if problems else []
     for index, row in enumerate(components):
@@ -275,6 +278,12 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         override = edits.get(number, {})
         planting_override = isinstance(override, dict) and 'planting' in override
         _, planting, end, crop = known[index]
+        if index == 0 and crop == 'FA' and start is not None and end is not None and end <= start:
+            problem = (f'{where}, rotation component {number}: the leading fallow ends on {end}, '
+                       f'not after simulation start date {start}. Move controls start_date '
+                       'before the fallow end, or the fallow end later.')
+            problems.append(problem)
+            report.append(f'      {problem}')
         if crop != 'FA' and planting is not None and end is not None and end <= planting:
             component = template[index] if template is not None else {}
             original_planting = component.get('planting')

@@ -33,7 +33,8 @@ FIELDS = [
 @pytest.fixture
 def sim(inputs):
     text = SAMPLE.replace(TREATMENT, TREATMENT.replace(" 2 ", " 1 ", 1) + "\n" + TREATMENT)
-    text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 1 MA              R     R     R     R     R\n"
+    # These tests supply no harvest dates; maturity keeps the fixture valid.
+    text += "@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n 1 MA              R     R     R     R     M\n"
     inputs.filex.write_bytes(text.replace("*SIMULATION CONTROLS", SECTION + "*SIMULATION CONTROLS").encode("latin-1"))
     return Simulation(inputs.filex, 2, inputs.rows,
                       management={"treatments": {2: {"residues": [dict(EVENT)]}}})

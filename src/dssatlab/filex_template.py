@@ -43,7 +43,10 @@ planting:
 # within weather data; omit to harvest at maturity.
 # Values must fit DSSAT's fixed-width columns without rounding or truncation.
 
-# Rotation example: replace the single-crop form above with these lines.
+# Only a leading fallow takes start_date, before end_date; the simulation starts there.
+# For example, prepend {crop: "fallow", start_date: "2021-02-01", end_date: "2021-02-28"}
+# and end the last fallow on "2022-01-31", before the start's day of year.
+# Rotation example: replace the single-crop form with 2 to 99 components.
 # treatment_name: "Maize and fallow"
 # rotation:
 #   - crop: "maize"

@@ -1,6 +1,7 @@
 """Field operation fields, event checks and FileX row values."""
 
 from datetime import date
+from pathlib import Path
 import re
 
 from .experiment import _check_date, _check_number, _unknown_keys
@@ -87,6 +88,77 @@ def _component_management(text, row, column, default=None):
         except (ValueError, TypeError, KeyError):
             pass  # Existing FileX checks report unavailable layouts.
     return default
+
+
+def _check_harvest(source, filex, selected_treatment=None, *, text=None):
+    """Require dated harvests for each checked crop under effective HARVS R."""
+    from .filex import _section_rows
+    from .irrigation import _effective_management
+    from .sequence import _rotation_components
+
+    entries = source.get('treatments', {}) if isinstance(source, dict) else {}
+    entries = entries if isinstance(entries, dict) else {}
+    entries = {int(key): entry for key, entry in entries.items()
+               if type(key) is int or isinstance(key, str) and key.isascii() and key.isdigit()}
+    numbers = list(entries)
+    if (type(selected_treatment) is int or isinstance(selected_treatment, str)
+            and selected_treatment.isascii() and selected_treatment.isdigit()):
+        number = int(selected_treatment)
+        if number not in numbers:
+            numbers.append(number)
+    if not numbers:
+        return []
+    if text is None and isinstance(filex, (str, Path)):
+        try:
+            text = Path(filex).read_text(encoding='latin-1')
+        except (OSError, ValueError):
+            return []  # FileX checks report unreadable inputs.
+    problems = []
+    for treatment in numbers:
+        entry = entries.get(treatment, {})
+        entry = entry if isinstance(entry, dict) else {}
+        components = _rotation_components(filex, treatment, text=text)
+        sequence = len(components) > 1
+        edits = entry.get('rotation', {})
+        edits = edits if isinstance(edits, dict) else {}
+        edits = {int(key): value for key, value in edits.items()
+                 if type(key) is int or isinstance(key, str) and key.isascii() and key.isdigit()}
+        for row in components:
+            if row['CR'] == 'FA':
+                continue
+            override = edits.get(int(row['R']), {}) if sequence and row['R'].isdigit() else entry
+            override = override if isinstance(override, dict) else {}
+            code = (_component_management(text, row, 'HARVS') if sequence else
+                    _effective_management(entry, text, treatment, 'harvest_management', 'HARVS'))
+            if code != 'R':
+                continue
+            if 'harvest' in override:
+                events = override['harvest']
+                usable = isinstance(events, list) and any(
+                    isinstance(event, dict) and not _check_date(event.get('date'), '')
+                    for event in events)
+            else:
+                usable = False
+                try:
+                    level = int(row['MH'])
+                    if level > 0:
+                        for event in _section_rows(text, 'HARVEST DETAILS', 'H', level, ('HDATE',)):
+                            value = event['HDATE']
+                            if re.fullmatch(r'[0-9]{5}', value):
+                                year, day = 2000 + int(value[:2]), int(value[2:])
+                                usable |= 1 <= day <= date(year, 12, 31).timetuple().tm_yday
+                except (ValueError, TypeError, KeyError):
+                    pass  # An absent or unreadable harvest level has no usable events.
+            if not usable:
+                where = f'Treatment {treatment}'
+                fix = 'Add a harvest event, or set controls harvest_management to another code.'
+                if sequence:
+                    where += f", rotation[{row['R']}]"
+                    fix = ('Add a harvest event to this component, or change HARVS in the '
+                           'FileX simulation controls.')
+                problems.append(f'{where}: harvest management is "R" (reported dates), '
+                                f'but there are no harvest events with a date. {fix}')
+    return problems
 
 
 def _harvest_end(entry, end, code):

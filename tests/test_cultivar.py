@@ -156,7 +156,6 @@ def test_multiple_matching_cul_files_are_not_guessed(cultivar_inputs):
 @pytest.mark.parametrize("old,new,word", [
     ("CU FL", "XX FL", "CU"),
     ("@C CR INGENO CNAME", "@C CR WRONGX CNAME", "INGENO"),
-    (" 7 MZ IB0060", "99 MZ IB0060", "fit"),
 ])
 def test_layout_problems_are_reported_before_run(cultivar_inputs, old, new, word):
     filex, _ = cultivar_inputs

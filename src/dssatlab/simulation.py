@@ -9,6 +9,8 @@ from .filex import _check_filex_controls, _irrigation_dates, _read_filex, _weath
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
 from .management import _check_management, _report_lines
+from .experiment import _overrides_section
+from .operations import _check_harvest
 from .management_file import _load_management
 from .rotation_data import _write_rotation_data
 from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
@@ -17,29 +19,6 @@ from .sequence import (_check_sequence, _rotation_components, _run_sequence,
                        _parse_sdate, _simulation_start_date)
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
-
-
-def _overrides_section(experiment_data, treatment, section=None, *, rotation=None):
-    """True for a supplied section, or any experiment overrides when omitted."""
-    treatments = experiment_data.get("treatments") if isinstance(experiment_data, dict) else None
-    if not isinstance(treatments, dict):
-        return False
-    for key, entry in treatments.items():
-        try:
-            selected = int(key) == int(treatment)
-        except (TypeError, ValueError, OverflowError):
-            continue
-        if selected and isinstance(entry, dict):
-            if rotation is not None:
-                edits = entry.get("rotation", {})
-                if isinstance(edits, dict):
-                    for number, component in edits.items():
-                        if (str(number).isascii() and str(number).isdigit()
-                                and int(number) == int(rotation) and isinstance(component, dict)):
-                            return section in component
-                return False
-            return bool(entry) if section is None else section in entry
-    return False
 
 
 class Simulation:
@@ -131,9 +110,14 @@ class Simulation:
         data_problems, checked_data = _sequence_experiment_data(
             experiment_data, self.treatment, components)
         filex_problems.extend(sequence_problems + data_problems)
+        filex_problems.extend(_check_harvest(experiment_data, self.filex, self.treatment))
         filex_problems.extend(_check_filex_controls(self.filex, self.treatment,
                                                     [row["SM"] for row in components]))
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
+        if Path(name).suffix.upper() == ".FCX":
+            filex_problems.append(f"FileX {name} is a forecast FileX: a Simulation "
+                                  "does not run forecast mode (Y). "
+                                  "Call run() on the FileX instead.")
         if len(name) > 12 and len(components) < 2:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
                                   "accepts at most 12. Rename the FileX to at most 12 "
@@ -213,7 +197,7 @@ class Simulation:
             else:
                 management_problems, management_report = _check_management(
                     checked_data, self.filex, self.treatment, rows, start_date, soil_depth,
-                    start_date_note=skip_reason,
+                    start_date_note=skip_reason, check_harvest=False,
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)

@@ -4,6 +4,7 @@ from datetime import date
 import math
 import re
 
+from .filex import _section_row
 from .weather import _show_value
 
 
@@ -136,3 +137,51 @@ def _check_controls(data, where):
                 problems.append(f"{location}: found {_show_value(value)}. "
                                 f"{instruction}")
     return problems
+
+
+def _check_treatment_key(key, seen_numbers, text, filex):
+    where = f"Management data treatment {_show_value(key)}"
+    try:
+        if (isinstance(key, bool) or not isinstance(key, (int, str)) or
+                isinstance(key, str) and not re.fullmatch(r"[0-9]+", key)):
+            raise ValueError
+        number = int(key)
+        where = f"Management data treatment {number}"
+    except ValueError:
+        return None, where, [f"{where}: invalid treatment key. Supply an int or digit string."]
+    problems = []
+    if number in seen_numbers:
+        problems.append(f"{where}: duplicate treatment number for keys "
+                        f"{_show_value(seen_numbers[number])} and {_show_value(key)}. "
+                        "Keep one entry per treatment number.")
+    else:
+        seen_numbers[number] = key
+    if text is not None:
+        try:
+            _section_row(text, "TREATMENTS", "N", number, ())
+        except ValueError as error:
+            problems.append(f"{where}: FileX {filex}: {error}")
+    return number, where, problems
+
+
+def _overrides_section(experiment_data, treatment, section=None, *, rotation=None):
+    """True for a supplied section, or any experiment overrides when omitted."""
+    treatments = experiment_data.get("treatments") if isinstance(experiment_data, dict) else None
+    if not isinstance(treatments, dict):
+        return False
+    for key, entry in treatments.items():
+        try:
+            selected = int(key) == int(treatment)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if selected and isinstance(entry, dict):
+            if rotation is not None:
+                edits = entry.get("rotation", {})
+                if isinstance(edits, dict):
+                    for number, component in edits.items():
+                        if (str(number).isascii() and str(number).isdigit()
+                                and int(number) == int(rotation) and isinstance(component, dict)):
+                            return section in component
+                return False
+            return bool(entry) if section is None else section in entry
+    return False

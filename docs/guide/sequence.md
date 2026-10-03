@@ -4,6 +4,13 @@ A single-crop or seasonal simulation evaluates one crop grown in isolated season
 
 In `dssatlab`, you run a sequence simply by creating a `Simulation` for a treatment that defines a sequence in an existing FileX. `dssatlab` detects the rotation components automatically, checks all inputs, writes a batch file (`DSSBatch.v48`) into the simulation folder, and runs DSSAT in sequence mode (`Q`) without needing any extra flags ([ADR 0013](../adr/0013-sequences-run-in-mode-q-through-a-batch-file.md)).
 
+With a FileX and its supporting DSSAT files already prepared, you can also call
+`dl.run("MSKB8902.SQX")`. `run()` selects Q from the treatment rows, whatever the
+extension (except `.FCX`, which selects forecast mode Y). It writes the batch file
+in the FileX folder and collects it into the run directory. If that FileX has
+more than one treatment number, select each with `treatment=n`. See
+[run modes and guards](run-filex.md#run-modes-sequences-and-forecasts).
+
 ## What is a sequence in a FileX?
 
 In a standard FileX (`*.SQX` or other experiment files), a sequence is a treatment number (`N`) that appears on multiple rows in the `*TREATMENTS` section. Each row represents one **rotation component**, distinguished by its rotation component number in the `R` column:
@@ -47,6 +54,8 @@ result = sim.run()
 ```
 
 When `sim.run()` executes, `dssatlab` writes `DSSBatch.v48` into the simulation folder and runs `<executable> Q DSSBatch.v48` with standard input closed, keeping your original FileX folder untouched.
+The batch file moves into the run directory with the outputs on success or
+failure; a failed launch removes it.
 
 ## Sequence checks
 
@@ -68,7 +77,7 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    ```text
    FileX NREPS 5 for sequence treatment 1: with measured weather every replicate repeats the same rows. Set NREPS to 1.
    ```
-5. **Weather coverage through the sequence's last day**: Weather data must continuously cover the simulation start date through the sequence's last day. Under DSSAT's sequence end rule (`CSM.for`), the sequence ends at:
+5. **Weather coverage through the calculated stopping day**: Weather data must continuously cover the simulation start date through the stopping day checked by dssatlab. Under DSSAT's calendar rule (`CSM.for`), this day is:
    `(start year + years)` at the start date's day of year, minus one day.
    For example, if the sequence starts on `1978-04-20` and runs for `NYERS 10` (or `controls: years: 10`), the end date is `1988-04-18` (since 1988 is a leap year). If weather data ends earlier (e.g. `1987-12-31`), `check()` reports:
    ```text
@@ -76,6 +85,12 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    ```
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
 6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop or fallow components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
+
+**Known weather limit ([#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205))**:
+`check()` can accept weather that ends before DSSAT's last component actually
+ends. MSKB8921 needed weather through 1998-05-06, but the checks accepted weather
+ending on 1998-02-28. Supply weather through the actual final component end;
+passing the calculated stopping-day check does not prove that coverage is enough.
 
 ## Weather and replicate settings in DSSAT sample sequence files
 
@@ -113,11 +128,11 @@ text = text.replace(" 1 GE             10     5 ", " 1 GE             10     1 "
 path.write_text(text, encoding="latin-1")
 ```
 
-Once updated, the FileX passes all checks.
+These edits address WTHER and NREPS; `check()` still checks the other inputs.
 
 ## A rotation from the FileX template
 
-In addition to running sequences from existing FileX files, you can build and run a sequence directly from a **FileX template** without hand-editing any FileX. Instead of single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`, `treatments`, `treatment_fields`), supply `treatment_name` and `rotation`, a list of 2 to 9 rotation components ([ADR 0014](../adr/0014-rotation-in-the-filex-template.md)).
+In addition to running sequences from existing FileX files, you can build and run a sequence directly from a **FileX template** without hand-editing any FileX. Instead of single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`, `treatments`, `treatment_fields`), supply `treatment_name` and `rotation`, a list of **2 to 99 rotation components** ([ADR 0014](../adr/0014-rotation-in-the-filex-template.md)). The R numbers are 1 through the list length, including 10 through 99. Fewer than 2 or more than 99 are rejected with `Supply a list of 2 to 99 rotation components.`
 
 ```yaml
 # rotation.yaml
@@ -151,6 +166,36 @@ rotation:
 
 A crop component takes the standard template crop fields (`crop`, `cultivar.code`, `planting`, and optional `harvest_date`, validated under the same rules as the single-crop template, including potato requirements). A fallow component is defined with `{crop: "fallow", end_date: "YYYY-MM-DD"}`.
 
+### Start with a fallow
+
+Only the first component may take `start_date`, and it must be a fallow with
+`start_date` strictly before `end_date`. For example:
+
+```yaml
+# leading-fallow.yaml
+treatment_name: "Fallow then maize"
+rotation:
+  - {crop: "fallow", start_date: "1977-12-15", end_date: "1978-03-14"}
+  - crop: "maize"
+    cultivar: {code: "IB0035"}
+    planting:
+      date: "1978-03-15"
+      method: "S"
+      distribution: "R"
+      population: 7.2
+      row_spacing: 75
+      depth: 5
+    harvest_date: "1978-08-01"
+  - {crop: "fallow", end_date: "1978-12-14"}
+```
+
+Use this template through `filex_template="leading-fallow.yaml"` in the
+Simulation example below, with weather covering the leading fallow too.
+The simulation starts on 1977-12-15: SDATE and the generated FileX stem's year
+come from that date, as do cycle length, weather coverage and component period
+checks. A crop-first rotation still starts on its first planting date.
+Experiment data `controls.start_date` can override SDATE for either form.
+
 ### Run with `Simulation`
 
 Pass the template path or dictionary to `dl.Simulation` alongside your daily weather and soil data:
@@ -176,7 +221,11 @@ When `sim.run()` executes, `dssatlab` writes `<station><yy>01.SQX`, copies the g
 
 ### One cycle by default, controls `years` for more
 
-By default, the rotation runs for **one complete cycle**. The cycle length in years (`year of last end + 1 day minus first planting year` = 1979 - 1978 = 1 year) is automatically calculated and written as the first component's `NYERS`. Running the single-cycle simulation above returns 4 summary rows (one for each rotation component).
+By default, the rotation runs for **one complete cycle**. dssatlab writes the
+fewest years whose calculated stopping day reaches the last component's known
+end as the first component's `NYERS`. For `rotation.yaml`, that is 1 year;
+for `leading-fallow.yaml`, it is also 1 year. A leading fallow uses its
+`start_date` instead of the first planting date when calculating this length.
 
 To run more cycles over multiple years, pass experiment data setting controls `years`:
 
@@ -198,9 +247,13 @@ DSSAT's sequence mode enforces a silent date-advancement rule: it advances each 
 
 To protect against silent year skips, `dssatlab` validates all calendar dates before writing files or running DSSAT:
 
-1. **First component must be a crop**: the simulation begins on its planting date; a fallow cannot be the first component.
+1. **Leading fallow needs ordered dates**: a crop-first rotation starts on its
+   planting date; a leading fallow needs `start_date` before `end_date`. Missing,
+   unordered, or misplaced `start_date` gives messages such as:
    ```text
-   FileX template, rotation[1]: the first component must be a crop; the simulation starts on its planting date. Move the fallow later in the rotation.
+   FileX template, rotation[1]: a leading fallow needs start_date. Supply start_date before end_date.
+   FileX template, rotation[1], start_date: 1978-03-14 is not before end_date (1978-03-14). Supply start_date before end_date.
+   FileX template, rotation[2], start_date: only a leading fallow takes start_date. Remove start_date from this component.
    ```
 2. **Last component needs a known end**: the final component must end on a definite date—either a fallow with `end_date` or a crop with `harvest_date`—so the cycle length is known and subsequent cycles start on time.
    ```text
@@ -210,7 +263,7 @@ To protect against silent year skips, `dssatlab` validates all calendar dates be
    ```text
    FileX template, rotation[3], planting date: 1978-05-30 is not after rotation[2]'s end (1978-11-14). DSSAT would move it a year later. Supply rotation dates in order.
    ```
-4. **Cycle closure**: the last component's end date day of year must be strictly before the first component's planting day of year so the next cycle starts on time. The check calculates the DOY and suggests a valid end date:
+4. **Cycle closure**: the last component's end date day of year must be strictly before the first planting's day of year, or the leading fallow's `start_date` day of year, so the next cycle starts on time. The start cannot be January 1. The check calculates the DOY and suggests a valid end date:
    ```text
    FileX template, rotation: the last component ends on 1979-03-20 (day 79 of the year), not before the first planting's day of the year (day 74, 1978-03-15); DSSAT would start the next cycle a year late. End the last component before day 74, for example on 1979-03-14.
    ```
@@ -273,7 +326,7 @@ result = sim.run()
 ```
 
 The same experiment data works with a copied sequence FileX, `run_treatments()` and a
-scenario's `management` override. Each edit adds a new level and repoints only that
+scenario's `management` override. Each edit writes a level and repoints only that
 component in the simulation folder's FileX. Other components, shared levels and the
 original FileX stay unchanged. Omitted sections keep their levels. Edits apply in every
 cycle, with DSSAT advancing the dates along with the component.
@@ -324,7 +377,8 @@ needs its scheduled end; omit `harvest` to keep that end.
 
 Residue events need the component's RESID `"R"`; `"D"` and `"N"` reject non-empty
 `residues`. Harvest events need its HARVS `"R"` or `"M"`; `"A"` and `"D"`
-reject non-empty `harvest`. Empty lists do not trigger code problems. Tillage
+reject non-empty `harvest`. A crop under HARVS R must have a dated harvest
+event, including when no experiment data is supplied (see below). Tillage
 has no code check; the component's TILL `"Y"` applies tillage. Generated templates
 keep TILL `"N"`, so the tillage example above writes events but applying them
 requires a copied FileX with that component at TILL `"Y"`. The codes are
@@ -333,6 +387,39 @@ sets HARVS (`"A"`, `"M"`, `"R"`, `"D"`); a sequence accepts only `years` and
 `start_date` in treatment controls, so change component codes in the copied
 FileX itself. See the [code rules and measured harvest behaviour](experiment.md#residues-tillage-and-harvest)
 and [ADR 0021](../adr/0021-field-operations-as-event-sections.md).
+
+### HARVS R needs a dated harvest
+
+For every crop component, `check()` reads HARVS from its SM level. Under `"R"`
+(reported dates), there must be at least one usable dated harvest event. A
+supplied `harvest` list replaces the inherited events; `harvest: []` therefore
+fails under R. If `harvest` is omitted, the FileX MH level must be nonzero and
+contain a usable HDATE. The check runs even without experiment data and reports:
+
+```text
+Treatment 1, rotation[3]: harvest management is "R" (reported dates), but there are no harvest events with a date. Add a harvest event to this component, or change HARVS in the FileX simulation controls.
+```
+
+Add a dated event under that component's `harvest`, or change HARVS in the copied
+FileX. Sequence experiment data cannot set `harvest_management`. This fixes
+[#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192); the requirement
+does not apply to fallows or crops under M/A. Other event/code checks still apply.
+
+### Reuse free levels past 99
+
+An edit normally appends a level numbered highest + 1. When that would pass 99,
+it reuses the lowest number from 1 through 99 that no TREATMENTS row references
+after the edited row is repointed. The old rows for that level are replaced in
+every header block of the section, in the FileX copy only. A level still used by
+another component or treatment is kept. If no number is free, `check()` reports
+the existing level-limit problem.
+
+This applies to planting, irrigation, fertilizer, harvest, residue, tillage and
+chemical event sections, cultivar, initial conditions and controls wherever
+dssatlab writes those levels. It adds no new experiment-data sections or
+per-component controls. Below the limit, output remains byte-identical to the
+previous writer. This fixes [#193](https://github.com/AbdelrahmanAmr3/dssatlab/issues/193);
+see [ADR 0023](../adr/0023-reuse-free-levels-past-99.md).
 
 ### Keep dates inside the component's period
 
@@ -375,6 +462,16 @@ irrigation returned `NICM 120` and `IRCM 50` on every maize row, and `NICM 40` o
 row. The YAML above illustrates one 25 mm irrigation event; tutorial Case 11 uses two
 25 mm events for the probe's 50 mm total. Use `summarize_seasons()` to compare yields per
 rotation component across cycles. See [ADR 0015](../adr/0015-experiment-data-per-rotation-component.md).
+
+## Checked on real DSSAT for 0.17
+
+- `run()` on stock MSKB8902.SQX in Q mode matched DSSAT's own run on all 55/55
+  Summary rows, with identical RUNNO, TRNO, HWAM, HDAT, CWAM and PRCM.
+- A 12-component rotation with NYERS 2 matched the same FileX run by hand.
+  A 99-component rotation template ran with 99 Summary rows and no ERROR.OUT.
+- HARVS R with `harvest: []` was rejected; adding a dated harvest passed the checks.
+- MSKB8902 rebuilt with 56 harvest events used levels 57 through 99, then reused
+  1 through 13, and matched the stock run on all 55/55 rows exactly.
 
 ## Summary rows and rotation components
 
@@ -431,7 +528,7 @@ If a FileX contains multiple sequences (for example, comparing a 2-year rotation
 
 ```python
 results = dl.run_treatments(
-    filex="ROTATIONS.SQX",
+    filex="ROTATE01.SQX",
     weather=weather_rows,
 )
 

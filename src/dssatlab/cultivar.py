@@ -9,7 +9,7 @@ from .errors import DSSATCheckError, DSSATNotFoundError
 from .experiment import _check_fields
 from .filex import _section_row
 from .filex_write import (_append_rows, _event_blocks, _event_row,
-                          _insert_section, _repoint)
+                          _insert_section, _new_level, _repoint)
 from .weather import _show_value
 
 
@@ -232,7 +232,7 @@ def _cultivar_text(text, treatment, cultivar, *, rotation=None):
     header = "@C CR INGENO CNAME"
     blocks, highest = _event_blocks(lines, "CULTIVARS", (header,))
     columns, index, _ = blocks[0]
-    level = highest + 1
+    level = _new_level(lines, treatment, "CU", highest, "CULTIVARS", rotation=rotation)
     # CNAME is descriptive; -99 avoids retaining the previous cultivar's name.
     row = _event_row(columns, {"C": level, "CR": cultivar["crop"],
                                "INGENO": cultivar["code"], "CNAME": -99}, "CULTIVARS")

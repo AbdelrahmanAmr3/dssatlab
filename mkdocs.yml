@@ -65,6 +65,9 @@ nav:
           - adr/0018-treatment-rows-read-with-dssats-fixed-columns.md
           - adr/0019-simulation-options-as-checked-controls-codes.md
           - adr/0020-automatic-management-as-controls-fields.md
+          - adr/0021-field-operations-as-event-sections.md
+          - adr/0022-run-picks-dssats-run-mode-from-the-filex.md
+          - adr/0023-reuse-free-levels-past-99.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md

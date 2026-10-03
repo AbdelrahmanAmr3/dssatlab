@@ -59,6 +59,30 @@ def _examples():
 EXAMPLES = list(_examples())
 
 
+def _rotation_templates():
+    yaml = pytest.importorskip('yaml')
+    for page in PAGES:
+        text = page.read_text(encoding='utf-8')
+        for number, block in enumerate(re.findall(r'```yaml\n(.*?)```', text, re.S)):
+            template = yaml.safe_load(block)
+            if isinstance(template, dict) and isinstance(template.get('rotation'), list):
+                yield f'{page.name}:yaml:{number}', template
+
+
+ROTATIONS = list(_rotation_templates())
+
+
+@pytest.mark.parametrize('label,template', ROTATIONS, ids=[label for label, _ in ROTATIONS])
+def test_guide_rotation_templates(label, template, rows, installed):
+    genotype = installed.executable.parent / 'Genotype' / 'WHCER048.CUL'
+    genotype.write_bytes(genotype.read_bytes() + b'IB1500 Wheat\n')
+    first = date(1977, 1, 1)
+    weather = [dict(rows[0][0], date=(first + timedelta(days=i)).isoformat())
+               for i in range((date(1982, 1, 1) - first).days)]
+    assert Simulation(filex_template=template, weather=weather,
+                      soil=rows[1]).check(False) == [], label
+
+
 @pytest.mark.parametrize('label,experiment', EXAMPLES, ids=[label for label, _ in EXAMPLES])
 def test_guide_experiment_examples(label, experiment, sim_inputs, cultivar_table,
                                   data, rows, installed):

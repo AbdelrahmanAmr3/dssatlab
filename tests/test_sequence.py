@@ -62,7 +62,7 @@ def test_sequence_run_batch_outputs_and_report(sequence, fake_dssat, capsys, mon
     assert fake_dssat.calls == [
         ([str(fake_dssat.executable), "Q", "DSSBatch.v48"], folder,
          {"stdin": subprocess.DEVNULL, "capture_output": True, "text": True})]
-    batch = folder / "DSSBatch.v48"
+    batch = result.run_dir / "DSSBatch.v48"
     assert batch.read_bytes() == (FIXTURES / "DSSBatch.v48").read_bytes()
     assert seen["DSSBatch.v48"] == batch.read_bytes()
     assert seen[sequence.filex.name] == sequence.filex.read_bytes()
@@ -70,8 +70,9 @@ def test_sequence_run_batch_outputs_and_report(sequence, fake_dssat, capsys, mon
     for number, line in enumerate(batch.read_text().splitlines()[3:], 1):
         assert line[:92].rstrip() == sequence.filex.name
         assert [int(line[i:i+7]) for i in range(92, 127, 7)] == [1, 1, number, 0, 0]
-    assert result.outputs == [result.run_dir / "Summary.OUT"]
-    assert result.outputs[0].read_bytes() == b"summary"
+    assert result.outputs == [batch, result.run_dir / "Summary.OUT"]
+    assert (result.run_dir / "Summary.OUT").read_bytes() == b"summary"
+    assert not (folder / "DSSBatch.v48").exists()
     assert not (folder / "Summary.OUT").exists()
     assert (folder / "UFGA7801.WTH").is_file()
 
@@ -187,9 +188,12 @@ def test_sequence_runner_errors(sequence, fake_dssat, failure):
     with pytest.raises(DSSATRunError, match="Could not start|DSSAT run failed"):
         sequence.run()
     folder = fake_dssat.calls[0][1]
-    assert (folder / "DSSBatch.v48").is_file()
+    assert not (folder / "DSSBatch.v48").exists()
     if failure != "start":
+        assert next(folder.glob("dssat_run_*/DSSBatch.v48")).is_file()
         assert next(folder.glob("dssat_run_*/Summary.OUT")).is_file()
+    else:
+        assert not list(folder.glob("dssat_run_*"))
 
 
 @pytest.mark.parametrize("entry", [

@@ -6,7 +6,7 @@ import re
 from .experiment import _check_date, _CONTROL_OPTIONS
 from .filex import _section_row
 from .weather import _dssat_date
-from .filex_write import _append_rows, _cell, _columns, _repoint, _section_bounds
+from .filex_write import _append_rows, _cell, _columns, _new_level, _repoint, _section_bounds
 
 
 def _selected_controls(source, treatment):
@@ -188,7 +188,8 @@ def _controls_text(text, treatment, controls):
                 selected.append((marker, header, columns, line.rstrip("\r\n")))
                 marker = None
 
-    level, body, applied = highest + 1, [], set()
+    level = _new_level(lines, treatment, "SM", highest, section)
+    body, applied = [], set()
     for marker, header, columns, row in selected:
         if marker is not None:
             body.extend(["", marker])

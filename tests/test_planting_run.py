@@ -158,15 +158,13 @@ def test_missing_columns_rejected_before_writing(planting_sim, seen, column):
     assert list(sim.filex.parent.iterdir()) == listing
 
 
-@pytest.mark.parametrize("failure", ["header", "population", "level"])
+@pytest.mark.parametrize("failure", ["header", "population"])
 def test_unwritable_layout_rejected_by_check(planting_sim, seen, failure):
     sim = planting_sim
     if failure == "header":
         sim.filex.write_bytes(sim.filex.read_bytes().replace(HEADER.encode(), b"! no header"))
-    elif failure == "population":
-        sim.management["treatments"]["02"]["planting"]["population"] = 1234567
     else:
-        sim.filex.write_bytes(sim.filex.read_bytes().replace(b" 7 82057", b"99 82057"))
+        sim.management["treatments"]["02"]["planting"]["population"] = 1234567
     assert sim.check()
     with pytest.raises(DSSATCheckError):
         sim.run()

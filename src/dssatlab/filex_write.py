@@ -143,7 +143,7 @@ def _planting_text(text, treatment, planting, *, rotation=None):
         if columns is None:
             raise ValueError("PLANTING DETAILS has no header containing columns "
                              f"P, {', '.join(_PLANTING_FIELDS)}. Supply the needed columns.")
-    level = highest + 1
+    level = _new_level(lines, treatment, "MP", highest, "PLANTING DETAILS", rotation=rotation)
     row = _planting_row(columns, level, planting)
 
     _repoint(lines, treatment, "MP", level, rotation=rotation)
@@ -159,7 +159,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
     if rotation is None:
         _section_row("".join(lines), section, key, treatment, (column,))
     treatments = _treatment_rows("".join(lines)) if section == "TREATMENTS" else {}
-    start, end = _section_bounds(lines, section) or (0, 0)
+    start, end = _section_bounds(lines, section.split()[0]) or (0, 0)
     columns = {}
     for index in range(start + 1, end):
         line = lines[index]
@@ -192,9 +192,35 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
                          "has no matching row. Choose an existing (N, R) pair in the FileX.")
 
 
+def _new_level(lines, treatment, column, highest, section, *, rotation=None):
+    """Past 99, replace the lowest level free after repointing this row."""
+    if highest < 99:
+        return highest + 1
+    _repoint(lines, treatment, column, 0, rotation=rotation)
+    start, end = _section_bounds(lines, "TREATMENTS")
+    used, left, right = set(), 0, 0
+    for line in lines[start + 1:end]:
+        if line.startswith("@"):
+            left, right = _columns(line).get(column, (0, 0))
+        else:
+            try:
+                used.add(int(line[left:right]))
+            except ValueError:
+                continue
+    level = next((n for n in range(1, 100) if n not in used), highest + 1)
+    start, end = _section_bounds(lines, section.split()[0]) or (0, 0)
+    for index in range(start + 1, end):
+        if lines[index].startswith("@"):
+            left, right = next(iter(_columns(lines[index]).values()))
+        elif lines[index][left:right].strip().lstrip("0") == str(level):
+            # Empty strings remove rows from the text without shifting insertion points.
+            lines[index] = ""
+    return level
+
+
 def _append_rows(lines, index, rows):
     newline = _newline(lines)
-    prefix = "" if lines[index - 1].endswith(("\r", "\n")) else newline
+    prefix = "" if not lines[index - 1] or lines[index - 1].endswith(("\r", "\n")) else newline
     lines[index:index] = [prefix + newline.join(rows) + newline]
 
 
@@ -256,7 +282,7 @@ def _event_text(text, treatment, events, section="irrigation", *, rotation=None)
         _section_row(text, "TREATMENTS", "N", treatment, (column,))
     lines = text.splitlines(keepends=True)
     blocks, highest = _event_blocks(lines, name, headers)
-    level = highest + 1 if has_level else 0
+    level = _new_level(lines, treatment, column, highest, name, rotation=rotation) if has_level else 0
     _repoint(lines, treatment, column, level, rotation=rotation)
     if not has_level:
         return "".join(lines)
