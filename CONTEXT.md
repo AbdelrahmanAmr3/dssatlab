@@ -73,7 +73,7 @@ A treatment whose number has several TREATMENTS rows in the FileX, one per rotat
 DSSAT runs the components one after another, each starting the day after the previous one ended,
 with soil water and nitrogen carried over, until the sequence's years (the first component's
 NYERS or the controls `years`) have passed. dssatlab runs it in DSSAT's sequence mode (Q) through
-a batch file it writes.
+a batch file it writes, in a Simulation and in `run()`.
 _Avoid_: rotation (alone), crop sequence file, multi-crop treatment
 
 **Rotation component**:
@@ -231,8 +231,9 @@ The one fixed shape a user fills in so dssatlab can write a FileX from scratch: 
 more fields, and one treatment or a list of named treatments, each on one field. Every treatment starts from the template's
 cultivar, planting and harvest; experiment data keyed by treatment number varies each one. Built
 from the experiment data plus the crop, station and soil profile. Instead of one crop it can hold a
-rotation: one sequence of 2 to 9 rotation components (crops or fallows), each crop with its own
-cultivar, planting and harvest, written as a sequence FileX.
+rotation: one sequence of 2 to 99 rotation components (crops or fallows), each crop with its own
+cultivar, planting and harvest, written as a sequence FileX. It starts on the first crop's planting
+date, or on the start date of a leading fallow.
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 
@@ -280,6 +281,18 @@ _Avoid_: validation errors, lint
 **Run**:
 One invocation of the DSSAT executable on one FileX.
 _Avoid_: job
+
+**Run mode**:
+The letter DSSAT is started with, which decides how it reads the FileX: A (all treatments), C (one
+treatment), Q (sequences, through a batch file) or Y (forecast, through a batch file). dssatlab
+picks it from the FileX: Y for a forecast FileX, Q when a treatment run is a sequence, else A or C.
+_Avoid_: batch mode (a batch file is how Q and Y receive their treatments), irrigation mode
+
+**Forecast run**:
+A run in DSSAT's forecast mode (Y) of a forecast FileX (`.FCX`): observed weather up to the
+forecast date (FODAT), then one result per historical weather year. `run()` does it; a Simulation
+does not.
+_Avoid_: prediction, seasonal analysis (that is NYERS seasons of one weather record)
 
 **Run directory**:
 A new, dated folder created beside the FileX for one run. DSSAT runs in the FileX's own
