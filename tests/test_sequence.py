@@ -284,6 +284,10 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
     expected = ([f"{prefix} {years}: the sequence runs from {start} through {last}, "
                  f"after the weather data ends ({end}). Supply weather through {last}, "
                  "or fewer years."] if short else [])
+    if override and start == '1980-02-29':
+        expected.append("Controls start_date '1980-02-29' is after the FileX's first irrigation "
+                        "date 1978-05-11; DSSAT stops with error IPIRR. Start on or before "
+                        "that date, or give irrigation in the management data.")
     before = set(sequence.filex.parent.iterdir())
     problems = sequence.check(True)
     inherited = [p for p in problems if 'outside weather range' in p
@@ -310,7 +314,7 @@ def test_sequence_coverage_uses_start_p_and_skips_unresolved_s(sequence, replace
     sequence.filex.write_text(sequence.filex.read_text().replace("S 78110", replacement))
     sequence.weather = weather("1978-04-20", "1978-04-21")
     problems = sequence.check(False)
-    assert any("sequence runs from" in p for p in problems) == (replacement == "P 78110")
+    assert any("sequence runs from" in p for p in problems) == (replacement != "S XXXXX")
     assert not any("season 1" in p for p in problems)
 
 
@@ -319,13 +323,17 @@ def test_sequence_start_still_needs_weather(sequence, override):
     sequence.weather = weather("1978-04-21", "1979-04-19")
     if override:
         sequence.management = {"treatments": {1: {"controls": {"start_date": "1978-04-20"}}}}
-    expected = ("Controls start_date '1978-04-20'" if override else "FileX start year 78 day 110")
     problems = sequence.check(False)
     inherited = [p for p in problems if 'outside weather range' in p]
     assert len(inherited) == (2 if override else 0)
-    assert [p for p in problems if p not in inherited] == [
-        f"{expected} is not covered by weather data (1978-04-21 to 1979-04-19). "
-        "Supply weather for the simulation's start date."]
+    expected = (
+        "Controls start_date '1978-04-20' is not covered by weather data "
+        "(1978-04-21 to 1979-04-19). Supply weather for the simulation's start date."
+        if override else
+        "FileX SDATE '78110' is 1978-04-20 (DSSAT reads two-digit years 00-35 as "
+        "2000-2035 and 36-99 as 1936-1999), not covered by weather data "
+        "(1978-04-21 to 1979-04-19). Supply weather for 1978-04-20, or set controls.start_date.")
+    assert [p for p in problems if p not in inherited] == [expected]
 
 
 def test_sequence_missing_nyers_defaults_to_one(sequence):

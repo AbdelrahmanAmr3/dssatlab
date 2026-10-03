@@ -11,10 +11,10 @@ def _filex_date(value):
     """Return a FileX YYDDD calendar date, or None for an unreadable date."""
     if not isinstance(value, str) or not re.fullmatch(r'[0-9]{5}', value):
         return None
-    # DSSAT-CSM v4.8.6.0, Utilities/DATES.for, Y2K_DOY:
-    # YY <= 40 means 2000 + YY; larger YY means 1900 + YY.
+    # DSSAT-CSM v4.8.6.0, Utilities/DATES.for, Y4K_DOY:
+    # YY <= 35 means 2000 + YY; larger YY means 1900 + YY.
     yy, doy = int(value[:2]), int(value[2:])
-    year = (2000 if yy <= 40 else 1900) + yy
+    year = (2000 if yy <= 35 else 1900) + yy
     if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
         return None
     return date(year, 1, 1) + timedelta(days=doy - 1)

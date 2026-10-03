@@ -122,7 +122,7 @@ def test_does_not_read_field_rows_outside_a_matching_block(filex, weather, delim
     assert any("FIELDS: row L= 1 does not exist" in p for p in problems)
 
 
-@pytest.mark.parametrize("section,expected", [("FIELDS", "year 82 day 056"),
+@pytest.mark.parametrize("section,expected", [("FIELDS", "SDATE '82056' is 1982-02-25"),
                                             ("SIMULATION CONTROLS", "expects station")])
 def test_available_filex_comparisons_survive_other_section_problems(filex, weather, section, expected):
     text = SAMPLE.replace(f"*{section}", "*UNUSED")
@@ -190,8 +190,8 @@ def multilevel_filex(filex):
 
 
 @pytest.mark.parametrize("treatment,day,other_day,start", [
-    (1, "1986-01-14", "1986-02-13", "year 86 day 014"),
-    (4, "1986-02-13", "1986-01-14", "year 86 day 044"),
+    (1, "1986-01-14", "1986-02-13", "SDATE '86014' is 1986-01-14"),
+    (4, "1986-02-13", "1986-01-14", "SDATE '86044' is 1986-02-13"),
 ])
 def test_repeated_controls_groups(multilevel_filex, weather, treatment, day, other_day, start):
     assert Simulation(multilevel_filex, treatment, weather(days=[day])).check() == []
@@ -264,13 +264,18 @@ def test_station_mismatch_names_both(filex, weather, station, template):
                                   ["1982-02-24", "1982-02-26"]])
 def test_start_missing_names_start_and_weather_dates(filex, weather, days):
     problems = Simulation(filex(), 1, weather(days=days)).check()
-    assert any("year 82 day 056" in p and days[0] in p and days[-1] in p
+    assert any("SDATE '82056' is 1982-02-25" in p and days[0] in p and days[-1] in p
                for p in problems)
 
 
 @pytest.mark.parametrize("year", [1982, 2082])
-def test_start_compares_without_century_rule(filex, weather, year):
-    assert Simulation(filex(), 1, weather(days=[f"{year}-02-25"])).check() == []
+def test_start_compares_with_filex_century_rule(filex, weather, year):
+    problems = Simulation(filex(), 1, weather(days=[f"{year}-02-25"])).check()
+    if year == 1982:
+        assert problems == []
+    else:
+        assert len(problems) == 1
+        assert "SDATE '82056' is 1982-02-25" in problems[0]
 
 
 def test_start_covered_in_multi_year_weather(filex, weather):
@@ -285,7 +290,7 @@ def test_filex_and_weather_problems_collected_together(filex, weather):
         assert any(message in p for p in problems)
 
 
-@pytest.mark.parametrize("changes,expected", [({"station": "bad"}, "year 82 day 056"),
+@pytest.mark.parametrize("changes,expected", [({"station": "bad"}, "SDATE '82056' is 1982-02-25"),
                                             ({"date": "bad"}, "expects station")])
 def test_only_unavailable_weather_comparisons_skipped(filex, weather, changes, expected):
     options = dict(station="ABCD", days=["1982-02-26"])

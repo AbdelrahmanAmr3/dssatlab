@@ -54,7 +54,7 @@ def test_start_s_controls_override_replaces_sdate(filex):
                      management=experiment(controls={"start_date": "1982-03-02"}))
     assert sim.check(False) == []
     sim.management = None
-    assert any("FileX start year 82 day 056" in p for p in sim.check(False))
+    assert any("FileX SDATE '82056' is 1982-02-25" in p for p in sim.check(False))
 
 
 def test_start_p_last_season_needs_weather(filex):

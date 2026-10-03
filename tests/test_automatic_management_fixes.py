@@ -4,9 +4,13 @@ from datetime import date
 
 import pytest
 
+from dssatlab import Simulation
 from dssatlab.controls import _check_planting_window
 from dssatlab.irrigation import _check_irrigation
 from dssatlab.rotation_data import _check_rotation_data
+from test_filex_check import SAMPLE
+from test_season_coverage import weather
+from test_simulation_run import fake_dssat
 
 
 @pytest.mark.parametrize('code,events,rejected', [
@@ -45,24 +49,27 @@ def test_component_irrigation_checks_its_own_sm(tmp_path, code, events, rejected
 @pytest.mark.parametrize('first,last,start,rejected', [
     ('99365', '00001', date(1999, 1, 1), False),
     ('00001', '99365', date(2000, 1, 1), True),
-    ('50001', '00001', date(1950, 1, 1), False),  # Equidistant centuries choose 2000.
+    ('50001', '00001', date(1950, 1, 1), False),
+    ('36001', '40001', date(2035, 1, 1), True),
 ])
-def test_inherited_planting_window_uses_nearest_century(tmp_path, first, last, start, rejected):
-    text = f"""*TREATMENTS
-@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
- 1 1 0 0 Window                     1  1  0  0  0  0  0  0  0  0  0  0  1
-*SIMULATION CONTROLS
+def test_inherited_planting_window_uses_filex_rule(tmp_path, fake_dssat, first, last, start, rejected):
+    text = SAMPLE.replace('S 82056', f'S {start.year % 100:02d}001') + f"""
+@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS
+ 1 MA              A     R     R     N     M
 @N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN
  1 PL          {first} {last}    40   100    30    40    10
 """
     path = tmp_path / 'TEST9901.MZX'
     path.write_text(text, encoding='latin-1')
-    problems = _check_planting_window(
-        path.read_text(encoding='latin-1'), 1, {'planting_management': 'A'},
-        'Management data treatment 1', start, (start, date(start.year, 12, 31)))
+    sim = Simulation(path, weather=weather(str(start), f'{start.year}-12-31'),
+                     executable=fake_dssat.executable,
+                     management={'treatments': {1: {'controls': {'planting_management': 'A'}}}})
+    problems = sim.check(False)
     assert len(problems) == int(rejected)
     if rejected:
-        assert "'2000-01-01' is after auto_planting_last '1999-12-31'" in problems[0]
+        expected = ("'1936-01-01' is before simulation start date '2035-01-01'" if first == '36001'
+                    else "'2000-01-01' is after auto_planting_last '1999-12-31'")
+        assert expected in problems[0]
 
 
 def test_irrigation_code_change_rejects_noninteger_inherited_mi(tmp_path):

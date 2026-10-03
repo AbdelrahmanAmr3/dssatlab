@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import re
 
 from .experiment import _check_date, _CONTROL_OPTIONS
-from .filex import _section_row
+from .filex import _filex_date, _section_row
 from .weather import _dssat_date
 from .filex_write import _append_rows, _cell, _columns, _new_level, _repoint, _section_bounds
 
@@ -70,7 +70,7 @@ def _season_coverage(source, treatment, start, days, nyers=None):
 def _check_planting_window(text, treatment, controls, where, start_date=None, weather_range=None):
     """Check a changed automatic window against inherited dates and selected weather."""
     from .management import _check_weather_date
-    from .sequence import _parse_sdate, _simulation_start, _simulation_start_date
+    from .sequence import _simulation_start
 
     fields = ("auto_planting_first", "auto_planting_last")
     if not any(field in controls for field in (*fields, "planting_management", "start_date")):
@@ -87,36 +87,20 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
             return []  # No effective A/F code; preserve checks for older FileX layouts.
     if plant not in ("A", "F"):
         return []
-    days = list(weather_range or ())
     if "start_date" in controls:
         general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
         if general["START"] == "S":
             start_date = date.fromisoformat(controls["start_date"])
-    if start_date is not None:
-        days.append(start_date)
-    days.extend(date.fromisoformat(controls[field]) for field in fields if field in controls)
-
-    def inherited_date(code):
-        day, _ = _simulation_start_date(code, days)
-        if day is None and days and (parsed := _parse_sdate(code)) is not None:
-            # An inherited window may lie outside the weather years. Choose the
-            # nearest matching year; a tie belongs to the later century.
-            reference = (start_date or days[0]).year
-            base = reference // 100 * 100 + parsed[0]
-            year = min((y for y in (base - 100, base, base + 100) if 1 <= y <= 9999),
-                       key=lambda y: (abs(y - reference), -y))
-            day, _ = _simulation_start_date(code, [date(year, 1, 1)])
-        return day
 
     if start_date is None:
         general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
         if general["START"] == "S":
-            start_date = inherited_date(general["SDATE"])
+            start_date = _filex_date(general["SDATE"])
         elif general["START"] == "P":
             start_date = _simulation_start(
                 text, treatment, {"treatments": {treatment: {"controls": controls}}})
     row = _section_row(text, "SIMULATION CONTROLS", "N", level, ("PLANTING", "PFRST", "PLAST"))
-    first, last = (date.fromisoformat(controls[field]) if field in controls else inherited_date(row[column])
+    first, last = (date.fromisoformat(controls[field]) if field in controls else _filex_date(row[column])
                    for field, column in zip(fields, ("PFRST", "PLAST")))
     where = f"{where}, controls"
     location = f"{where}, field 'auto_planting_first'"
