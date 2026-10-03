@@ -187,3 +187,13 @@ def test_commented_leading_fallow_example_loads_and_passes(tmp_path, rows, insta
                      soil=rows[1])
     assert sim.check(False) == []
     assert write_filex(loaded, *rows, tmp_path, data_dir=installed.executable.parent).is_file()
+
+
+@pytest.mark.parametrize("override", ["1978-03-14", "1978-03-15"])
+def test_controls_start_not_before_leading_fallow_end(sim, installed, override):
+    sim.weather = weather("1977-12-15", "1978-12-15")
+    sim.management = {"treatments": {1: {"controls": {"start_date": override}}}}
+    problems = sim.check(False)
+    assert any("leading fallow ends on 1978-03-14" in p and override in p
+               for p in problems), problems
+    assert installed.calls == []

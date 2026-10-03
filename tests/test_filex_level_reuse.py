@@ -183,3 +183,16 @@ def test_other_rotation_components_keep_their_levels(
     if shared:
         assert level_rows(written, section, 10) == level_rows(original, section, 10)
     assert path.read_bytes() == original.encode("latin-1")
+
+
+@pytest.mark.parametrize("key,column,section,data,blocks,expected",
+                         [case for case in CASES if case.id == "irrigation"])
+def test_reused_level_drops_rows_under_abbreviated_header(
+        tmp_path, key, column, section, data, blocks, expected):
+    original = filex_text(section, blocks).replace("*" + section, "*IRRIGATION", 1)
+    path = tmp_path / "TEST8201.MZX"
+    path.write_bytes(original.encode("latin-1"))
+    _write_management(path, 3, {"treatments": {3: {key: data}}})
+    written = path.read_bytes().decode("latin-1")
+    assert [row[2:].split() for row in level_rows(written, "IRRIGATION", 3)] == [
+        row.split() for row in expected]

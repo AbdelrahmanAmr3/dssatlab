@@ -278,6 +278,12 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         override = edits.get(number, {})
         planting_override = isinstance(override, dict) and 'planting' in override
         _, planting, end, crop = known[index]
+        if index == 0 and crop == 'FA' and start is not None and end is not None and end <= start:
+            problem = (f'{where}, rotation component {number}: the leading fallow ends on {end}, '
+                       f'not after simulation start date {start}. Move controls start_date '
+                       'before the fallow end, or the fallow end later.')
+            problems.append(problem)
+            report.append(f'      {problem}')
         if crop != 'FA' and planting is not None and end is not None and end <= planting:
             component = template[index] if template is not None else {}
             original_planting = component.get('planting')

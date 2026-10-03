@@ -159,7 +159,7 @@ def _repoint(lines, treatment, column, level, section="TREATMENTS", key="N", *, 
     if rotation is None:
         _section_row("".join(lines), section, key, treatment, (column,))
     treatments = _treatment_rows("".join(lines)) if section == "TREATMENTS" else {}
-    start, end = _section_bounds(lines, section) or (0, 0)
+    start, end = _section_bounds(lines, section.split()[0]) or (0, 0)
     columns = {}
     for index in range(start + 1, end):
         line = lines[index]
@@ -208,7 +208,7 @@ def _new_level(lines, treatment, column, highest, section, *, rotation=None):
             except ValueError:
                 continue
     level = next((n for n in range(1, 100) if n not in used), highest + 1)
-    start, end = _section_bounds(lines, section) or (0, 0)
+    start, end = _section_bounds(lines, section.split()[0]) or (0, 0)
     for index in range(start + 1, end):
         if lines[index].startswith("@"):
             left, right = next(iter(_columns(lines[index]).values()))
