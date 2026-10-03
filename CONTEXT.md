@@ -128,6 +128,12 @@ weather template CSV once: its columns are already in DSSAT's units, so only the
 missing marker (-999 becomes -99) change. It is never passed as `weather=` directly.
 _Avoid_: POWER weather, downloaded weather
 
+**Weather summary**:
+What `summarize_weather()` returns for weather data that passes the weather checks: station values,
+first and last date, day count, min/mean/max per variable, rain total and one row per calendar year.
+Only the user's weather data (the weather template), never a stock weather file.
+_Avoid_: weather report, weather statistics
+
 **Simulation start date**:
 The day used by the start-day, season and sequence coverage checks: SDATE under START S,
 resolved from the years the weather covers, or the effective planting date under START P.
@@ -167,6 +173,12 @@ soil profile IDs.
 **Soil profile**:
 One named set of soil layers in a soil file, identified by the FileX's `ID_SOIL`. The
 soil template describes exactly one.
+
+**Soil summary**:
+What `summarize_soil()` returns for soil data that passes the soil checks: the soil profile ID,
+layer count, depth, extractable water (sum of DUL minus LL over the layers, mm) and the profile
+values. Only the user's soil data (the soil template), never a stock soil file.
+_Avoid_: soil report
 
 **Level**:
 One numbered entry of a FileX section (a planting, an irrigation schedule, a fertilizer
