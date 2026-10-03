@@ -6,7 +6,7 @@ to the notebook's current directory; replace them with your own FileX path.
 
 ## Run all treatments or one treatment
 
-Omit `treatment` to run all treatments in the FileX:
+For a non-sequence, non-forecast FileX, omit `treatment` to run all treatments:
 
 ```python
 import dssatlab as dl
@@ -31,9 +31,10 @@ treatment number has two or more rows when read with those columns; the filename
 extension does not decide this. See [ADR 0018](../adr/0018-treatment-rows-read-with-dssats-fixed-columns.md).
 
 The FileX must exist. Its filename must contain **at most 12 characters including
-the extension**, following DSSAT's 8.3 style, such as `UFGA8201.MZX`. This limit
-applies to the filename, not the full path. A missing FileX or an overlong
-filename raises `DSSATRunError` before DSSAT starts.
+the extension**, and **exactly 12 for sequence and forecast runs**, following
+DSSAT's 8.3 style, such as `UFGA8201.MZX`. This limit applies to the filename,
+not the full path. A missing FileX or an invalid filename length raises
+`DSSATRunError` before DSSAT starts.
 
 Without `executable`, `run()` uses `connect(interactive=False)`: it discovers and
 remembers a DSSAT executable but never prompts to install one. To choose a DSSAT
@@ -53,6 +54,91 @@ Replace the example path with your DSSAT executable. An explicit `executable`
 is checked without changing saved config. A directory directly containing the
 DSSAT executable is also accepted.
 
+## Run modes, sequences and forecasts
+
+`run()` picks DSSAT's run mode from the FileX; there is no mode argument:
+
+| FileX and selection | DSSAT run mode |
+|---|---|
+| `.FCX` extension, in any case | Y: forecast, all treatments or the selected treatment |
+| Otherwise, a selected treatment number has two or more TREATMENTS rows | Q: sequence, whatever the extension |
+| Otherwise, `treatment=None` (the default) | A: all treatments |
+| Otherwise, `treatment=n` | C: one treatment |
+
+A sequence carries soil water and nitrogen from one rotation component to the
+next. If its FileX has only one treatment number, you can omit `treatment`:
+
+```python
+result = dl.run("MSKB8902.SQX")
+print(len(result.summary()))
+```
+
+If a FileX contains a sequence and more than one treatment number, pass
+`treatment=n` for each treatment separately. DSSAT's Q mode runs one continuous
+batch and would carry one treatment into the next. See [sequence analysis](sequence.md).
+
+A forecast FileX runs in Y mode, using observed weather up to its forecast date
+(FODAT), then producing results for historical weather years:
+
+```python
+result = dl.run("UFAC2301.FCX")
+```
+
+Forecast runs through `Simulation` and `run_treatments()` are for a later release.
+`Simulation.check()` reports:
+
+```text
+FileX UFAC2301.FCX is a forecast FileX: a Simulation does not run forecast mode (Y). Call run() on the FileX instead.
+```
+
+For Q and Y, `run()` writes `DSSBatch.v48` in the FileX folder and invokes
+`<executable> Q DSSBatch.v48` or `<executable> Y DSSBatch.v48`. Q has one batch
+row per rotation component; Y has one per selected treatment. A/C use no batch
+file. See [ADR 0022](../adr/0022-run-picks-dssats-run-mode-from-the-filex.md).
+
+### Guards before DSSAT starts
+
+Each guard raises `DSSATRunError` before running. The messages below use example
+filenames and treatment numbers; `<folder>` stands for the resolved FileX folder.
+An existing `DSSBatch.v48` is refused for Q/Y and is never overwritten:
+
+```text
+Cannot run FileX MSKB8902.SQX in sequence mode (Q): <folder> already holds DSSBatch.v48, which run() writes. Nothing was run. Move or rename it, or use Simulation, which runs in its own folder.
+```
+
+For Y, the message says `forecast mode (Y)` in place of `sequence mode (Q)`.
+Use `run()` for forecasts; a Simulation does not run them. A/C ignore an existing
+batch file. An 11-character name is refused for Q/Y:
+
+```text
+Cannot run FileX 'MSKB892.SQX': its filename has 11 characters; DSSAT's sequence mode (Q) accepts exactly 12. Rename the FileX to exactly 12 characters, including the extension, using DSSAT's 8.3 style.
+Cannot run FileX 'UFAC231.FCX': its filename has 11 characters; DSSAT's forecast mode (Y) accepts exactly 12. Rename the FileX to exactly 12 characters, including the extension, using DSSAT's 8.3 style.
+```
+
+With `treatment=None`, a sequence FileX with treatment numbers 1, 2 and 3 is refused:
+
+```text
+Cannot run FileX ROTATE01.SQX in sequence mode (Q) without a treatment: it has treatments 1, 2, 3, and DSSAT runs one continuous batch, carrying each treatment into the next. Nothing was run. Pass run(filex, treatment=n) for each treatment.
+```
+
+The existing guards still apply first: the FileX must exist, names longer than
+12 characters are refused, and CSV files DSSAT would delete must be moved or
+renamed. Their messages are:
+
+```text
+Cannot run FileX <path>: it does not exist or is not a file. Pass the path to an existing FileX.
+Cannot run FileX 'MSKB89021.SQX': its filename has 13 characters; DSSAT accepts at most 12. Rename the FileX to at most 12 characters, including the extension, using DSSAT's 8.3 style.
+Cannot run FileX MSKB8902.SQX: DSSAT deletes files named like its own Output files from the FileX folder, and <folder> holds weather.csv. Nothing was run. Rename or move them (for example my_weather.csv), or use Simulation, which runs in its own folder.
+```
+
+### Checked on real DSSAT
+
+On stock MSKB8902.SQX, `run()` in Q mode matched DSSAT's own run on all 55/55
+Summary rows; UFAC2301 in Y mode matched on all 46/46 rows. The compared columns
+were RUNNO, TRNO, HWAM, HDAT, CWAM and PRCM, identical in each case. An
+11-character FileX name was refused before DSSAT ran. An existing `DSSBatch.v48`
+was refused and left byte-identical.
+
 ## Where the files go
 
 DSSAT runs in the FileX's own folder, where it can find the weather file and other
@@ -65,6 +151,10 @@ timestamps changed into the run directory. Unchanged files stay beside the FileX
 This also means that a pre-existing file overwritten by DSSAT is moved; its
 previous contents are not restored. Use a copy of the FileX and supporting files
 if you need to preserve that folder exactly.
+
+The generated Q/Y `DSSBatch.v48` moves into the run directory with the outputs,
+whether DSSAT succeeds or fails. If DSSAT cannot be started, dssatlab deletes
+the generated batch file and the empty run directory.
 
 ## Inspect the run result
 

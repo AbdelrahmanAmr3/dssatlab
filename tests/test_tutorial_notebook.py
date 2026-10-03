@@ -32,6 +32,25 @@ def test_weather_file_is_committed():
     assert (DATA / "my_weather.csv").is_file()
 
 
+def test_case17_is_an_unexecuted_stock_sequence_run():
+    cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
+    start = next(i for i, cell in enumerate(cells)
+                 if "".join(cell["source"]).startswith("## Case 17:"))
+    calls = []
+    for cell in cells[start:]:
+        if cell["cell_type"] != "code":
+            continue
+        assert cell["execution_count"] is None and cell["outputs"] == []
+        tree = ast.parse("".join(cell["source"]))
+        calls.extend(node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                     and isinstance(node.func, ast.Attribute) and node.func.attr == "run")
+    assert len(calls) == 1
+    call = calls[0]
+    assert isinstance(call.func.value, ast.Name) and call.func.value.id == "dl"
+    assert ast.literal_eval(call.args[0]) == "case17_sequence/MSKB8902.SQX"
+    assert call.keywords == []  # run() selects sequence mode from the FileX.
+
+
 def test_case16_residue_passes_checks(sim_inputs):
     cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
     values = {}
