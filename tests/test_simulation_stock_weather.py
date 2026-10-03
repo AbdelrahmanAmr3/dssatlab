@@ -7,6 +7,8 @@ import pytest
 
 import dssatlab as lab
 from dssatlab.filex import _read_filex
+from dssatlab.sequence import _rotation_components
+from dssatlab.stock import _simulation_weather
 from test_filex_template import data, rows
 from test_scenarios import batch_inputs
 from test_sequence import sequence
@@ -311,15 +313,19 @@ def test_supplied_preferred_name_wins_over_installed_file(inputs, fake_dssat, tm
     assert_copied(sim.run(), [path])
 
 
-def test_configured_weather_path_is_checked(inputs, fake_dssat, tmp_path, monkeypatch):
+@pytest.mark.parametrize('os_name,profile', [
+    ('windows', 'DSSATPRO.V48'), ('linux', 'DSSATPRO.L48'),
+])
+def test_configured_weather_path_is_checked(inputs, fake_dssat, tmp_path, monkeypatch,
+                                          os_name, profile):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(lab.core, '_os_name', lambda: os_name)
     monkeypatch.setattr(lab.core, 'detect', lambda: {'dssat_path': fake_dssat.executable})
     weather_dir = tmp_path / 'ConfiguredWeather'
     weather_dir.mkdir()
     installed_file = weather_dir / 'UFGA8201.WTH'
     installed_file.write_text('installed weather', encoding='ascii')
-    pro = fake_dssat.executable.parent / (
-        'DSSATPRO.W48' if lab.core._os_name() == 'windows' else 'DSSATPRO.L48')
+    pro = fake_dssat.executable.parent / profile
     pro.write_text('WED    ConfiguredWeather\n', encoding='ascii')
     sim = lab.Simulation(inputs.filex, 2, stock_file(tmp_path, 'UFGA.WTH'))
     problems = sim.check(False)
@@ -336,3 +342,37 @@ def test_stock_century_boundary_covers_simulation_start(inputs, tmp_path):
     inputs.filex.write_text(inputs.filex.read_text().replace('82056', '00001'))
     path = weather_file(tmp_path, 'UFGA.WTH', ('99365', '00001', '00002'))
     assert lab.Simulation(inputs.filex, 2, path).check(False) == []
+
+
+@pytest.mark.parametrize('start,override', [
+    ('P', False), ('P', True), ('S', False), ('E', False),
+])
+def test_stock_weather_uses_effective_start_date(tmp_path, start, override):
+    sim = harvest_simulation(tmp_path, level=1, harvest='84057')
+    text = sim.filex.read_text().replace('UFGA       -99', 'UFGA8401   -99')
+    text = text.replace('     S 82056', f'     {start} {"84056" if start == "S" else "82056"}')
+    text = text.replace('  1  1  0  0  0  0  0  0  0  0  0  1  1',
+                        '  1  1  0  0  1  0  0  0  0  0  0  1  1')
+    text += ('\n*PLANTING DETAILS\n'
+             '@P PDATE EDATE  PPOP  PPOE  PLME  PLDS  PLRS  PLRD  PLDP  PLWT  PAGE'
+             '  PENV  PLPH  SPRL\n'
+             f' 1 {"82056" if override else "84056"}   -99    10    10     S     R'
+             '    75     0     5   -99   -99   -99   -99   -99\n')
+    sim.filex.write_text(text, encoding='ascii')
+    if override:
+        sim.management = {'treatments': {'07': {'planting': {
+            'date': '1984-02-25', 'method': 'S', 'distribution': 'R',
+            'population': 10, 'depth': 5, 'row_spacing': 75}}}}
+    sim.weather = stock_file(tmp_path, 'UFGA8401.WTH',
+                             days=[date(1984, 2, 25), date(1984, 2, 26)])
+    assert sim.check(False) == []
+    if start in ('P', 'E') and not override:
+        # This override changes SDATE only; IPEXP still uses planting/emergence.
+        values, problems = _read_filex(sim.filex, sim.treatment)
+        assert problems == []
+        rows, problems = _simulation_weather(sim, values, {'treatments': {
+            7: {'controls': {'start_date': '1982-02-25'}}}},
+            _rotation_components(sim.filex, sim.treatment))
+        assert problems == []
+        assert [row['date'] for row in rows] == (
+            [date(1984, 2, 25), date(1984, 2, 26)] if start == 'P' else [])

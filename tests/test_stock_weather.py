@@ -58,8 +58,8 @@ def test_adjacent_numeric_values_are_read_by_spans(tmp_path):
     path.write_text(
         "@ INSI      LAT     LONG  ELEV\n"
         "  UFGA  -90.000 -180.000  -500\n"
-        "@DATE  SRAD  TMAX  TMIN  RAIN\n"
-        "76001  20.0 -10.0 -60.01000.0\n", encoding="ascii")
+        "@DATE  SRAD  TMAX  TMIN   RAIN\n"
+        "76001  20.0 -10.0 -60.0N1000.0\n", encoding="ascii")
     rows, problems = read(path)
     assert problems == []
     assert rows[0] == dict(station="UFGA", latitude=-90.0, longitude=-180.0,
@@ -198,6 +198,21 @@ def test_initial_record_before_century_boundary_covers_start(tmp_path):
     assert problems == []
     assert [row["date"] for row in rows] == [date(1999, 12, 31),
                                            date(2000, 1, 1), date(2000, 1, 2)]
+    assert _parse_weather(rows)[1] == []
+
+
+def test_ccpa_flags_in_separator_columns(tmp_path):
+    path = tmp_path / "CCPA8001.WTH"
+    path.write_text(
+        "@ INSI      LAT     LONG  ELEV\n"
+        "  CCPA   10.000  -85.000    10\n"
+        "@DATE  SRAD  TMAX  TMIN  RAIN\n"
+        "80001  19.8N 29.1N 19.0N  0.0N\n", encoding="ascii")
+    rows, problems = read(path, start=date(1980, 1, 1), station="CCPA")
+    assert problems == []
+    assert rows[0] == dict(station="CCPA", latitude=10.0, longitude=-85.0,
+                           elevation=10.0, date=date(1980, 1, 1),
+                           srad=19.8, tmax=29.1, tmin=19.0, rain=0.0)
     assert _parse_weather(rows)[1] == []
 
 

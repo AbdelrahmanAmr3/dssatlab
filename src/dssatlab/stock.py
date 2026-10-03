@@ -11,7 +11,7 @@ from .experiment import _overrides_section
 from .filex import _filex_date, _weather_filename
 from .irrigation import _effective_management
 from .operations import _harvest_end
-from .rotation_data import _level_date
+from .rotation_data import _calendar_date, _level_date
 from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
@@ -20,13 +20,14 @@ from .weather import _parse_weather, write_weather_file
 def _header_spans(header):
     """Return header names and their data slices, bounded by label ends."""
     # DSSAT-CSM v4.8.6.0, Weather/IPWTH_alt.for, IPWTH/IpWRec use
-    # Utilities/READS.for, PARSE_HEADERS: each span ends at its header label.
+    # Utilities/READS.for, PARSE_HEADERS (1015, 1029-1032): end at the label;
+    # the next span starts one past its following blank (a value flag column).
     columns, start = {}, 0
     for token in re.finditer(r"\S+", header.split("!", 1)[0]):
         name = token.group().lstrip("@").rstrip(".").upper()
         if name:
             columns[name] = slice(start, token.end())
-            start = token.end()
+            start = token.end() + 1
     return columns
 
 
@@ -94,7 +95,9 @@ def _stock_weather_shadow(paths, station, start_date, end_date, executable):
     weather_dir = found.parent / "Weather"
     # DSSAT-CSM v4.8.6.0, InputModule/PATH.for, PATH (49-65): WED in
     # DSSATPRO selects the installed weather path, including split drive/path.
-    pro = found.parent / ("DSSATPRO.W48" if core._os_name() == "windows" else "DSSATPRO.L48")
+    # Utilities/OSDefsWINDOWS.for / OSDefsLINUX.for (15) define V48 / L48;
+    # InputModule/PATH.for, PATHD (144) uses that DSSATPRO constant.
+    pro = found.parent / ("DSSATPRO.V48" if core._os_name() == "windows" else "DSSATPRO.L48")
     try:
         for line in pro.read_text(encoding="latin-1").splitlines():
             if line.startswith("WED"):
@@ -272,12 +275,34 @@ def _simulation_weather(sim, values, experiment_data, components, *, executable=
     paths = _stock_weather_paths(sim.weather)
     if paths is None:
         return _parse_weather(sim.weather)
-    start = (_controls_start_date(experiment_data, sim.treatment)
-             or _filex_date(values.get("SDATE")))
-    if start is None and re.fullmatch(r"[0-9]{5}", values.get("SDATE", "")):
+    if "WSTA" not in values:
+        return [], []  # The FileX checks explain the missing station.
+    entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
+    entry = next((value for key, value in entries.items()
+                  if str(key).isascii() and str(key).isdigit() and int(key) == int(sim.treatment)
+                  and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
+    text = Path(sim.filex).read_text(encoding="latin-1")
+    # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for, IPEXP (655-663):
+    # START P uses YRPLT, S uses YRSIM; E needs an unavailable emergence date.
+    start = ((_controls_start_date(experiment_data, sim.treatment)
+              or _filex_date(values.get("SDATE"))) if values.get("START") == "S" else None)
+    if start is None and values.get("START") == "P" and components:
+        planting_entry = entry
+        if len(components) > 1:
+            edits = entry.get("rotation", {})
+            planting_entry = next((value for key, value in edits.items()
+                                   if str(key).isascii() and str(key).isdigit()
+                                   and components[0]["R"].isdigit()
+                                   and int(key) == int(components[0]["R"]) and isinstance(value, dict)),
+                                  {}) if isinstance(edits, dict) else {}
+        planting = planting_entry.get("planting")
+        start = (_calendar_date(planting.get("date")) if isinstance(planting, dict) else
+                 _level_date(text, components[0], "MP", "PLANTING DETAILS", "P", "PDATE"))
+    if (start is None and values.get("START") == "S"
+            and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))):
         return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
                     "Supply five digits: two-digit year followed by three-digit day of year."]
-    if start is None or "WSTA" not in values:
+    if start is None:
         # The FileX checks explain what is missing; do not guess a weather century.
         return [], []
     years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
@@ -288,11 +313,6 @@ def _simulation_weather(sim, values, experiment_data, components, *, executable=
     end = _sequence_stop(start, years) or date.max
     harvest = None
     if len(components) == 1:
-        entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
-        entry = next((value for key, value in entries.items()
-                      if str(key).isascii() and str(key).isdigit() and int(key) == int(sim.treatment)
-                      and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
-        text = Path(sim.filex).read_text(encoding="latin-1")
         code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
         if code == "R":
             harvest = _harvest_end(entry, _level_date(
