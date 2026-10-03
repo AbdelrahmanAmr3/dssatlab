@@ -264,3 +264,18 @@ def test_later_first_planting_counts_years_from_sdate(rotation, rows, installed)
     written = next(result.run_dir.parent.glob('*.SQX')).read_text()
     controls = _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS', 'SDATE'))
     assert (controls['NYERS'], controls['SDATE']) == ('2', '78074')
+
+
+def test_later_planting_and_final_harvest_reach_dssat_stop(rotation, rows, installed):
+    # DSSAT stops the day before SDATE's day of year, so 1979-04-14 needs two years.
+    rotation['rotation'][2]['cultivar']['code'] = 'IB0488'
+    planting = dict(rotation['rotation'][0]['planting'], date='1978-04-15')
+    sim = Simulation(filex_template=rotation, soil=rows[1],
+                     weather=weather('1978-03-15', '1981-03-15'),
+                     management={'treatments': {1: {'rotation': {
+                         1: {'planting': planting}, 4: {'harvest': [{'date': '1979-04-14'}]}}}}})
+    assert sim.check(False) == []
+    result = sim.run()
+    written = next(result.run_dir.parent.glob('*.SQX')).read_text()
+    controls = _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS', 'SDATE'))
+    assert (controls['NYERS'], controls['SDATE']) == ('2', '78074')

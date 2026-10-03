@@ -137,10 +137,10 @@ def _check_cycle_closure(start_date, end_date, where):
 
 
 def _rotation_cycle_years(components, experiment_data=None, start=None):
-    """Cycle years from start (SDATE) to the end plus one day, the next cycle's year.
+    """Fewest cycle years from start (SDATE) whose DSSAT stopping day reaches the end.
 
     Date-order and cycle-closure checks belong to the caller. Do not clamp or
-    repair dates here: the end plus one day determines the next cycle's year.
+    repair dates here.
     """
     last = components[-1]
     end = last.get("end_date") if last["crop"] == "fallow" else last["harvest_date"]
@@ -158,9 +158,13 @@ def _rotation_cycle_years(components, experiment_data=None, start=None):
             edits, _ = _rotation_keys(entry.get('rotation', {}), rows, '')
             end = _harvest_end(edits.get(len(components)), end, 'R') or end
             break
-    # Avoid overflowing datetime at 9999-12-31; only the resulting year is needed.
-    next_year = end.year + 1 if (end.month, end.day) == (12, 31) else (end + timedelta(days=1)).year
-    return next_year - start.year
+    # DSSAT stops the day before SDATE's day of year in year SDATE + NYERS
+    # (see sequence._sequence_coverage), so take the fewest years reaching the end.
+    years = 1
+    while (start.year + years <= date.max.year and
+           date(start.year + years, 1, 1) + timedelta(days=start.timetuple().tm_yday - 2) < end):
+        years += 1
+    return years
 
 
 def _render_rotation(data, weather_rows, soil_rows):
