@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dssatlab.stock import _read_stock_weather
+from dssatlab.weather_files import _read_stock_weather, _walk_weather_files
 from dssatlab.weather import _parse_weather
 
 
@@ -16,8 +16,8 @@ def test_stock_weather_term_describes_copy_and_checked_daily_columns():
     assert "srad, tmax, tmin and rain" in term
 
 
-def read(source, start=date(1976, 1, 1), end=None, station="UFGA"):
-    return _read_stock_weather(source, station, start, end)
+def read(source, start=date(1976, 1, 1)):
+    return _read_stock_weather(source, start)
 
 
 def weather_file(tmp_path, name="UFGA7601.WTH", codes=("76001",), *,
@@ -35,6 +35,15 @@ def weather_file(tmp_path, name="UFGA7601.WTH", codes=("76001",), *,
         lines.append(code + "    0.0 junk!   15.0  20.0N   25.0" + ("  50.0N" if par else ""))
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
     return path
+
+
+def test_reader_needs_only_source_and_start_date(tmp_path):
+    path = weather_file(tmp_path, 'UFGA4001.WTH', ('1940069', '1940070'), wide=True)
+    before = path.read_bytes()
+    rows, problems = _read_stock_weather(path, date(1940, 3, 9))
+    assert problems == []
+    assert [row['date'] for row in rows] == [date(1940, 3, 9), date(1940, 3, 10)]
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("wide,code,start", [
@@ -82,7 +91,7 @@ def test_adjacent_numeric_values_are_read_by_spans(tmp_path):
 ])
 def test_five_digit_dates_use_weather_century(tmp_path, codes, start, expected):
     path = weather_file(tmp_path, "UFGA.WTH", codes)
-    rows, problems = read(path, start=start, end=expected[-1])
+    rows, problems = read(path, start=start)
     assert problems == []
     assert [row["date"] for row in rows] == expected
     assert _parse_weather(rows)[1] == []
@@ -106,14 +115,14 @@ def test_invalid_weather_date_is_one_file_problem(tmp_path, wide, code, start):
 def test_files_keep_given_order_and_duplicates_for_existing_checks(tmp_path):
     first = weather_file(tmp_path, "UFGA7601.WTH", ("76366",))
     second = weather_file(tmp_path, "UFGA7701.WTH", ("76366", "77001"))
-    rows, problems = read([first, second], start=date(1976, 12, 31), end=date(1977, 1, 1))
+    rows, problems = read([first, second], start=date(1976, 12, 31))
     assert problems == []
     assert [row["date"] for row in rows] == [date(1976, 12, 31),
                                             date(1976, 12, 31), date(1977, 1, 1)]
     checks = _parse_weather(rows)[1]
     assert len(checks) == 1
     assert "duplicate date 1976-12-31" in checks[0]
-    rows, problems = read([second, first], start=date(1976, 12, 31), end=date(1977, 1, 1))
+    rows, problems = read([second, first], start=date(1976, 12, 31))
     assert problems == []
     assert [row["date"] for row in rows] == [date(1976, 12, 31),
                                             date(1977, 1, 1), date(1976, 12, 31)]
@@ -122,34 +131,31 @@ def test_files_keep_given_order_and_duplicates_for_existing_checks(tmp_path):
 def test_century_carries_across_yearly_files(tmp_path):
     first = weather_file(tmp_path, "UFGA9901.WTH", ("99365",))
     second = weather_file(tmp_path, "UFGA0001.WTH", ("00001",))
-    rows, problems = read([first, second], start=date(1999, 12, 31), end=date(2000, 1, 1))
+    rows, problems = read([first, second], start=date(1999, 12, 31))
     assert problems == []
     assert [row["date"] for row in rows] == [date(1999, 12, 31), date(2000, 1, 1)]
 
 
-@pytest.mark.parametrize("name,station", [
-    ("UFGA7601.WTH", "UFGA"), ("UFGA7701.WTH", "UFGA"),
-    ("ufga.wth", "UFGA"), ("UFGA7609.WTH", "UFGA7609"),
-    ("UFGA.WTH", "UFGA7609"),
-    ("UFGA7701.WTH", "UFGA7601"),
+@pytest.mark.parametrize("name", [
+    "UFGA7601.WTH", "UFGA7701.WTH", "ufga.wth", "UFGA7609.WTH", "UFGA.WTH",
 ])
-def test_names_dssat_opens_are_accepted(tmp_path, name, station):
+def test_reader_decodes_names_before_selection(tmp_path, name):
     path = weather_file(tmp_path, name, par=False)
-    rows, problems = read(path, station=station, end=date(1977, 1, 1))
+    rows, problems = read(path)
     assert problems == []
     assert "par" not in rows[0]
 
 
 @pytest.mark.parametrize("name,station,expected", [
-    ("UFGA7609.WTH", "UFGA", ["UFGA7601.WTH", "UFGA7701.WTH", "UFGA.WTH"]),
-    ("UFGA7801.WTH", "UFGA", ["UFGA7601.WTH", "UFGA7701.WTH", "UFGA.WTH"]),
-    ("OTHER.WTH", "UFGA7609", ["UFGA7609.WTH", "UFGA.WTH"]),
+    ("UFGA7609.WTH", "UFGA", "UFGA7601.WTH"),
+    ("UFGA7801.WTH", "UFGA", "UFGA7601.WTH"),
+    ("OTHER.WTH", "UFGA7609", "UFGA7609.WTH"),
 ])
-def test_wrong_name_reports_file_and_expected_names_once(tmp_path, name, station, expected):
+def test_wrong_name_reports_file_and_requested_name_once(tmp_path, name, station, expected):
     path = weather_file(tmp_path, name)
-    _, problems = read(path, station=station, end=date(1977, 1, 1))
+    _, problems = _walk_weather_files([path], station, "76001", date(1976, 1, 1), date(1976, 1, 1))
     assert len(problems) == 1
-    assert all(value in problems[0] for value in [str(path), *expected, "Rename"])
+    assert all(value in problems[0] for value in (name, expected, "Checked", "Supply"))
 
 
 def test_uppercase_name_collision_in_two_folders_is_one_problem(tmp_path):
@@ -208,7 +214,7 @@ def test_ccpa_flags_in_separator_columns(tmp_path):
         "  CCPA   10.000  -85.000    10\n"
         "@DATE  SRAD  TMAX  TMIN  RAIN\n"
         "80001  19.8N 29.1N 19.0N  0.0N\n", encoding="ascii")
-    rows, problems = read(path, start=date(1980, 1, 1), station="CCPA")
+    rows, problems = read(path, start=date(1980, 1, 1))
     assert problems == []
     assert rows[0] == dict(station="CCPA", latitude=10.0, longitude=-85.0,
                            elevation=10.0, date=date(1980, 1, 1),

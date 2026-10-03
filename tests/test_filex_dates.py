@@ -182,3 +182,16 @@ def test_identity_edits_three_column_fields_level():
     row = next(line for line in _identity_text(text, 1, None, 'ABCD', 'XYZW000001').splitlines()
                if 'UFGA0002' in line)
     assert ' ABCD ' in row and 'XYZW000001' in row
+
+
+@pytest.mark.parametrize('code', ['A', 'F'])
+def test_start_p_automatic_planting_keeps_harvest_start_bound(tmp_path, code):
+    sim = dated_simulation(tmp_path, '82056', '82079', '82074', '1982-01-01')
+    text = sim.filex.read_text().replace('     S 82056', '     P 82056')
+    sim.filex.write_text(text.replace(' 1 MA              R', f' 1 MA              {code}'))
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert all(part in problems[0] for part in (
+        "FileX HDATE '82074'", 'harvest level 1',
+        'simulation start date (1982-03-20)', 'Move HDATE on or after'))
+    assert 'planting date (' not in problems[0]

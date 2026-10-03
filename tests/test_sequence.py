@@ -306,10 +306,12 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
 
 
 @pytest.mark.parametrize("replacement", ["P 78110", "S XXXXX", "S 79110"])
-def test_sequence_unresolved_start_skips_coverage(sequence, replacement):
+def test_sequence_coverage_uses_start_p_and_skips_unresolved_s(sequence, replacement):
     sequence.filex.write_text(sequence.filex.read_text().replace("S 78110", replacement))
     sequence.weather = weather("1978-04-20", "1978-04-21")
-    assert not any("sequence runs from" in p or "season 1" in p for p in sequence.check(False))
+    problems = sequence.check(False)
+    assert any("sequence runs from" in p for p in problems) == (replacement == "P 78110")
+    assert not any("season 1" in p for p in problems)
 
 
 @pytest.mark.parametrize("override", [False, True])

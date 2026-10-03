@@ -122,6 +122,17 @@ The one fixed CSV shape (named columns, DSSAT's own units) a user must put their
 data in. Weather data that does not follow it is rejected by the checks, never guessed at.
 _Avoid_: input format, schema
 
+**NASA POWER file**:
+A daily point CSV downloaded by the user from NASA POWER. `import_nasa_power()` turns it into a
+weather template CSV once: its columns are already in DSSAT's units, so only the names and the
+missing marker (-999 becomes -99) change. It is never passed as `weather=` directly.
+_Avoid_: POWER weather, downloaded weather
+
+**Simulation start date**:
+The day used by the start-day, season and sequence coverage checks: SDATE under START S,
+resolved from the years the weather covers, or the effective planting date under START P.
+controls.start_date replaces SDATE under START S only.
+
 **Weather file**:
 The DSSAT `*.WTH` file generated from weather data. DSSAT finds it beside the FileX.
 

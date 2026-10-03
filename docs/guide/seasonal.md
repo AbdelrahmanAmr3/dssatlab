@@ -102,8 +102,9 @@ No batch file or custom run mode is required ([ADR 0012](../adr/0012-seasons-thr
 DSSAT determines the start date of each season using a fixed calendar day-of-year rule:
 
 Season k (1-based) starts on **day of year D of year Y + k - 1**,
-where Y and D come from the simulation start date (controls `start_date`, else FileX `SDATE` when
-`START` is `S`, else the template planting date).
+where Y and D come from the simulation start date: `controls.start_date`, else
+SDATE under START S; the effective planting date under START P.
+See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
 
 - For example, if season 1 starts on `1978-03-01` (day of year 60 in 1978), season 3 (year 1980) starts
   on day of year 60 of 1980, which is **`1980-02-29`** because 1980 is a leap year.

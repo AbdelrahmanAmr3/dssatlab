@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from pathlib import Path
 import re
 
-from .controls import _selected_controls
+from .controls import _controls_start_date, _selected_controls
 from .filex import _filex_date, _section_row, _section_rows, _treatment_rows
 from .filex_write import _columns
 from .runner import _batch_text, _run_command, _run_mode
@@ -261,3 +261,34 @@ def _simulation_start_date(sdate, days):
     if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
         return None, f"day {doy} does not exist in {year}; correct SDATE"
     return date(year, 1, 1) + timedelta(days=doy - 1), None
+
+
+def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> date | None:
+    """Return the effective S/P start of the first component."""
+    from .experiment import _check_date
+
+    try:
+        row = _section_row(text, "TREATMENTS", "N", int(treatment), ("SM",))
+        general = _section_row(text, "SIMULATION CONTROLS", "N", int(row["SM"]),
+                               ("GENERAL", "START", "SDATE"))
+        if general["START"] == "S":
+            return (_controls_start_date(experiment_data, treatment)
+                    or _simulation_start_date(general["SDATE"], weather_dates)[0])
+        if general["START"] != "P":
+            return None
+        entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
+        entry = next((v for k, v in entries.items() if str(k).isascii() and str(k).isdigit()
+                      and int(k) == int(treatment) and isinstance(v, dict)), {}) if isinstance(entries, dict) else {}
+        components = _rotation_components(None, treatment, text=text)
+        if len(components) > 1:
+            edits = entry.get("rotation", {})
+            entry = next((v for k, v in edits.items() if str(k).isascii() and str(k).isdigit()
+                          and int(k) == int(row["R"]) and isinstance(v, dict)), {}) if isinstance(edits, dict) else {}
+        planting = entry.get("planting")
+        if isinstance(planting, dict):
+            value = planting.get("date")
+            return None if _check_date(value, "date") else date.fromisoformat(value)
+        details = _section_row(text, "PLANTING DETAILS", "P", int(row["MP"]), ("PDATE",))
+        return _filex_date(details["PDATE"])
+    except (ValueError, TypeError, KeyError):
+        return None  # Ordinary FileX/experiment checks explain unreadable inputs.

@@ -16,7 +16,7 @@ from .rotation_data import _write_rotation_data
 from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
 from .sequence import (_check_sequence, _rotation_components, _run_sequence,
                        _sequence_coverage, _sequence_experiment_data,
-                       _parse_sdate, _simulation_start_date)
+                       _parse_sdate, _simulation_start, _simulation_start_date)
 from .stock import (_simulation_soil, _simulation_weather, _stock_weather_paths,
                     _write_simulation_soil, _write_simulation_weather)
 
@@ -90,7 +90,7 @@ class Simulation:
         ranges, date order, duplicates, and gaps; reads the FileX for treatment
         validity, field station code (WSTA), and start controls (START, SDATE);
         ensures FileX filename is at most 12 characters and weather data covers
-        SDATE when START is 'S'. Checks soil data and scenario name column fit.
+        the simulation start under START S/P. Checks soil and scenario name.
         With experiment overrides, checks field edits in memory; otherwise
         requires matching weather station and soil profile IDs.
         """
@@ -103,6 +103,8 @@ class Simulation:
         edit_identity = _overrides_section(experiment_data, self.treatment)
         override_start = _controls_start_date(experiment_data, self.treatment)
         values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
+        if values.get("START") != "S":
+            override_start = None
         components = _rotation_components(self.filex, self.treatment)
         rows, weather_problems = _simulation_weather(self, values, experiment_data, components)
         if isinstance(self.weather, dict):
@@ -139,6 +141,13 @@ class Simulation:
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate, days))
+        if values.get("START") == "P":
+            try:
+                text = Path(self.filex).read_text(encoding="latin-1")
+            except (OSError, TypeError, ValueError):
+                text = ""
+            start_date = _simulation_start(text, self.treatment, experiment_data, days)
+            skip_reason = None if start_date is not None else "START P planting date is unavailable; check PDATE"
         if len(components) > 1:
             filex_problems.extend(_sequence_coverage(
                 experiment_data, self.treatment, start_date, days, values.get("NYERS"), filex=self.filex))
@@ -158,14 +167,19 @@ class Simulation:
                 filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
-        if override_start is not None and days and not _overrides_section(
+        if values.get("START") == "P" and start_date is not None and days and start_date not in days:
+            filex_problems.append(f"Simulation start date {start_date.isoformat()!r} is not "
+                                 f"covered by weather data ({min(days)} to {max(days)}). "
+                                 "Supply weather for the simulation's start date.")
+        if (override_start is not None or values.get("START") == "P") and start_date is not None and days and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
             irrigation = [_simulation_start_date(text, days)[0]
                           for text in _irrigation_dates(self.filex, self.treatment)]
             irrigation = [day for day in irrigation if day is not None]
-            if irrigation and min(irrigation) < override_start:
-                filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is "
+            if irrigation and min(irrigation) < start_date:
+                label = "Controls start_date" if override_start is not None else "Simulation start date"
+                filex_problems.append(f"{label} {start_date.isoformat()!r} is "
                                      f"after the FileX's first irrigation date {min(irrigation)}; "
                                      "DSSAT stops with error IPIRR. Start on or before that date, "
                                      "or give irrigation in the management data.")

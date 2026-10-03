@@ -70,7 +70,7 @@ def _season_coverage(source, treatment, start, days, nyers=None):
 def _check_planting_window(text, treatment, controls, where, start_date=None, weather_range=None):
     """Check a changed automatic window against inherited dates and selected weather."""
     from .management import _check_weather_date
-    from .sequence import _parse_sdate, _simulation_start_date
+    from .sequence import _parse_sdate, _simulation_start, _simulation_start_date
 
     fields = ("auto_planting_first", "auto_planting_last")
     if not any(field in controls for field in (*fields, "planting_management", "start_date")):
@@ -89,7 +89,9 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
         return []
     days = list(weather_range or ())
     if "start_date" in controls:
-        start_date = date.fromisoformat(controls["start_date"])
+        general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
+        if general["START"] == "S":
+            start_date = date.fromisoformat(controls["start_date"])
     if start_date is not None:
         days.append(start_date)
     days.extend(date.fromisoformat(controls[field]) for field in fields if field in controls)
@@ -108,8 +110,11 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
 
     if start_date is None:
         general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
-        if general["START"] == "S":  # DSSAT ignores SDATE for other START codes.
+        if general["START"] == "S":
             start_date = inherited_date(general["SDATE"])
+        elif general["START"] == "P":
+            start_date = _simulation_start(
+                text, treatment, {"treatments": {treatment: {"controls": controls}}})
     row = _section_row(text, "SIMULATION CONTROLS", "N", level, ("PLANTING", "PFRST", "PLAST"))
     first, last = (date.fromisoformat(controls[field]) if field in controls else inherited_date(row[column])
                    for field, column in zip(fields, ("PFRST", "PLAST")))

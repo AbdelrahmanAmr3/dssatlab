@@ -95,6 +95,7 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
     from .controls import _controls_start_date
     from .filex import _filex_date, _section_row
     from .irrigation import _effective_management
+    from .sequence import _simulation_start
 
     # DSSAT-CSM v4.8.6.0, CSM_Main/CSM.for, CSM (381-390): later Q
     # components start the day after the previous one ends, ignoring SDATE.
@@ -112,6 +113,8 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
             details = _section_row(text, section, key, int(row[reference]), (column,))
             if reference == 'SM' and first and details.get('START') == 'S':
                 start = _controls_start_date(source, treatment) or _filex_date(details[column])
+            elif reference == 'SM' and first and details.get('START') == 'P':
+                start = _simulation_start(text, treatment, source)
             elif reference == 'MP' and 'planting' not in override:
                 planting = _filex_date(details[column])
         except (ValueError, TypeError, KeyError):
