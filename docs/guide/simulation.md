@@ -270,8 +270,10 @@ A selected multi-year file stays selected; DSSAT does not borrow another file
 when its records end.
 
 Mode C, used for a single crop treatment, rejects the four-character
-`<WSTA4>.WTH` fallback. Other run modes can use it when no yearly file wins the
-lookup. Checks read the installed DSSATPRO WED path and report an installed
+`<WSTA4>.WTH` fallback. A sequence uses mode Q and can pass `check()` and run
+with only that file, such as `UFGA.WTH`, when it covers the required dates and
+no yearly file wins the lookup. Real DSSAT 4.8.5.017 read it throughout both
+rotation components. Checks read the installed DSSATPRO WED path and report an installed
 yearly file that would shadow a supplied fallback. Installed weather never
 counts as supplied coverage. Supply the requested yearly file to take priority.
 
@@ -423,6 +425,46 @@ Weather data: missing date 1984-01-02. Supply one row for each missing calendar 
 A missing parameter value becomes `-99`; the checks name its column and date
 in a range problem. `sim.run()` raises `DSSATCheckError` if these problems remain.
 Supply the missing weather data and check again.
+
+## Summarise your weather and soil before a run
+
+After preparing `weather.csv` and the [soil template](soil.md#prepare-the-soil-template),
+inspect your data before creating a Simulation:
+
+```python
+import dssatlab as dl
+
+weather_summary = dl.summarize_weather("weather.csv")
+soil_summary = dl.summarize_soil("soil.csv")
+print(weather_summary["first_date"], weather_summary["last_date"], weather_summary["days"])
+print(weather_summary["variables"])
+print(weather_summary["years"])
+print(soil_summary)
+```
+
+For the unchanged examples from `write_weather_template()` and
+`write_soil_template()`, the output is:
+
+```text
+2021-03-01 2021-03-07 7
+{'srad': {'min': 20.0, 'mean': 20.0, 'max': 20.0}, 'tmax': {'min': 25.0, 'mean': 25.0, 'max': 25.0}, 'tmin': {'min': 10.0, 'mean': 10.0, 'max': 10.0}, 'rain': {'min': 0.0, 'mean': 0.0, 'max': 0.0}}
+[{'year': 2021, 'days': 7, 'srad_mean': 20.0, 'tmax_mean': 25.0, 'tmin_mean': 10.0, 'rain_total': 0.0}]
+{'soil_id': 'IBMZ910214', 'layers': 3, 'depth': 30.0, 'extractable_water': 42.0, 'salb': 0.13, 'slro': 60.0, 'sldr': 0.5, 'slpf': 1.0}
+```
+
+The weather summary shows the actual day count for each calendar year.
+Seven days are a partial year, so its rain total covers only those days.
+When your weather data has daily `par`, `variables` also has `par` and each
+year has `par_mean`. The soil summary gives depth in cm and extractable water
+in mm. Statistics and soil values are rounded to two decimals.
+Replace the template examples with your own data before a run.
+
+Both functions also accept a list of row dicts or a DataFrame. They run the
+template checks without a FileX or DSSAT executable. Template problems raise
+one `DSSATCheckError`; print each string in `error.problems` and correct the data.
+Stock `.WTH` and `.SOL` paths and lists of paths are rejected. A Simulation
+copies stock files unchanged. See the [API reference](../reference/api.md#summarize_weathersource)
+for every returned key. Still call `sim.check()` to check the FileX and date coverage.
 
 ## Create a Simulation and inspect the checks
 

@@ -38,6 +38,69 @@ filling, unit conversion or range checking is done. Pass the returned path as
 
 ::: dssatlab.write_soil_template
 
+### summarize_weather(source)
+
+::: dssatlab.summarize_weather
+
+Accepts a weather template CSV path (`str` or `Path`), a list of row dicts,
+or a pandas DataFrame with the weather template columns. No DSSAT executable
+is needed. Returns a plain dict with these keys:
+
+| Key | Value |
+| --- | --- |
+| `station` | Four-character station code |
+| `latitude`, `longitude` | Station coordinates in degrees, as supplied |
+| `elevation` | Station elevation in m, as supplied; an explicit `-99` is kept |
+| `first_date`, `last_date` | First and last `datetime.date` values |
+| `days` | Number of daily rows |
+| `variables` | Dict keyed by `srad`, `tmax`, `tmin`, `rain`, and `par` when supplied; each value has `min`, `mean`, `max` |
+| `rain_total` | Total rainfall in mm over all rows |
+| `years` | List of dicts in calendar-year order; each has `year`, `days`, `srad_mean`, `tmax_mean`, `tmin_mean`, `rain_total`, and `par_mean` when PAR is supplied |
+
+SRAD uses MJ/m2 per day, temperatures use degrees C, rain uses mm, and PAR
+uses mol/m2 per day. Each year's `days` is its actual row count, including
+partial years. `par` and `par_mean` appear only when PAR is supplied on every row.
+Statistics and rain totals use unrounded data, then Python's `round(value, 2)`
+once on each result. Station coordinates and elevation are not rounded.
+Use `to_dataframe(summary["years"])` for a yearly table if pandas is installed.
+
+Raises one `DSSATCheckError` with all weather template problems in
+`error.problems`, using the same source checks as `Simulation.check()`.
+It does not repair data or check FileX coverage. Stock `.WTH` or `.SOL` paths
+(any suffix case) and lists of paths are rejected. Supply weather template
+data instead; a Simulation copies stock weather files unchanged.
+
+### summarize_soil(source)
+
+::: dssatlab.summarize_soil
+
+Accepts a soil template CSV path (`str` or `Path`), a list of row dicts,
+or a pandas DataFrame with the soil template columns. No DSSAT executable
+is needed. Returns a plain dict for one soil profile:
+
+| Key | Value |
+| --- | --- |
+| `soil_id` | Soil profile ID |
+| `layers` | Number of soil layers |
+| `depth` | Deepest layer bottom in cm |
+| `extractable_water` | Sum of `(sdul - slll) * layer_thickness_cm * 10`, in mm; the first layer starts at 0 cm |
+| `salb` | Soil albedo, fraction |
+| `slro` | Runoff curve number, dimensionless |
+| `sldr` | Drainage rate, fraction per day |
+| `slpf` | Soil fertility factor, dimensionless |
+
+`depth`, `extractable_water`, `salb`, `slro`, `sldr`, and `slpf` use Python's
+`round(value, 2)`. Extractable water is summed from unrounded layer values
+before rounding the result.
+
+Raises one `DSSATCheckError` with all soil template problems in
+`error.problems`, using the same source checks as `Simulation.check()`.
+Stock `.SOL` or `.WTH` paths (any suffix case) and lists of paths are rejected.
+Supply soil template data instead; a Simulation copies stock soil files unchanged.
+See [Summarise your weather and soil before a run](../guide/simulation.md#summarise-your-weather-and-soil-before-a-run).
+
+### Management and FileX templates
+
 ::: dssatlab.write_management_template
 
 ::: dssatlab.write_experiment_template
