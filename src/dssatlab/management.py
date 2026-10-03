@@ -226,10 +226,9 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
-                      soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None,
+                      *, text=None, cultivar_path=None, start_date_note=None,
                       rotation_template=None, data_dir=None, check_harvest=True):
     """Check treatments without mutation; unreadable FileX still permits shape checks."""
-    # soil_depth is unused; it stays only while Simulation still passes it.
     from .rotation_data import _check_rotation_data
     from .operations import _check_harvest
 
