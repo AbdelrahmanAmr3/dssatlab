@@ -95,7 +95,7 @@ def test_sequence_batch_uses_fixed_component_numbers(tmp_path, fake_dssat, compo
                          management={"treatments": {1: {"rotation": {10: {"irrigation": []}}}}})
     assert sim.check() == []
     result = sim.run()
-    batch = (result.run_dir.parent / "DSSBatch.v48").read_text().splitlines()[3:]
+    batch = (result.run_dir / "DSSBatch.v48").read_text().splitlines()[3:]
     assert [int(row[106:113]) for row in batch] == components
     assert fake_dssat.calls[0][0][1] == "Q"
     copied = (result.run_dir.parent / filex.name).read_text().splitlines()[2:2+len(prefixes)]

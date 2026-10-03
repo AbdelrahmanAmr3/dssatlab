@@ -13,6 +13,7 @@ import subprocess
 from . import core
 from .core import connect
 from .errors import DSSATRunError
+from .filex import _treatment_rows
 from .outputs import (read_dssat_evaluation, read_plant_growth,
                       read_plant_nitrogen, read_soil_water, read_summary,
                       read_weather)
@@ -87,6 +88,34 @@ _DELETED_CSV = {"et", "evaluate", "mulch", "plantgro", "plantn", "soilni", "soil
                 "summary", "weather"}
 
 
+def _run_mode(filex, treatment, rows):
+    """Pick the run mode from the selected (treatment, R) rows and FileX suffix."""
+    numbers = [number for number, _ in rows]
+    if filex.suffix.upper() == ".FCX":
+        return "Y"
+    if len(set(numbers)) == len(numbers):
+        return "A" if treatment is None else "C"
+    if treatment is None and len(set(numbers)) > 1:
+        raise DSSATRunError(
+            f"Cannot run FileX {filex.name} in sequence mode (Q) without a treatment: "
+            f"it has treatments {', '.join(map(str, sorted(set(numbers))))}, and DSSAT "
+            "runs one continuous batch, carrying each treatment into the next. "
+            "Nothing was run. Pass run(filex, treatment=n) for each treatment."
+        )
+    return "Q"
+
+
+def _batch_text(filex_name, mode, rows):
+    """Render Q/Y batch rows in DSSAT's fixed columns, with CRLF line endings."""
+    header = "@FILEX                                                                                        TRTNO     RP     SQ     OP     CO"
+    lines = ["$BATCH(SEQUENCE)" if mode == "Q" else "$BATCH(FORECAST)", "", header]
+    if mode == "Y":
+        rows = [(number, 0) for number in dict.fromkeys(number for number, _ in rows)]
+    lines.extend(f"{filex_name:<92}{int(number):7d}{1:7d}{int(rotation):7d}{0:7d}{0:7d}"
+                 for number, rotation in rows)
+    return "\r\n".join(lines) + "\r\n"
+
+
 def run(
     filex: str | Path,
     treatment: int | None = None,
@@ -96,13 +125,16 @@ def run(
 
     Executes the DSSAT executable on the specified FileX. Creates a dated run
     directory beside the FileX (dssat_run_YYYY-MM-DD_HHMMSS) and moves all output
-    files generated or updated during the run into it.
+    files generated or updated during the run into it. Picks forecast mode Y for
+    .FCX, sequence mode Q for a selected treatment with several TREATMENTS rows,
+    otherwise A (all treatments) or C (one treatment). Q/Y write DSSBatch.v48 and
+    collect it with the outputs; a failed launch removes it.
 
     Args:
         filex: Path to the FileX experiment file (*.MZX, *.SBX, etc.). The filename
-            must be at most 12 characters.
-        treatment: Specific treatment number to run (DSSAT batch option C). If None,
-            runs all treatments in the FileX (DSSAT batch option A).
+            must be at most 12 characters, and exactly 12 for Q/Y.
+        treatment: Specific treatment number to run. If None, runs all treatments;
+            a FileX containing a sequence must have just one treatment number.
         executable: Optional explicit path to the DSSAT executable or its directory.
             Validated without modifying saved configuration. If None, uses
             connect(interactive=False) to locate the executable.
@@ -111,7 +143,8 @@ def run(
         RunResult: Dataclass containing returncode, run_dir, outputs, and stdout_tail.
 
     Raises:
-        DSSATRunError: If the FileX does not exist, its filename exceeds 12 characters,
+        DSSATRunError: If the FileX does not exist, its filename has an invalid length,
+            a Q/Y run finds DSSBatch.v48 or Q needs a treatment selected,
             the FileX folder holds a .csv file DSSAT would delete (such as weather.csv),
             the DSSAT executable cannot be executed, DSSAT exits with a non-zero code,
             or ERROR.OUT is generated during the run.
@@ -140,11 +173,34 @@ def run(
             "(for example my_weather.csv), or use Simulation, which runs in its own folder."
         )
 
-    arguments = ["A", filex.name] if treatment is None else ["C", filex.name, str(treatment)]
-    return _run_command(filex.parent, arguments, executable)
+    rows = [(int(number), rotation) for number, rotation in
+            _treatment_rows(filex.read_text(encoding="latin-1")).values() if number]
+    selected = int(treatment) if isinstance(treatment, str) and treatment.isdigit() else treatment
+    rows = [row for row in rows if treatment is None or row[0] == selected]
+    mode = _run_mode(filex, treatment, rows)
+    batch_text = None
+    if mode in ("Q", "Y"):
+        label = "sequence mode (Q)" if mode == "Q" else "forecast mode (Y)"
+        if (filex.parent / "DSSBatch.v48").exists():
+            raise DSSATRunError(
+                f"Cannot run FileX {filex.name} in {label}: {filex.parent} already holds "
+                "DSSBatch.v48, which run() writes. Nothing was run. Move or rename it, "
+                "or use Simulation, which runs in its own folder."
+            )
+        if len(filex.name) != 12:
+            raise DSSATRunError(
+                f"Cannot run FileX {filex.name!r}: its filename has {len(filex.name)} "
+                f"characters; DSSAT's {label} accepts exactly 12. Rename the FileX "
+                "to exactly 12 characters, including the extension, using DSSAT's 8.3 style."
+            )
+        arguments = [mode, "DSSBatch.v48"]
+        batch_text = _batch_text(filex.name, mode, rows)
+    else:
+        arguments = ["A", filex.name] if treatment is None else ["C", filex.name, str(treatment)]
+    return _run_command(filex.parent, arguments, executable, batch_text)
 
 
-def _run_command(folder: Path, arguments: list[str], executable=None) -> RunResult:
+def _run_command(folder: Path, arguments: list[str], executable=None, batch_text=None) -> RunResult:
     """Resolve DSSAT, execute its arguments, and collect outputs in a run directory."""
     if executable is None:
         executable = connect(interactive=False)
@@ -158,6 +214,8 @@ def _run_command(folder: Path, arguments: list[str], executable=None) -> RunResu
 
     before = {path.name: path.stat().st_mtime_ns
               for path in folder.iterdir() if path.is_file()}
+    if batch_text is not None:
+        (folder / "DSSBatch.v48").write_bytes(batch_text.encode("latin-1"))
     command = [str(executable), *arguments]
     try:
         completed = subprocess.run(
@@ -165,6 +223,8 @@ def _run_command(folder: Path, arguments: list[str], executable=None) -> RunResu
             capture_output=True, text=True,
         )
     except OSError as error:
+        if batch_text is not None:
+            (folder / "DSSBatch.v48").unlink()
         run_dir.rmdir()
         raise DSSATRunError(
             f"Could not start the DSSAT executable: {shlex.join(command)}\n"

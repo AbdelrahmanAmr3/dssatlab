@@ -48,7 +48,7 @@ def test_run_sequence_inputs(sim, installed, name, controls):
     command, cwd, _ = installed.calls[0]
     assert command == [str(installed.executable), "Q", "DSSBatch.v48"]
     assert cwd == folder
-    lines = (folder / "DSSBatch.v48").read_text().splitlines()[3:]
+    lines = (result.run_dir / "DSSBatch.v48").read_text().splitlines()[3:]
     assert len(lines) == 4
     for number, line in enumerate(lines, 1):
         assert line[:92].rstrip() == "UFGA7801.SQX"
