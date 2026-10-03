@@ -268,6 +268,9 @@ def test_harvest_uses_effective_management_code(option_sim, capsys, filex_code, 
     entry["harvest"] = [] if empty else [dict(CASES["harvest"]["event"])] * 2
     if override is not None:
         entry["controls"] = {"harvest_management": override}
+    if empty and (override or filex_code) == "R":
+        # Empty schedules use maturity; reported empty schedules are covered in #192 tests.
+        entry["controls"] = {"harvest_management": "M"}
     original, management = sim.filex.read_bytes(), deepcopy(sim.management)
     code = override or filex_code
     expected = [] if empty or code in ("R", "M") else [

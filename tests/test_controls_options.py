@@ -59,6 +59,19 @@ def option_sim(sim_inputs):
     return Simulation(filex, 1, weather, management={"treatments": {1: {"controls": {}}}})
 
 
+@pytest.fixture
+def dated_harvest(option_sim):
+    filex = option_sim.filex
+    text = filex.read_text(encoding="latin-1")
+    # Option tests can select HARVS R, so provide its inherited dated harvest.
+    lines = [line[:67] + '  1' + line[70:] if line.startswith((' 1 1', ' 2 1'))
+             else line for line in text.splitlines()]
+    text = '\n'.join(lines).replace('*SIMULATION CONTROLS',
+        '*HARVEST DETAILS\n@H HDATE  HSTG  HCOM HSIZE   HPC  HBPC HNAME\n'
+        ' 1 82057 GS000   -99   -99   100     0 -99\n\n*SIMULATION CONTROLS')
+    filex.write_text(text + '\n', encoding="latin-1")
+
+
 def test_option_table_matches_spec():
     assert {field: experiment._CONTROL_OPTIONS[field] for field in OPTIONS} == OPTIONS
 
@@ -66,7 +79,7 @@ def test_option_table_matches_spec():
 @pytest.mark.parametrize("field,value", [
     (field, value) for field, (_, _, codes) in OPTIONS.items() for value in codes
 ])
-def test_code_written_and_other_cells_preserved(option_sim, fake_dssat, field, value):
+def test_code_written_and_other_cells_preserved(option_sim, dated_harvest, fake_dssat, field, value):
     sim = option_sim
     sim.management["treatments"][1]["controls"] = {field: value}
     original, inputs = sim.filex.read_bytes(), deepcopy(sim.management)
@@ -167,7 +180,7 @@ def test_missing_layout_uses_existing_error(option_sim, fake_dssat, field, missi
     assert not fake_dssat.calls
 
 
-def test_template_documents_options_and_loads_with_them(option_sim, tmp_path):
+def test_template_documents_options_and_loads_with_them(option_sim, dated_harvest, tmp_path):
     pytest.importorskip("yaml")
     sim = option_sim
     fixture = Path(__file__).parent / "fixtures/cultivar/MZCER048.CUL"

@@ -8,7 +8,7 @@ from .filex import _section_row
 from .cultivar import _check_cultivar
 from .filex_write import _event_text, _planting_text
 from .experiment import (_check_controls, _check_date, _check_fields,
-                         _check_number, _unknown_keys)
+                         _check_number, _check_treatment_key, _unknown_keys)
 from .weather import _show_value
 from .initial_conditions import _check_initial_conditions, _initial_conditions_text
 from .controls import _check_planting_window, _controls_text
@@ -143,31 +143,6 @@ def _check_events(events, section, where, weather_range=None):
     return problems, _report_lines(label, problems, details=[]) + report
 
 
-def _check_treatment_key(key, seen_numbers, text, filex):
-    where = f"Management data treatment {_show_value(key)}"
-    try:
-        if (isinstance(key, bool) or not isinstance(key, (int, str)) or
-                isinstance(key, str) and not re.fullmatch(r"[0-9]+", key)):
-            raise ValueError
-        number = int(key)
-        where = f"Management data treatment {number}"
-    except ValueError:
-        return None, where, [f"{where}: invalid treatment key. Supply an int or digit string."]
-    problems = []
-    if number in seen_numbers:
-        problems.append(f"{where}: duplicate treatment number for keys "
-                        f"{_show_value(seen_numbers[number])} and {_show_value(key)}. "
-                        "Keep one entry per treatment number.")
-    else:
-        seen_numbers[number] = key
-    if text is not None:
-        try:
-            _section_row(text, "TREATMENTS", "N", number, ())
-        except ValueError as error:
-            problems.append(f"{where}: FileX {filex}: {error}")
-    return number, where, problems
-
-
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
                  soil_depth, cultivar_path, *, start_date_note=None):
     from .irrigation import _check_irrigation
@@ -252,9 +227,10 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
                       soil_depth=None, *, text=None, cultivar_path=None, start_date_note=None,
-                      rotation_template=None, data_dir=None):
+                      rotation_template=None, data_dir=None, check_harvest=True):
     """Check treatments without mutation; unreadable FileX still permits shape checks."""
     from .rotation_data import _check_rotation_data
+    from .operations import _check_harvest
 
     label = "Management data"
     if not isinstance(source, dict):
@@ -276,6 +252,10 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
             text = Path(filex).read_text(encoding="latin-1")
         except (OSError, ValueError):
             pass
+    if check_harvest:
+        found = _check_harvest(source, filex, selected_treatment, text=text)
+        problems.extend(found)
+        root_problems.extend(found)
     selected_number = None
     try:
         if not isinstance(selected_treatment, bool):
