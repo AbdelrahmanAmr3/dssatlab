@@ -90,9 +90,32 @@ def _component_management(text, row, column, default=None):
     return default
 
 
+def _harvest_bounds(source, text, treatment, row, override):
+    """Read known start and planting bounds after experiment edits."""
+    from .controls import _controls_start_date
+    from .filex import _filex_date, _section_row
+
+    start = _controls_start_date(source, treatment)
+    planting = override.get('planting')
+    planting = (date.fromisoformat(planting['date']) if isinstance(planting, dict)
+                and not _check_date(planting.get('date'), '') else None)
+    for reference, section, key, column in (
+            ('SM', 'SIMULATION CONTROLS', 'N', 'SDATE'),
+            ('MP', 'PLANTING DETAILS', 'P', 'PDATE')):
+        try:
+            details = _section_row(text, section, key, int(row[reference]), (column,))
+            if reference == 'SM' and start is None and details.get('START') == 'S':
+                start = _filex_date(details[column])
+            elif reference == 'MP' and 'planting' not in override:
+                planting = _filex_date(details[column])
+        except (ValueError, TypeError, KeyError):
+            pass  # Existing checks report unavailable levels and invalid edits.
+    return [('simulation start date', start), ('planting date', planting)]
+
+
 def _check_harvest(source, filex, selected_treatment=None, *, text=None):
-    """Require dated harvests for each checked crop under effective HARVS R."""
-    from .filex import _section_rows
+    """Require dated harvests at or after known bounds under effective HARVS R."""
+    from .filex import _filex_date, _section_rows
     from .irrigation import _effective_management
     from .sequence import _rotation_components
 
@@ -139,14 +162,25 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None):
                     for event in events)
             else:
                 usable = False
+                bounds = _harvest_bounds(source, text, treatment, row, override)
                 try:
                     level = int(row['MH'])
                     if level > 0:
                         for event in _section_rows(text, 'HARVEST DETAILS', 'H', level, ('HDATE',)):
-                            value = event['HDATE']
-                            if re.fullmatch(r'[0-9]{5}', value):
-                                year, day = 2000 + int(value[:2]), int(value[2:])
-                                usable |= 1 <= day <= date(year, 12, 31).timetuple().tm_yday
+                            day = _filex_date(event['HDATE'])
+                            if day is None:
+                                continue
+                            usable = True
+                            failed = [f'{label} ({bound})' for label, bound in bounds
+                                      if bound is not None and day < bound]
+                            if failed:
+                                where = f'Treatment {treatment}'
+                                if sequence:
+                                    where += f", rotation[{row['R']}]"
+                                problems.append(f"{where}: FileX HDATE {event['HDATE']!r} ({day}) "
+                                                f"in harvest level {level} is before "
+                                                f"{' and '.join(failed)}. Move HDATE on or after "
+                                                "these bounds, or change the start or planting date.")
                 except (ValueError, TypeError, KeyError):
                     pass  # An absent or unreadable harvest level has no usable events.
             if not usable:

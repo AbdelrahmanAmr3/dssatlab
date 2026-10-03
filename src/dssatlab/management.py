@@ -271,7 +271,8 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         is_selected = number is not None and number == selected_number
         entry, rotation_problems, rotation_report = _check_rotation_data(
             entry, number, filex, text, start_date if is_selected else None,
-            weather_range if is_selected else None, rotation_template, data_dir)
+            weather_range if is_selected else None, rotation_template, data_dir,
+            inherited_harvest_checked=True)
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
