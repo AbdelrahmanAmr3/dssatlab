@@ -77,10 +77,10 @@ def test_missing_or_unreadable_nyers_means_one(filex, old, new):
 
 
 @pytest.mark.parametrize("start,sdate", [("P", "78060"), ("S", "XXXXX"), ("S", "79060")])
-def test_unresolved_start_skips_seasons(filex, start, sdate):
+def test_seasons_use_resolved_start_without_weather_match(filex, start, sdate):
     sim = Simulation(filex(start=start, sdate=sdate), 1, weather("1978-03-01", "1978-03-02"),
                      management=management(11))
-    assert not any("season 11" in p for p in sim.check(False))
+    assert any("season 11" in p for p in sim.check(False)) == (start == "S" and sdate == "79060")
 
 
 def test_nyers_comes_from_selected_controls_level(filex):

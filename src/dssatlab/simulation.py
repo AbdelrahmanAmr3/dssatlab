@@ -5,7 +5,7 @@ import shutil
 
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
-from .filex import _check_filex_controls, _irrigation_dates, _read_filex
+from .filex import _check_filex_controls, _filex_date, _irrigation_dates, _read_filex
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
 from .management import _check_management, _report_lines
@@ -140,13 +140,16 @@ class Simulation:
         days = [row["date"] for row in rows if "date" in row]
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
-                                   else _simulation_start_date(sdate, days))
+                                   else _simulation_start_date(sdate))
+        if days and start_date is None and _parse_sdate(sdate) is not None:
+            filex_problems.append(f"FileX {self.filex}: SDATE {sdate!r} is invalid. "
+                                 "Supply five digits: two-digit year followed by three-digit day of year.")
         if values.get("START") == "P":
             try:
                 text = Path(self.filex).read_text(encoding="latin-1")
             except (OSError, TypeError, ValueError):
                 text = ""
-            start_date = _simulation_start(text, self.treatment, experiment_data, days)
+            start_date = _simulation_start(text, self.treatment, experiment_data)
             skip_reason = None if start_date is not None else "START P planting date is unavailable; check PDATE"
         if len(components) > 1:
             filex_problems.extend(_sequence_coverage(
@@ -159,14 +162,11 @@ class Simulation:
                 filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
-        elif sdate is not None and days:
-            parsed = _parse_sdate(sdate)
-            if parsed is not None and not any(
-                    (day.year % 100, day.timetuple().tm_yday) == parsed for day in days):
-                start = values["SDATE"]
-                filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
-                                     f"covered by weather data ({min(days)} to {max(days)}). "
-                                     "Supply weather for the simulation's start date.")
+        elif sdate is not None and start_date is not None and days and start_date not in days:
+            filex_problems.append(f"FileX SDATE {sdate!r} is {start_date} (DSSAT reads two-digit "
+                                 "years 00-35 as 2000-2035 and 36-99 as 1936-1999), not "
+                                 f"covered by weather data ({min(days)} to {max(days)}). "
+                                 f"Supply weather for {start_date}, or set controls.start_date.")
         if values.get("START") == "P" and start_date is not None and days and start_date not in days:
             filex_problems.append(f"Simulation start date {start_date.isoformat()!r} is not "
                                  f"covered by weather data ({min(days)} to {max(days)}). "
@@ -174,7 +174,7 @@ class Simulation:
         if (override_start is not None or values.get("START") == "P") and start_date is not None and days and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
-            irrigation = [_simulation_start_date(text, days)[0]
+            irrigation = [_filex_date(text)
                           for text in _irrigation_dates(self.filex, self.treatment)]
             irrigation = [day for day in irrigation if day is not None]
             if irrigation and min(irrigation) < start_date:
