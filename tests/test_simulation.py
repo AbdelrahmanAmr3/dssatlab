@@ -32,6 +32,49 @@ def write_csv(path, rows):
     return path
 
 
+@pytest.mark.parametrize("form", ["rows", "csv"])
+@pytest.mark.parametrize("values,empty", [
+    ([50, None, ""], 2), ([None, "", "  "], 3),
+])
+def test_empty_par_is_one_column_problem(tmp_path, rows, form, values, empty):
+    for row, value in zip(rows, values):
+        row["par"] = value
+    source = rows if form == "rows" else write_csv(tmp_path / "weather.csv", rows)
+    assert check(source) == [
+        f"Weather column 'par' is empty on {empty} rows. "
+        "Supply par on every row or drop the column."
+    ]
+
+
+@pytest.mark.parametrize("filled_row", [0, 2])
+def test_missing_par_keys_are_counted(rows, filled_row):
+    rows[filled_row]["par"] = 50
+    assert check(rows) == [
+        "Weather column 'par' is empty on 2 rows. "
+        "Supply par on every row or drop the column."
+    ]
+
+
+@pytest.mark.parametrize("value", [0, 100])
+def test_par_inclusive_boundaries_pass(rows, value):
+    assert check([dict(row, par=value) for row in rows]) == []
+
+
+@pytest.mark.parametrize("value,reason", [
+    (100.1, "0 to 100"), (-0.1, "0 to 100"),
+    (float("nan"), "finite number"), (float("inf"), "finite number"),
+    ("nan", "finite number"), ("inf", "finite number"),
+])
+def test_invalid_par_is_rejected(tmp_path, rows, value, reason):
+    rows = [dict(row, par=50) for row in rows]
+    rows[1]["par"] = value
+    for source in (rows, write_csv(tmp_path / "weather.csv", rows)):
+        problems = check(source)
+        assert len(problems) == 1
+        assert "row 3" in problems[0] and "'par'" in problems[0]
+        assert reason in problems[0] and "mol/m2 per day" in problems[0]
+
+
 def test_construction_stores_inputs_without_work(tmp_path, monkeypatch):
     def forbidden(*args, **kwargs):
         pytest.fail("construction must not access files")

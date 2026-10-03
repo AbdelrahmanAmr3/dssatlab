@@ -157,3 +157,28 @@ def test_plain_rows_missing_column_is_reported_once(rows):
         del row["srad"]
     problems = [p for p in check(rows) if "'srad'" in p]
     assert len(problems) == 1
+
+
+@pytest.mark.parametrize("values,expected", [
+    ([0, 50, 100], []),
+    ([50, None, ""], ["Weather column 'par' is empty on 2 rows. "
+                      "Supply par on every row or drop the column."]),
+    ([None, "", "  "], ["Weather column 'par' is empty on 3 rows. "
+                         "Supply par on every row or drop the column."]),
+])
+def test_dataframe_par_matches_csv(tmp_path, rows, values, expected):
+    for row, value in zip(rows, values):
+        row["par"] = value
+    assert check(FakeDataFrame(rows)) == check(
+        write_csv(tmp_path / "weather.csv", rows)) == expected
+
+
+@pytest.mark.parametrize("value", [100.1, -0.1, float("nan"), float("inf")])
+def test_dataframe_invalid_par_matches_csv(tmp_path, rows, value):
+    rows = [dict(row, par=50) for row in rows]
+    rows[1]["par"] = value
+    for source in (FakeDataFrame(rows), write_csv(tmp_path / "weather.csv", rows)):
+        problems = check(source)
+        assert len(problems) == 1 and "'par'" in problems[0]
+        assert "row 3" in problems[0] and "mol/m2 per day" in problems[0]
+        assert ("0 to 100" if value in (100.1, -0.1) else "finite number") in problems[0]
