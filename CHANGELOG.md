@@ -2,6 +2,19 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.18.2] - unreleased
+
+### Added
+- `summarize_weather(source)` checks weather template data and returns a weather summary. It includes station values, dates, day counts, variable min/mean/max, total rain and calendar-year values. Daily PAR is included when supplied ([#241](https://github.com/AbdelrahmanAmr3/dssatlab/issues/241)).
+- `summarize_soil(source)` checks soil template data and returns a soil summary. It includes the soil profile ID, layer count, depth, extractable water and profile values. Both summaries accept a CSV path, rows or a DataFrame. Template problems raise `DSSATCheckError`; stock `.WTH` and `.SOL` files are rejected ([#241](https://github.com/AbdelrahmanAmr3/dssatlab/issues/241)).
+- A [tutorial step to summarise weather and soil before a run](guide/simulation.md#summarise-your-weather-and-soil-before-a-run) and API entries with every returned key.
+
+### Fixed
+- A sequence (mode Q) with only a four-character fallback weather file, such as `UFGA.WTH`, now passes `check()` and runs when the required weather is covered and no yearly file shadows it. Real DSSAT 4.8.5.017 read the fallback throughout both rotation components. Mode C still rejects it ([#242](https://github.com/AbdelrahmanAmr3/dssatlab/issues/242); closes [#236](https://github.com/AbdelrahmanAmr3/dssatlab/issues/236)).
+
+### Notes
+- Zero runtime dependencies are preserved.
+
 ## [0.18.1] - 2026-10-03
 
 ### Added
