@@ -125,6 +125,16 @@ _Avoid_: input format, schema
 **Weather file**:
 The DSSAT `*.WTH` file generated from weather data. DSSAT finds it beside the FileX.
 
+**Stock weather file**:
+A DSSAT `*.WTH` file the user already has (for example from DSSAT's own Weather folder), handed
+to a Simulation as its weather. It is copied unchanged, under its own name, into the simulation
+folder; the checks read only its station, dates and the four daily values they need.
+_Avoid_: raw weather, native weather
+
+**Daily PAR**:
+Photosynthetically active radiation for one day (DSSAT PAR, mol/m2 per day). An optional weather
+template column; a weather file carries it when the weather data has it.
+
 **Soil data**:
 A user's own soil profile, as they hold it (a table of layers), before it is converted
 into a DSSAT soil file.
@@ -137,6 +147,11 @@ _Avoid_: soil input, soil schema
 **Soil file**:
 The DSSAT `*.SOL` file generated from soil data. Not the same as a `.SOL` file the user
 already keeps beside their FileX.
+
+**Stock soil file**:
+A DSSAT `*.SOL` file the user already has, handed to a Simulation as its soil. It is copied
+unchanged, under its own name, instead of the FileX's sibling soil files; the checks read only its
+soil profile IDs.
 
 **Soil profile**:
 One named set of soil layers in a soil file, identified by the FileX's `ID_SOIL`. The
