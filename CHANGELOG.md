@@ -15,7 +15,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Fixed
 - Sequence weather must reach the end of the component that crosses DSSAT's stopping boundary when its end is known before the run ([#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205)).
-- An inherited HARVS R harvest dated before the simulation start or planting date is rejected, with its HDATE, harvest level and bounds; in sequences only the first component uses a simulation-start bound ([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)).
+- An inherited HARVS R harvest dated before the planting date, or before the simulation start under START S, is rejected, with its HDATE, harvest level and bounds; in sequences only the first component uses the START S bound ([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)).
 - Identical TREATMENTS rows remain separate: `run()` selects Q for two rows, while `Simulation.check()` reports their duplicate R numbers ([#207](https://github.com/AbdelrahmanAmr3/dssatlab/issues/207)).
 - A trailing DOS EOF byte (Ctrl-Z) in a stock weather or soil file is accepted and preserved in the copy.
 - Stock weather values skip separator-column flags, and their dates use the planting date (including overrides) under START P; START S keeps the simulation start date.
