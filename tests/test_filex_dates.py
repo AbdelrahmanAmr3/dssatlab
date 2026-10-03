@@ -53,6 +53,38 @@ def test_sequence_inherited_harvest_before_planting_reported_once(tmp_path):
                ('rotation[2]', 'HDATE', 'level 1', '1982-03-10', 'planting date (1982-03-15)'))
 
 
+@pytest.mark.parametrize('later_start', ['91126', '89060'])
+@pytest.mark.parametrize('override', [False, True])
+def test_sequence_harvest_ignores_later_sdate(tmp_path, later_start, override):
+    sim = dated_simulation(tmp_path, '89060', '89080', '90126', '1989-03-01', sequence=True)
+    text = sim.filex.read_text().replace(' 2 GE              1     1     S 89060',
+                                       f' 2 GE              1     1     S {later_start}')
+    row = next(line for line in text.splitlines() if line.startswith(' 7 2'))
+    text = text.replace(row, row[:46] + '  2' + row[49:])
+    text = text.replace('@P PDATE\n 1 89080', '@P PDATE\n 1 89080\n 2 90080')
+    sim.filex.write_text(text, encoding='ascii')
+    sim.weather = weather('1989-03-01', '1990-05-06')
+    if override:
+        sim.management = {'treatments': {7: {'controls': {'start_date': '1989-03-01'}}}}
+    assert sim.check(False) == []
+
+
+@pytest.mark.parametrize('override', [False, True])
+def test_sequence_first_harvest_keeps_start_bound(tmp_path, override):
+    sim = dated_simulation(tmp_path, '89060', '89055', '89056', '1989-02-24', sequence=True)
+    text = sim.filex.read_text().replace(' 1 MA              R     R     R     N     M',
+                                       ' 1 MA              R     R     R     N     R')
+    sim.filex.write_text(text, encoding='ascii')
+    sim.weather = weather('1989-02-24', '1990-03-01')
+    if override:
+        sim.management = {'treatments': {7: {'controls': {'start_date': '1989-03-02'}}}}
+    problems = sim.check(False)
+    harvest = [problem for problem in problems if 'HDATE' in problem]
+    assert len(harvest) == 1
+    assert 'rotation[1]' in harvest[0]
+    assert f'simulation start date (1989-03-0{2 if override else 1})' in harvest[0]
+
+
 def test_filex_year_zero_leap_day_through_harvest(tmp_path):
     sim = dated_simulation(tmp_path, '00061', '00061', '00060', '2000-02-27')
     problems = sim.check(False)

@@ -193,7 +193,7 @@ class Simulation:
             try:
                 _identity_text(Path(self.filex).read_bytes().decode("latin-1"),
                                int(self.treatment), name,
-                               rows[0]["station"] if edit_identity else None,
+                               rows[0]["station"] if edit_identity and rows else None,
                                template_id if edit_identity else None)
             except ValueError as error:
                 problems.append(f"FileX: {error}")

@@ -8,7 +8,7 @@ import shutil
 from . import core
 from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
-from .filex import _filex_date, _weather_filename
+from .filex import _filex_date, _read_filex, _weather_filename
 from .irrigation import _effective_management
 from .operations import _harvest_end
 from .rotation_data import _calendar_date, _level_date
@@ -276,14 +276,19 @@ def _simulation_weather(sim, values, experiment_data, components, *, executable=
     if paths is None:
         return _parse_weather(sim.weather)
     if "WSTA" not in values:
-        return [], []  # The FileX checks explain the missing station.
+        checked, checks = _read_filex(sim.filex, sim.treatment)
+        if "WSTA" not in checked and checks:
+            return [], []  # The FileX checks explain why the station is unavailable.
+        return [], [f"Stock weather {sim.weather}: cannot check weather dates without WSTA. "
+                    f"Checked the FileX field for treatment {sim.treatment}. "
+                    "Supply a FileX with a four- or eight-character WSTA."]
     entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
     entry = next((value for key, value in entries.items()
                   if str(key).isascii() and str(key).isdigit() and int(key) == int(sim.treatment)
                   and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
     text = Path(sim.filex).read_text(encoding="latin-1")
     # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for, IPEXP (655-663):
-    # START P uses YRPLT, S uses YRSIM; E needs an unavailable emergence date.
+    # START P uses YRPLT, S uses YRSIM; E uses IEMRG, which we do not resolve.
     start = ((_controls_start_date(experiment_data, sim.treatment)
               or _filex_date(values.get("SDATE"))) if values.get("START") == "S" else None)
     if start is None and values.get("START") == "P" and components:
@@ -303,8 +308,11 @@ def _simulation_weather(sim, values, experiment_data, components, *, executable=
         return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
                     "Supply five digits: two-digit year followed by three-digit day of year."]
     if start is None:
-        # The FileX checks explain what is missing; do not guess a weather century.
-        return [], []
+        reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""
+        return [], [f"Stock weather {sim.weather}: cannot check weather dates because "
+                    f"the simulation start is unknown{reason}. Checked START and "
+                    f"SDATE/PDATE for treatment {sim.treatment}. "
+                    "Use START S or P with a valid date, or pass the weather as rows."]
     years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
     try:
         years = max(1, int(years))

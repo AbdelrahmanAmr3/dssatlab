@@ -90,13 +90,17 @@ def _component_management(text, row, column, default=None):
     return default
 
 
-def _harvest_bounds(source, text, treatment, row, override):
+def _harvest_bounds(source, text, treatment, row, override, *, first=True):
     """Read known start and planting bounds after experiment edits."""
     from .controls import _controls_start_date
     from .filex import _filex_date, _section_row
     from .irrigation import _effective_management
 
-    start = _controls_start_date(source, treatment)
+    # DSSAT-CSM v4.8.6.0, CSM_Main/CSM.for, CSM (381-390): later Q
+    # components start the day after the previous one ends, ignoring SDATE.
+    # InputModule/ipexp.for, IPEXP (655-669) resolves the initial START S/P/E;
+    # CSM replaces that YRSIM for later components.
+    start = _controls_start_date(source, treatment) if first else None
     planting = override.get('planting')
     planting = (date.fromisoformat(planting['date']) if isinstance(planting, dict)
                 and not _check_date(planting.get('date'), '') else None)
@@ -105,7 +109,7 @@ def _harvest_bounds(source, text, treatment, row, override):
             ('MP', 'PLANTING DETAILS', 'P', 'PDATE')):
         try:
             details = _section_row(text, section, key, int(row[reference]), (column,))
-            if reference == 'SM' and start is None and details.get('START') == 'S':
+            if reference == 'SM' and first and start is None and details.get('START') == 'S':
                 start = _filex_date(details[column])
             elif reference == 'MP' and 'planting' not in override:
                 planting = _filex_date(details[column])
@@ -115,7 +119,7 @@ def _harvest_bounds(source, text, treatment, row, override):
     if code is None:
         code = _component_management(text, row, 'PLANT')
     # DSSAT-CSM v4.8.6.0, Management/AUTPLT.for, AUTPLT (98-99):
-    # PLANT A/F discard the reported PDATE; only the simulation start bounds HDATE.
+    # PLANT A/F discard the reported PDATE; keep only a known simulation start.
     if code in ('A', 'F'):
         planting = None
     return [('simulation start date', start), ('planting date', planting)]
@@ -154,7 +158,7 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None):
         edits = edits if isinstance(edits, dict) else {}
         edits = {int(key): value for key, value in edits.items()
                  if type(key) is int or isinstance(key, str) and key.isascii() and key.isdigit()}
-        for row in components:
+        for index, row in enumerate(components):
             if row['CR'] == 'FA':
                 continue
             override = edits.get(int(row['R']), {}) if sequence and row['R'].isdigit() else entry
@@ -170,7 +174,7 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None):
                     for event in events)
             else:
                 usable = False
-                bounds = _harvest_bounds(source, text, treatment, row, override)
+                bounds = _harvest_bounds(source, text, treatment, row, override, first=index == 0)
                 try:
                     level = int(row['MH'])
                     if level > 0:
