@@ -470,20 +470,14 @@ treatment name. Names that exceed the FileX column width are rejected during
 checks, including when no experiment data is supplied. Giving a name alone
 leaves the copied field IDs unchanged.
 
-Weather must cover the **simulation start date**. Under START S this is SDATE,
-or `controls.start_date` when supplied. Under START P it is the effective
-planting date (an experiment-data override, else PDATE). Under START E it is the
-effective emergence date (`planting.emergence_date`, else EDATE).
-`controls.start_date` is ignored under START P and E. Harvest bounds use the
-planting date under START P and the emergence date under START E; in a sequence,
-only the first rotation component uses this simulation start bound.
-
-FileX two-digit years use the century of the first seven-digit `$WEATHER`
-date. If a resolved year falls before that weather year, it advances one
-century. Without an explicit weather year, DSSAT uses crossover 35: years 00
-through 35 mean 2000 through 2035, and 36 through 99 mean 1936 through 1999.
-Generated weather uses this crossover rule. Simulation start, irrigation,
-automatic planting and harvest dates use the same year rule.
+Weather must cover the **simulation start date** under START S and START P.
+Under START S this is SDATE, resolved from the years the weather covers, or
+`controls.start_date` when supplied. A weather date must match the two-digit
+year and day of year in SDATE. Under START P the start is the effective
+planting date (an experiment-data override, else PDATE). `controls.start_date`
+replaces SDATE under START S only. Harvest bounds use the effective planting
+date under START P, including automatic planting; in a sequence, only the
+first rotation component uses this simulation start bound.
 
 Seasonal checks cover the last season's start; sequence checks require weather
 through the scheduled end of the component that crosses the stopping boundary

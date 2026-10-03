@@ -77,8 +77,8 @@ at run time.
 
 A changed `controls` `start_date` replaces the FileX `SDATE` in the weather-coverage and
 planting-date checks under START S. Under START P the effective planting date is
-the simulation start date; under START E it is the effective emergence date.
-`controls.start_date` is ignored under START P and E. The FileX `START` setting
+the simulation start date. `controls.start_date` replaces SDATE under START S only.
+The FileX `START` setting
 is left as it is. See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
 
 ## Residues, tillage and harvest

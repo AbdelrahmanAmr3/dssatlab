@@ -129,12 +129,9 @@ missing marker (-999 becomes -99) change. It is never passed as `weather=` direc
 _Avoid_: POWER weather, downloaded weather
 
 **Simulation start date**:
-The day DSSAT starts the simulation on, as the checks use it: SDATE under START S (read with
-DSSAT's two-digit-year rule, never guessed from the weather years), the planting date under
-START P, the emergence date under START E. controls.start_date replaces SDATE under START S only.
-All FileX two-digit dates use the century of the first seven-digit `$WEATHER` date and
-advance one century if their year is before that weather year. Without that context,
-years 00 through 35 mean 2000 through 2035, and 36 through 99 mean 1936 through 1999.
+The day used by the start-day, season and sequence coverage checks: SDATE under START S,
+resolved from the years the weather covers, or the effective planting date under START P.
+controls.start_date replaces SDATE under START S only.
 
 **Weather file**:
 The DSSAT `*.WTH` file generated from weather data. DSSAT finds it beside the FileX.

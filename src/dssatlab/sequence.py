@@ -243,33 +243,28 @@ def _parse_sdate(sdate):
 
 
 def _simulation_start_date(sdate, days):
-    """Resolve FileX YYDDD with the first explicit weather year or crossover 35.
-
-    A year before the first explicit weather year advances one century.
-    """
+    """Resolve SDATE using weather years, or return the reason it cannot be checked."""
     if sdate is None:
         return None, "START is not S or SDATE is unavailable; check the FileX start controls"
     parsed = _parse_sdate(sdate)
     if parsed is None:
         return None, f"SDATE {sdate!r} is not a DSSAT date (yyddd); correct SDATE"
+    if not days:
+        return None, "weather unreadable"
     yy, doy = parsed
-    year = (days[0].year // 100 * 100 if days else 2000 if yy <= 35 else 1900) + yy
-    # All inherited calendar dates use the same weather context as the start.
-    if days and year < days[0].year:
-        year += 100
-    if not 1 <= year <= 9999:
-        return None, "simulation start year is outside the calendar; correct the FileX date"
+    years = [y for y in range(min(d.year for d in days), max(d.year for d in days) + 1) if y % 100 == yy]
+    if not years:
+        return None, f"no weather year matches SDATE year {yy:02d}; supply weather for the start year"
+    if len(years) > 1:
+        return None, f"ambiguous start year (candidate years: {', '.join(map(str, years))}); supply controls.start_date"
+    year = years[0]
     if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
         return None, f"day {doy} does not exist in {year}; correct SDATE"
     return date(year, 1, 1) + timedelta(days=doy - 1), None
 
 
 def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> date | None:
-    """Return the effective S/P/E start of the first component, without guessing years.
-
-    weather_dates supplies the first seven-digit $WEATHER date; leave it empty
-    for legacy five-digit weather (including generated template weather).
-    """
+    """Return the effective S/P start of the first component."""
     from .experiment import _check_date
 
     try:
@@ -279,7 +274,8 @@ def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> dat
         if general["START"] == "S":
             return (_controls_start_date(experiment_data, treatment)
                     or _simulation_start_date(general["SDATE"], weather_dates)[0])
-        field, column = {"P": ("date", "PDATE"), "E": ("emergence_date", "EDATE")}[general["START"]]
+        if general["START"] != "P":
+            return None
         entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
         entry = next((v for k, v in entries.items() if str(k).isascii() and str(k).isdigit()
                       and int(k) == int(treatment) and isinstance(v, dict)), {}) if isinstance(entries, dict) else {}
@@ -290,9 +286,9 @@ def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> dat
                           and int(k) == int(row["R"]) and isinstance(v, dict)), {}) if isinstance(edits, dict) else {}
         planting = entry.get("planting")
         if isinstance(planting, dict):
-            value = planting.get(field)
-            return None if _check_date(value, field) else date.fromisoformat(value)
-        details = _section_row(text, "PLANTING DETAILS", "P", int(row["MP"]), (column,))
-        return _simulation_start_date(details[column], weather_dates)[0]
+            value = planting.get("date")
+            return None if _check_date(value, "date") else date.fromisoformat(value)
+        details = _section_row(text, "PLANTING DETAILS", "P", int(row["MP"]), ("PDATE",))
+        return _filex_date(details["PDATE"])
     except (ValueError, TypeError, KeyError):
         return None  # Ordinary FileX/experiment checks explain unreadable inputs.

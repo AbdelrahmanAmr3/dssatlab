@@ -80,12 +80,7 @@ def test_missing_or_unreadable_nyers_means_one(filex, old, new):
 def test_unresolved_start_skips_seasons(filex, start, sdate):
     sim = Simulation(filex(start=start, sdate=sdate), 1, weather("1978-03-01", "1978-03-02"),
                      management=management(11))
-    problems = sim.check(False)
-    if start == "S" and sdate == "79060":
-        assert any("season 11" in p for p in problems)
-        assert any("Simulation start date '1979-03-01'" in p for p in problems)
-    else:
-        assert not any("season 11" in p for p in problems)
+    assert not any("season 11" in p for p in sim.check(False))
 
 
 def test_nyers_comes_from_selected_controls_level(filex):

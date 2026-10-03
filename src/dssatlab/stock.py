@@ -5,17 +5,16 @@ from pathlib import Path
 import re
 import shutil
 
-from .controls import _selected_controls
+from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
-from .filex import _read_filex, _weather_filename
+from .filex import _filex_date, _read_filex, _weather_filename
 from .irrigation import _effective_management
 from .operations import _harvest_end
-from .rotation_data import _level_date
-from .sequence import _sequence_end, _sequence_shift, _sequence_stop, _simulation_start
+from .rotation_data import _calendar_date, _level_date
+from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
-from .weather_files import (_read_stock_weather, _read_weather_file, _weather_date,
-                            _walk_weather_files, _weather_directory)
+from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory)
 
 
 def _stock_weather_paths(source):
@@ -25,26 +24,6 @@ def _stock_weather_paths(source):
                      for path in paths):
         return [Path(path) for path in paths]
     return None
-
-
-def _weather_start_dates(source, values, *, edit_identity=False):
-    """Give start checks explicit weather dates; legacy weather supplies no century."""
-    paths = _stock_weather_paths(source)
-    if paths is None:
-        return []  # write_weather_file emits legacy YYDDD for template data.
-    station = values.get("WSTA", "")
-    if edit_identity and station[:4] != paths[0].name[:4].upper():
-        station = paths[0].name[:4].upper()
-    if len(station) not in (4, 8):
-        return []  # The FileX checks report an unavailable station.
-    name = _weather_filename(station, values.get("SDATE", ""))
-    selected = next((path for path in paths if path.name.upper() == name), None)
-    if selected is None:
-        return []  # The selection walk reports the missing initial file.
-    raw, _ = _read_weather_file(selected)
-    code = raw[0][1]["date"] if raw else ""
-    first = _weather_date(code, None) if len(code) == 7 else None
-    return [first] if first is not None else []
 
 
 def _weather_source_problems(source, *, template=False):
@@ -86,22 +65,32 @@ def _simulation_weather(sim, values, experiment_data, components):
                   if str(key).isascii() and str(key).isdigit() and int(key) == int(sim.treatment)
                   and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
     text = Path(sim.filex).read_text(encoding="latin-1")
-    # e2e22: only seven-digit $WEATHER supplies a century before start selection.
-    explicit = _weather_start_dates(sim.weather, values,
-                                    edit_identity=_overrides_section(experiment_data, sim.treatment))
-    start = _simulation_start(text, sim.treatment, experiment_data, explicit)
+    # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for, IPEXP (655-663):
+    # START P uses YRPLT, S uses YRSIM; E uses IEMRG, which we do not resolve.
+    start = ((_controls_start_date(experiment_data, sim.treatment)
+              or _filex_date(values.get("SDATE"))) if values.get("START") == "S" else None)
+    if start is None and values.get("START") == "P" and components:
+        planting_entry = entry
+        if len(components) > 1:
+            edits = entry.get("rotation", {})
+            planting_entry = next((value for key, value in edits.items()
+                                   if str(key).isascii() and str(key).isdigit()
+                                   and components[0]["R"].isdigit()
+                                   and int(key) == int(components[0]["R"]) and isinstance(value, dict)),
+                                  {}) if isinstance(edits, dict) else {}
+        planting = planting_entry.get("planting")
+        start = (_calendar_date(planting.get("date")) if isinstance(planting, dict) else
+                 _level_date(text, components[0], "MP", "PLANTING DETAILS", "P", "PDATE"))
     if (start is None and values.get("START") == "S"
             and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))):
         return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
                     "Supply five digits: two-digit year followed by three-digit day of year."]
     if start is None:
-        fix = ("Under START E, add planting.emergence_date or change START. "
-               if values.get("START") == "E" else "")
+        reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""
         return [], [f"Stock weather {sim.weather}: cannot check weather dates because "
-                    f"the simulation start is unknown. Checked START and "
-                    f"SDATE/PDATE/EDATE for treatment {sim.treatment}. "
-                    f"{fix}"
-                    "Supply a valid simulation start date, or pass the weather as rows."]
+                    f"the simulation start is unknown{reason}. Checked START and "
+                    f"SDATE/PDATE for treatment {sim.treatment}. "
+                    "Use START S or P with a valid date, or pass the weather as rows."]
     years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
     try:
         years = max(1, int(years))
@@ -113,8 +102,7 @@ def _simulation_weather(sim, values, experiment_data, components):
         code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
         if code == "R":
             harvest = _harvest_end(entry, _level_date(
-                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE",
-                weather_dates=explicit), code)
+                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
             if harvest is not None:
                 try:
                     harvest = _sequence_shift(harvest, harvest.year + years - 1)

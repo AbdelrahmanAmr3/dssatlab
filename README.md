@@ -20,9 +20,8 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 ## Current stage
 
 Version 0.18.1 adds `import_nasa_power()` for a downloaded daily CSV. Simulation
-start dates and stock weather selection now follow DSSAT's rules. START P uses
-the planting date and START E uses the emergence date for coverage and harvest
-bounds. See the [NASA POWER tutorial](docs/guide/simulation.md#import-a-nasa-power-file).
+checks use the effective planting date under START P for coverage and harvest
+bounds. Stock weather selection follows DSSAT's lookup. See the [NASA POWER tutorial](docs/guide/simulation.md#import-a-nasa-power-file).
 
 Version 0.18.0 adds stock weather and soil files copied unchanged, optional daily PAR in the weather template, deeper initial conditions, and fixes sequence weather coverage, inherited harvest dates and identical treatment rows.
 

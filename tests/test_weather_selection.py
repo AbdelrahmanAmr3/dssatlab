@@ -46,11 +46,10 @@ def test_224_next_year_only_does_not_meet_first_lookup(tmp_path):
 
 
 @pytest.mark.parametrize("start,year,code", [("S", 1982, "82056"),
-                                           ("P", 1983, "83057"),
-                                           ("E", 1984, "84060")])
+                                           ("P", 1983, "83057")])
 @pytest.mark.parametrize("missing", [None, "initial", "effective"])
 def test_initial_lookup_then_effective_start_year(tmp_path, start, year, code, missing):
-    # e2e22 initial_S/P/E: every candidate contains all three years.
+    # Initial S/P lookup: every candidate contains all three years.
     sim = period(tmp_path, "82056", "83058" if start == "S"
                  else f"{year % 100:02d}{int(code[-3:]) + 1:03d}")
     text = sim.filex.read_text().replace("     S 82056", f"     {start} 82056")
@@ -88,15 +87,15 @@ def test_eight_character_wsta_uses_literal_not_sdate_name(tmp_path):
     assert sim.check(False) == []
 
 
-def test_start_century_comes_from_initial_lookup_regardless_of_path_order(tmp_path):
-    sim = period(tmp_path, '40069', '40080')
+def test_initial_lookup_selection_is_independent_of_path_order(tmp_path):
+    sim = period(tmp_path, '82069', '82080')
     sim.filex.write_text(sim.filex.read_text().replace(
         ' 1 MA              R     R     R     N     R',
         ' 1 MA              R     R     R     N     M'))
-    selected = stock_file(tmp_path, 'UFGA4001.WTH',
-                          days=days('1940-01-01', '1941-12-31'), wide=True)
-    unused = stock_file(tmp_path, 'UFGA4101.WTH',
-                        days=days('2041-01-01', '2041-12-31'), wide=True)
+    selected = stock_file(tmp_path, 'UFGA8201.WTH',
+                          days=days('1982-01-01', '1983-12-31'), wide=True)
+    unused = stock_file(tmp_path, 'UFGA8401.WTH',
+                        days=days('1984-01-01', '1984-12-31'), wide=True)
     for paths in ([selected, unused], [unused, selected]):
         sim.weather = paths
         assert sim.check(False) == []

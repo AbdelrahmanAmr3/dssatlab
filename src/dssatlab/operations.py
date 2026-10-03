@@ -90,11 +90,12 @@ def _component_management(text, row, column, default=None):
     return default
 
 
-def _harvest_bounds(source, text, treatment, row, override, *, first=True, weather_dates=()):
+def _harvest_bounds(source, text, treatment, row, override, *, first=True):
     """Read known start and planting bounds after experiment edits."""
-    from .filex import _section_row
+    from .controls import _controls_start_date
+    from .filex import _filex_date, _section_row
     from .irrigation import _effective_management
-    from .sequence import _simulation_start, _simulation_start_date
+    from .sequence import _simulation_start
 
     # DSSAT-CSM v4.8.6.0, CSM_Main/CSM.for, CSM (381-390): later Q
     # components start the day after the previous one ends, ignoring SDATE.
@@ -110,10 +111,12 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True, weath
             ('MP', 'PLANTING DETAILS', 'P', 'PDATE')):
         try:
             details = _section_row(text, section, key, int(row[reference]), (column,))
-            if reference == 'SM' and first and details.get('START') in ('S', 'P', 'E'):
-                start = _simulation_start(text, treatment, source, weather_dates)
+            if reference == 'SM' and first and details.get('START') == 'S':
+                start = _controls_start_date(source, treatment) or _filex_date(details[column])
+            elif reference == 'SM' and first and details.get('START') == 'P':
+                start = _simulation_start(text, treatment, source)
             elif reference == 'MP' and 'planting' not in override:
-                planting = _simulation_start_date(details[column], weather_dates)[0]
+                planting = _filex_date(details[column])
         except (ValueError, TypeError, KeyError):
             pass  # Existing checks report unavailable levels and invalid edits.
     code = _effective_management(override, None, treatment, 'planting_management', 'PLANT')
@@ -126,11 +129,11 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True, weath
     return [('simulation start date', start), ('planting date', planting)]
 
 
-def _check_harvest(source, filex, selected_treatment=None, *, text=None, weather_dates=()):
+def _check_harvest(source, filex, selected_treatment=None, *, text=None):
     """Require dated harvests at or after known bounds under effective HARVS R."""
-    from .filex import _section_rows
+    from .filex import _filex_date, _section_rows
     from .irrigation import _effective_management
-    from .sequence import _rotation_components, _simulation_start_date
+    from .sequence import _rotation_components
 
     entries = source.get('treatments', {}) if isinstance(source, dict) else {}
     entries = entries if isinstance(entries, dict) else {}
@@ -153,7 +156,6 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None, weather
     for treatment in numbers:
         entry = entries.get(treatment, {})
         entry = entry if isinstance(entry, dict) else {}
-        dates = weather_dates
         components = _rotation_components(filex, treatment, text=text)
         sequence = len(components) > 1
         edits = entry.get('rotation', {})
@@ -176,13 +178,12 @@ def _check_harvest(source, filex, selected_treatment=None, *, text=None, weather
                     for event in events)
             else:
                 usable = False
-                bounds = _harvest_bounds(source, text, treatment, row, override,
-                                         first=index == 0, weather_dates=dates)
+                bounds = _harvest_bounds(source, text, treatment, row, override, first=index == 0)
                 try:
                     level = int(row['MH'])
                     if level > 0:
                         for event in _section_rows(text, 'HARVEST DETAILS', 'H', level, ('HDATE',)):
-                            day = _simulation_start_date(event['HDATE'], dates)[0]
+                            day = _filex_date(event['HDATE'])
                             if day is None:
                                 continue
                             usable = True
