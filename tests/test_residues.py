@@ -221,8 +221,8 @@ def test_residues_use_effective_management_code(option_sim, capsys, filex_code, 
     original, management = sim.filex.read_bytes(), deepcopy(sim.management)
     code = override or filex_code
     expected = [] if empty or code == "R" else [
-        'Management data treatment 1, residues: residues events need the controls residue '
-        f'"R", but it is "{code}". Set controls residue to "R", '
+        'Management data treatment 1, residues: residue events need the residue management '
+        f'"R" (reported dates), but it is "{code}". Set controls residue to "R", '
         'or remove the residues events.']
     assert sim.check() == expected
     report = capsys.readouterr().out

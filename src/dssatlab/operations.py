@@ -59,9 +59,10 @@ def _check_operation_field(value, rule):
     return None
 
 
-# Section -> (controls field, codes that read the events, every valid code).
-_CODE_RULES = {"residues": ("residue", ("R",), ("N", "R", "D")),
-               "harvest": ("harvest_management", ("R", "M"), ("A", "M", "R", "D"))}
+# Section -> (event kind, controls field, codes that read the events, valid codes, fix wording).
+_CODE_RULES = {"residues": ("residue", "residue", ("R",), ("N", "R", "D"), '"R"'),
+               "harvest": ("harvest", "harvest_management", ("R", "M"), ("A", "M", "R", "D"),
+                           '"R" or "M"')}
 
 
 def _check_operation(entry, treatment, section, where, text, weather_range=None):
@@ -71,7 +72,7 @@ def _check_operation(entry, treatment, section, where, text, weather_range=None)
     code = None
     if section in _CODE_RULES:
         column = "RESID" if section == "residues" else "HARVS"
-        code = _effective_management(entry, text, treatment, _CODE_RULES[section][0], column)
+        code = _effective_management(entry, text, treatment, _CODE_RULES[section][1], column)
     return _check_operation_events(entry[section], section, where, weather_range, code=code)
 
 
@@ -90,10 +91,10 @@ def _check_operation_events(events, section, where, weather_range=None, *, code=
         return [], [f"{label}: OK (empty list; none for this treatment)"]
     problems, report, previous = [], [], None
     if section in _CODE_RULES:
-        field, needed, codes = _CODE_RULES[section]
+        kind, field, needed, codes, fix = _CODE_RULES[section]
         if code in codes and code not in needed:
-            fix = " or ".join(f'"{c}"' for c in needed)
-            problem = (f'{where}: {section} events need the controls {field} {fix}, '
+            dates = " (reported dates)" if section == "residues" else ""
+            problem = (f'{where}: {kind} events need the {kind} management {fix}{dates}, '
                        f'but it is "{code}". Set controls {field} to {fix}, '
                        f'or remove the {section} events.')
             problems.append(problem)

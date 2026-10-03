@@ -262,7 +262,7 @@ def test_harvest_uses_effective_management_code(option_sim, capsys, filex_code, 
     original, management = sim.filex.read_bytes(), deepcopy(sim.management)
     code = override or filex_code
     expected = [] if empty or code in ("R", "M") else [
-        'Management data treatment 1, harvest: harvest events need the controls harvest_management '
+        'Management data treatment 1, harvest: harvest events need the harvest management '
         f'"R" or "M", but it is "{code}". Set controls harvest_management to "R" or "M", '
         'or remove the harvest events.']
     assert sim.check() == expected
