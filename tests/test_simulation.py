@@ -334,7 +334,7 @@ def test_unrepresentable_integer_returns_problem(rows, column):
 
 
 def test_parse_sdate_and_simulation_start_date():
-    from dssatlab.simulation import _parse_sdate, _simulation_start_date
+    from dssatlab.sequence import _parse_sdate, _simulation_start_date
 
     assert _parse_sdate("82056") == (82, 56)
     assert _parse_sdate("00001") == (0, 1)
@@ -351,16 +351,16 @@ def test_parse_sdate_and_simulation_start_date():
     assert reason is None
 
     d, reason = _simulation_start_date(sdate, [])
-    assert d is None
-    assert reason == "weather unreadable"
+    assert d == date(1982, 2, 25)
+    assert reason is None
 
     d, reason = _simulation_start_date(sdate, [date(1982, 1, 1), date(2082, 1, 1)])
-    assert d is None
-    assert "ambiguous start year" in reason and "1982, 2082" in reason
+    assert d == date(1982, 2, 25)
+    assert reason is None
 
     d, reason = _simulation_start_date(sdate, [date(1990, 1, 1)])
-    assert d is None
-    assert "no weather year matches" in reason
+    assert d == date(1982, 2, 25)
+    assert reason is None
 
     d, reason = _simulation_start_date(None, days_unique)
     assert d is None

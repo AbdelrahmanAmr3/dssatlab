@@ -5,13 +5,13 @@ from pathlib import Path
 import re
 import shutil
 
-from .controls import _controls_start_date, _selected_controls
+from .controls import _selected_controls
 from .experiment import _overrides_section
-from .filex import _filex_date, _read_filex, _weather_filename
+from .filex import _read_filex, _weather_filename
 from .irrigation import _effective_management
 from .operations import _harvest_end
-from .rotation_data import _calendar_date, _level_date
-from .sequence import _sequence_end, _sequence_shift, _sequence_stop
+from .rotation_data import _level_date
+from .sequence import _sequence_end, _sequence_shift, _sequence_stop, _simulation_start
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 
@@ -204,6 +204,17 @@ def _stock_weather_paths(source):
     return None
 
 
+def _weather_start_dates(source):
+    """Give start checks explicit weather dates; legacy weather supplies no century."""
+    paths = _stock_weather_paths(source)
+    if paths is None:
+        return []  # write_weather_file emits legacy YYDDD for template data.
+    raw, _ = _read_weather_file(paths[0])
+    code = raw[0][1]["date"] if raw else ""
+    first = _weather_date(code, None) if len(code) == 7 else None
+    return [first] if first is not None else []
+
+
 def _weather_source_problems(source, *, template=False):
     """Reject mixed lists and stock sources for a FileX template before reading."""
     if isinstance(source, list):
@@ -243,32 +254,18 @@ def _simulation_weather(sim, values, experiment_data, components):
                   if str(key).isascii() and str(key).isdigit() and int(key) == int(sim.treatment)
                   and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
     text = Path(sim.filex).read_text(encoding="latin-1")
-    # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for, IPEXP (655-663):
-    # START P uses YRPLT, S uses YRSIM; E uses IEMRG, which we do not resolve.
-    start = ((_controls_start_date(experiment_data, sim.treatment)
-              or _filex_date(values.get("SDATE"))) if values.get("START") == "S" else None)
-    if start is None and values.get("START") == "P" and components:
-        planting_entry = entry
-        if len(components) > 1:
-            edits = entry.get("rotation", {})
-            planting_entry = next((value for key, value in edits.items()
-                                   if str(key).isascii() and str(key).isdigit()
-                                   and components[0]["R"].isdigit()
-                                   and int(key) == int(components[0]["R"]) and isinstance(value, dict)),
-                                  {}) if isinstance(edits, dict) else {}
-        planting = planting_entry.get("planting")
-        start = (_calendar_date(planting.get("date")) if isinstance(planting, dict) else
-                 _level_date(text, components[0], "MP", "PLANTING DETAILS", "P", "PDATE"))
+    # e2e22: only seven-digit $WEATHER supplies a century before start selection.
+    explicit = _weather_start_dates(sim.weather)
+    start = _simulation_start(text, sim.treatment, experiment_data, explicit)
     if (start is None and values.get("START") == "S"
             and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))):
         return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
                     "Supply five digits: two-digit year followed by three-digit day of year."]
     if start is None:
-        reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""
         return [], [f"Stock weather {sim.weather}: cannot check weather dates because "
-                    f"the simulation start is unknown{reason}. Checked START and "
-                    f"SDATE/PDATE for treatment {sim.treatment}. "
-                    "Use START S or P with a valid date, or pass the weather as rows."]
+                    f"the simulation start is unknown. Checked START and "
+                    f"SDATE/PDATE/EDATE for treatment {sim.treatment}. "
+                    "Supply a valid simulation start date, or pass the weather as rows."]
     years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
     try:
         years = max(1, int(years))

@@ -144,7 +144,7 @@ def _check_events(events, section, where, weather_range=None):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
-                 cultivar_path, *, start_date_note=None):
+                 cultivar_path, *, start_date_note=None, weather_dates=None):
     from .irrigation import _check_irrigation
     from .operations import _OPERATION_FIELDS, _check_operation
 
@@ -157,6 +157,15 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         return entry_problems, []
     entry_problems.extend(_unknown_keys(entry, sections, where, "Experiment"))
     problems, report = list(entry_problems), []
+    planting_start = start_date
+    if text is not None:
+        try:
+            level = int(_section_row(text, "TREATMENTS", "N", number, ("SM",))["SM"])
+            general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START"))
+            if general["START"] == "E":
+                planting_start = None  # Planting normally precedes the emergence start.
+        except (ValueError, TypeError):
+            pass
     for section in ("planting", "irrigation", "fertilizer", *_OPERATION_FIELDS):
         label = f"    {section}"
         if section not in entry and section != "irrigation":
@@ -165,7 +174,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         if section == "irrigation":
             section_problems, lines = _check_irrigation(entry, number, where, text, weather_range)
         elif section == "planting":
-            section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
+            section_problems = _check_planting(entry[section], f"{where}, planting", planting_start, weather_range)
             lines = _report_lines(label, section_problems)
         elif section in _OPERATION_FIELDS:
             section_problems, lines = _check_operation(entry, number, section, where, text, weather_range)
@@ -214,7 +223,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                     try:
                         _controls_text(text, number, entry[section])
                         section_problems.extend(_check_planting_window(
-                            text, number, entry[section], where, start_date, weather_range))
+                            text, number, entry[section], where, start_date, weather_range,
+                            weather_dates=weather_dates))
                     except ValueError as error:
                         section_problems.append(f"{where}, controls: FileX {filex}: {error}")
             problems.extend(section_problems)
@@ -227,7 +237,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
                       *, text=None, cultivar_path=None, start_date_note=None,
-                      rotation_template=None, data_dir=None, check_harvest=True):
+                      rotation_template=None, data_dir=None, check_harvest=True, weather_dates=None):
     """Check treatments without mutation; unreadable FileX still permits shape checks."""
     from .rotation_data import _check_rotation_data
     from .operations import _check_harvest
@@ -262,9 +272,9 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
             selected_number = int(selected_treatment)
     except (TypeError, ValueError):
         pass
-    weather_dates = [r["date"] for r in weather_rows
+    days = [r["date"] for r in weather_rows
                      if isinstance(r, dict) and isinstance(r.get("date"), date)] if weather_rows else []
-    weather_range = (min(weather_dates), max(weather_dates)) if weather_dates else None
+    weather_range = (min(days), max(days)) if days else None
     report, seen_numbers = [], {}
     for key, entry in source["treatments"].items():
         number, where, entry_problems = _check_treatment_key(key, seen_numbers, text, filex)
@@ -277,6 +287,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
             cultivar_path,
+            weather_dates=weather_dates if is_selected else None,
             start_date_note=start_date_note if is_selected else
             "only the selected treatment has a resolved simulation start date")
         treatment_problems.extend(rotation_problems)

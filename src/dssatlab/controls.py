@@ -67,10 +67,11 @@ def _season_coverage(source, treatment, start, days, nyers=None):
             "Supply weather for every season, or fewer years."]
 
 
-def _check_planting_window(text, treatment, controls, where, start_date=None, weather_range=None):
+def _check_planting_window(text, treatment, controls, where, start_date=None, weather_range=None,
+                          *, weather_dates=None):
     """Check a changed automatic window against inherited dates and selected weather."""
     from .management import _check_weather_date
-    from .sequence import _parse_sdate, _simulation_start_date
+    from .sequence import _simulation_start, _simulation_start_date
 
     fields = ("auto_planting_first", "auto_planting_last")
     if not any(field in controls for field in (*fields, "planting_management", "start_date")):
@@ -87,29 +88,12 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
             return []  # No effective A/F code; preserve checks for older FileX layouts.
     if plant not in ("A", "F"):
         return []
-    days = list(weather_range or ())
-    if "start_date" in controls:
-        start_date = date.fromisoformat(controls["start_date"])
-    if start_date is not None:
-        days.append(start_date)
-    days.extend(date.fromisoformat(controls[field]) for field in fields if field in controls)
-
+    days = list(weather_range or ()) if weather_dates is None else weather_dates
     def inherited_date(code):
-        day, _ = _simulation_start_date(code, days)
-        if day is None and days and (parsed := _parse_sdate(code)) is not None:
-            # An inherited window may lie outside the weather years. Choose the
-            # nearest matching year; a tie belongs to the later century.
-            reference = (start_date or days[0]).year
-            base = reference // 100 * 100 + parsed[0]
-            year = min((y for y in (base - 100, base, base + 100) if 1 <= y <= 9999),
-                       key=lambda y: (abs(y - reference), -y))
-            day, _ = _simulation_start_date(code, [date(year, 1, 1)])
-        return day
+        return _simulation_start_date(code, days)[0]
 
     if start_date is None:
-        general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL", "START", "SDATE"))
-        if general["START"] == "S":  # DSSAT ignores SDATE for other START codes.
-            start_date = inherited_date(general["SDATE"])
+        start_date = _simulation_start(text, treatment, {"treatments": {treatment: {"controls": controls}}}, days)
     row = _section_row(text, "SIMULATION CONTROLS", "N", level, ("PLANTING", "PFRST", "PLAST"))
     first, last = (date.fromisoformat(controls[field]) if field in controls else inherited_date(row[column])
                    for field, column in zip(fields, ("PFRST", "PLAST")))

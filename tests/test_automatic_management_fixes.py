@@ -42,12 +42,13 @@ def test_component_irrigation_checks_its_own_sm(tmp_path, code, events, rejected
         assert 'Use days_after_planting' not in problems[0]
 
 
-@pytest.mark.parametrize('first,last,start,rejected', [
-    ('99365', '00001', date(1999, 1, 1), False),
-    ('00001', '99365', date(2000, 1, 1), True),
-    ('50001', '00001', date(1950, 1, 1), False),  # Equidistant centuries choose 2000.
+@pytest.mark.parametrize('first,last,start,rejected,first_date,last_date', [
+    ('99365', '00001', date(1999, 1, 1), True, '1999-12-31', '1900-01-01'),
+    ('00001', '99365', date(2000, 1, 1), False, '2000-01-01', '2099-12-31'),
+    ('50001', '00001', date(1950, 1, 1), True, '1950-01-01', '1900-01-01'),
 ])
-def test_inherited_planting_window_uses_nearest_century(tmp_path, first, last, start, rejected):
+def test_inherited_planting_window_uses_weather_century(
+        tmp_path, first, last, start, rejected, first_date, last_date):
     text = f"""*TREATMENTS
 @N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
  1 1 0 0 Window                     1  1  0  0  0  0  0  0  0  0  0  0  1
@@ -62,7 +63,7 @@ def test_inherited_planting_window_uses_nearest_century(tmp_path, first, last, s
         'Management data treatment 1', start, (start, date(start.year, 12, 31)))
     assert len(problems) == int(rejected)
     if rejected:
-        assert "'2000-01-01' is after auto_planting_last '1999-12-31'" in problems[0]
+        assert f"'{first_date}' is after auto_planting_last '{last_date}'" in problems[0]
 
 
 def test_irrigation_code_change_rejects_noninteger_inherited_mi(tmp_path):

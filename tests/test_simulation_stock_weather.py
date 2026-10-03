@@ -315,9 +315,7 @@ def test_stock_weather_unknown_start_is_one_problem(tmp_path, start, override):
     assert len(problems) == 1
     assert all(part in problems[0] for part in (
         'Stock weather missing.WTH', 'simulation start is unknown',
-        'START and SDATE/PDATE', 'treatment 2', 'Use START S or P', 'weather as rows'))
-    if start == 'E':
-        assert 'emergence date' in problems[0]
+        'START and SDATE/PDATE/EDATE', 'treatment 2', 'Supply a valid simulation start date', 'weather as rows'))
     with pytest.raises(lab.DSSATCheckError) as error:
         sim.run()
     assert error.value.problems == problems
