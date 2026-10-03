@@ -15,6 +15,7 @@ from test_filex_template import data, rows
 from test_management_file import sim_inputs
 from test_simulation_run import fake_dssat
 from test_simulation_template import installed
+from test_season_coverage import weather
 
 
 # Field -> column, accepted value, written value, rejected value, correction.
@@ -31,6 +32,17 @@ FIELDS = {
 }
 DATES = ("auto_planting_first", "auto_planting_last")
 NUMBERS = tuple(field for field in FIELDS if field not in DATES)
+
+
+def test_template_planting_window_uses_legacy_crossover(data, rows, installed):
+    data['planting']['date'] = '2000-01-01'
+    data['harvest_date'] = '2000-01-02'
+    sim = Simulation(filex_template=data, soil=rows[1],
+                     weather=weather('1999-12-30', '2000-01-02', station='TEST'),
+                     management={'treatments': {1: {'controls': {
+                         'years': 1, 'start_date': '1999-12-30', 'planting_management': 'A',
+                         'auto_planting_first': '1999-12-31'}}}})
+    assert sim.check(False) == []
 
 
 def _controls(sim, values):

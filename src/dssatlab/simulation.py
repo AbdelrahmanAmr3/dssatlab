@@ -105,6 +105,7 @@ class Simulation:
         values, filex_problems = _read_filex(self.filex, self.treatment, start_date=override_start)
         components = _rotation_components(self.filex, self.treatment)
         rows, weather_problems = _simulation_weather(self, values, experiment_data, components)
+        date_context = _weather_start_dates(self.weather, values, edit_identity=edit_identity)
         if isinstance(self.weather, dict):
             weather_problems.append("Weather data per field needs a FileX template. "
                                     "Supply one weather source for a FileX.")
@@ -112,7 +113,8 @@ class Simulation:
         data_problems, checked_data = _sequence_experiment_data(
             experiment_data, self.treatment, components)
         filex_problems.extend(sequence_problems + data_problems)
-        filex_problems.extend(_check_harvest(experiment_data, self.filex, self.treatment))
+        filex_problems.extend(_check_harvest(experiment_data, self.filex, self.treatment,
+                                           weather_dates=date_context))
         filex_problems.extend(_check_filex_controls(self.filex, self.treatment,
                                                     [row["SM"] for row in components]))
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
@@ -140,7 +142,6 @@ class Simulation:
             text = Path(self.filex).read_text(encoding="latin-1") if "START" in values else ""
         except (OSError, TypeError, ValueError):
             text = ""
-        date_context = _weather_start_dates(self.weather)
         start_date = _simulation_start(text, self.treatment, experiment_data, date_context)
         skip_reason = None
         if not days:

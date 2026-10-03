@@ -88,6 +88,34 @@ def test_eight_character_wsta_uses_literal_not_sdate_name(tmp_path):
     assert sim.check(False) == []
 
 
+def test_start_century_comes_from_initial_lookup_regardless_of_path_order(tmp_path):
+    sim = period(tmp_path, '40069', '40080')
+    sim.filex.write_text(sim.filex.read_text().replace(
+        ' 1 MA              R     R     R     N     R',
+        ' 1 MA              R     R     R     N     M'))
+    selected = stock_file(tmp_path, 'UFGA4001.WTH',
+                          days=days('1940-01-01', '1941-12-31'), wide=True)
+    unused = stock_file(tmp_path, 'UFGA4101.WTH',
+                        days=days('2041-01-01', '2041-12-31'), wide=True)
+    for paths in ([selected, unused], [unused, selected]):
+        sim.weather = paths
+        assert sim.check(False) == []
+
+
+@pytest.mark.parametrize('last', ['1982-12-31', '1983-01-02'])
+def test_unknown_harvest_ends_with_selected_files_not_unused_extra(tmp_path, last):
+    sim = period(tmp_path)
+    sim.filex.write_text(sim.filex.read_text().replace(
+        ' 1 MA              R     R     R     N     R',
+        ' 1 MA              R     R     R     N     M'))
+    selected = stock_file(tmp_path, 'UFGA8201.WTH', days=days('1982-12-30', last))
+    unused = stock_file(tmp_path, 'UFGA8401.WTH', days=days('1984-01-01', '1984-01-02'))
+    sim.weather = [selected]
+    assert sim.check(False) == []
+    sim.weather = [selected, unused]
+    assert sim.check(False) == []
+
+
 @pytest.mark.parametrize("station", ["UFGA", "UFGA9901"])
 def test_mode_c_rejects_four_character_fallback(tmp_path, station):
     sim = period(tmp_path, station=station)

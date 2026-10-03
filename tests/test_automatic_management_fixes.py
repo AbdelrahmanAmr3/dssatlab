@@ -60,10 +60,26 @@ def test_inherited_planting_window_uses_weather_century(
     path.write_text(text, encoding='latin-1')
     problems = _check_planting_window(
         path.read_text(encoding='latin-1'), 1, {'planting_management': 'A'},
-        'Management data treatment 1', start, (start, date(start.year, 12, 31)))
+        'Management data treatment 1', start, (start, date(start.year, 12, 31)),
+        weather_dates=[start])
     assert len(problems) == int(rejected)
     if rejected:
         assert f"'{first_date}' is after auto_planting_last '{last_date}'" in problems[0]
+
+
+def test_legacy_planting_window_crosses_century_without_weather_hint():
+    text = """*TREATMENTS
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 Window                     1  1  0  0  0  0  0  0  0  0  0  0  1
+*SIMULATION CONTROLS
+@N GENERAL     NYERS NREPS START SDATE RSEED SNAME.................... SMODEL
+ 1 GE              1     1     S 99364  2150 WINDOW
+@N PLANTING    PFRST PLAST PH2OL PH2OU PH2OD PSTMX PSTMN
+ 1 PL          99365 00001    40   100    30    40    10
+"""
+    assert _check_planting_window(
+        text, 1, {'planting_management': 'A'}, 'Management data treatment 1',
+        weather_range=(date(1999, 12, 30), date(2000, 1, 1))) == []
 
 
 def test_irrigation_code_change_rejects_noninteger_inherited_mi(tmp_path):

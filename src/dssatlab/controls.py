@@ -88,7 +88,7 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
             return []  # No effective A/F code; preserve checks for older FileX layouts.
     if plant not in ("A", "F"):
         return []
-    days = list(weather_range or ()) if weather_dates is None else weather_dates
+    days = weather_dates or ()
     def inherited_date(code):
         return _simulation_start_date(code, days)[0]
 

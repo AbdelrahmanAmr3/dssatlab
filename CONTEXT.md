@@ -131,7 +131,7 @@ _Avoid_: POWER weather, downloaded weather
 **Simulation start date**:
 The day DSSAT starts the simulation on, as the checks use it: SDATE under START S (read with
 DSSAT's two-digit-year rule, never guessed from the weather years), the planting date under
-START P, the emergence date under START E. controls.start_date replaces it.
+START P, the emergence date under START E. controls.start_date replaces SDATE under START S only.
 
 **Weather file**:
 The DSSAT `*.WTH` file generated from weather data. DSSAT finds it beside the FileX.

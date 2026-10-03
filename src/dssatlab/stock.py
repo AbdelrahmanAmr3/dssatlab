@@ -27,12 +27,21 @@ def _stock_weather_paths(source):
     return None
 
 
-def _weather_start_dates(source):
+def _weather_start_dates(source, values, *, edit_identity=False):
     """Give start checks explicit weather dates; legacy weather supplies no century."""
     paths = _stock_weather_paths(source)
     if paths is None:
         return []  # write_weather_file emits legacy YYDDD for template data.
-    raw, _ = _read_weather_file(paths[0])
+    station = values.get("WSTA", "")
+    if edit_identity and station[:4] != paths[0].name[:4].upper():
+        station = paths[0].name[:4].upper()
+    if len(station) not in (4, 8):
+        return []  # The FileX checks report an unavailable station.
+    name = _weather_filename(station, values.get("SDATE", ""))
+    selected = next((path for path in paths if path.name.upper() == name), None)
+    if selected is None:
+        return []  # The selection walk reports the missing initial file.
+    raw, _ = _read_weather_file(selected)
     code = raw[0][1]["date"] if raw else ""
     first = _weather_date(code, None) if len(code) == 7 else None
     return [first] if first is not None else []
@@ -78,7 +87,8 @@ def _simulation_weather(sim, values, experiment_data, components):
                   and isinstance(value, dict)), {}) if isinstance(entries, dict) else {}
     text = Path(sim.filex).read_text(encoding="latin-1")
     # e2e22: only seven-digit $WEATHER supplies a century before start selection.
-    explicit = _weather_start_dates(sim.weather)
+    explicit = _weather_start_dates(sim.weather, values,
+                                    edit_identity=_overrides_section(experiment_data, sim.treatment))
     start = _simulation_start(text, sim.treatment, experiment_data, explicit)
     if (start is None and values.get("START") == "S"
             and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))):
@@ -118,12 +128,11 @@ def _simulation_weather(sim, values, experiment_data, components):
     # A station mismatch is reported by Simulation;
     # avoid a second name-lookup problem for the same mismatch.
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
-    rows, problems = _read_stock_weather(paths, station, start)
+    rows, problems = _read_stock_weather(paths, start)
     if same_station and not problems:
-        # Maturity is unknown until DSSAT runs. Keep the existing harvest/season
-        # bounds; check selection through the supplied period when no end is known.
-        last = max((row["date"] for row in rows), default=start)
-        walk_end = end if harvest is not None or len(components) > 1 else min(end, last)
+        # Maturity is unknown until DSSAT runs. Without a known end, check only
+        # the files reachable through DSSAT's selection walk.
+        walk_end = end if harvest is not None or len(components) > 1 else None
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
         rows, problems = _walk_weather_files(paths, station, initial, start, walk_end,
                                              wed=_weather_directory(sim.executable))

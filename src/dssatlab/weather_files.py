@@ -121,7 +121,7 @@ def _read_weather_file(path):
     return rows, []
 
 
-def _read_stock_weather(source, station, start_date, end_date=None) -> tuple[list[dict], list[str]]:
+def _read_stock_weather(source, start_date) -> tuple[list[dict], list[str]]:
     """Read a stock path or list of paths into weather template rows and problems.
 
     start_date supplies the weather century. Files and rows keep their given
@@ -190,6 +190,7 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
     fails the four-character fallback on 4.8.5.017 (e2e22 mode C caveat), so
     require yearly-named or eight-character literal files in mode C.
     Installed weather is checked for shadowing, never used as supplied coverage.
+    With no known end, stop at the end of the reachable supplied files.
     """
     supplied = {path.name.upper(): path for path in paths}
     fallback = f"{station[:4]}.WTH"
@@ -215,7 +216,7 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
 
     rows, current = [], start
     while selected is not None:
-        file_rows, problems = _read_stock_weather(supplied[selected], station, current)
+        file_rows, problems = _read_stock_weather(supplied[selected], current)
         if problems:
             return rows, problems
         if not file_rows:
@@ -223,7 +224,7 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
                           "Checked the selected stock weather file. Supply daily weather in that file."]
         rows.extend(file_rows)
         first, last = min(r["date"] for r in file_rows), max(r["date"] for r in file_rows)
-        if last >= end:
+        if end is not None and last >= end:
             return rows, []
         if (last >= current and first.year == last.year
                 and len(selected) == 12 and selected[6:8] == "01"
@@ -232,10 +233,14 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
             selected = f"{station[:4]}{current.year % 100:02d}01.WTH"
             if selected in supplied:
                 continue  # All supplied files are copied beside FileX: retain that directory.
+            if end is None:
+                return rows, []
             return rows, [f"DSSAT requests {selected} at rollover on {current}. "
                           "Checked supplied weather in the selected simulation folder; "
                           "rollover does not search WED or use the four-character fallback. "
                           f"Supply {selected} beside the FileX."]
+        if end is None and last >= current:
+            return rows, []
         missing = max(current, last + timedelta(days=1))
         return rows, [f"DSSAT requests {missing} in {selected}, but its records end on {last}. "
                       "Checked the selected file; DSSAT keeps multi-year and four-character files "

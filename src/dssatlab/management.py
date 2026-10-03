@@ -263,7 +263,8 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         except (OSError, ValueError):
             pass
     if check_harvest:
-        found = _check_harvest(source, filex, selected_treatment, text=text)
+        found = _check_harvest(source, filex, selected_treatment, text=text,
+                               weather_dates=weather_dates or ())
         problems.extend(found)
         root_problems.extend(found)
     selected_number = None
