@@ -134,6 +134,10 @@ class Simulation:
         filex_problems.extend(_check_filex_controls(self.filex, self.treatment,
                                                     [row["SM"] for row in components]))
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
+        if Path(name).suffix.upper() == ".FCX":
+            filex_problems.append(f"FileX {name} is a forecast FileX: a Simulation "
+                                  "does not run forecast mode (Y). "
+                                  "Call run() on the FileX instead.")
         if len(name) > 12 and len(components) < 2:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
                                   "accepts at most 12. Rename the FileX to at most 12 "

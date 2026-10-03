@@ -11,7 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from dssatlab import DSSATCheckError, DSSATRunError, Simulation, runner
+from dssatlab import DSSATCheckError, DSSATRunError, Simulation, runner, run_treatments
 from dssatlab import simulation as simulation_module
 from dssatlab.soil import write_soil_file
 from dssatlab.weather import write_weather_file
@@ -126,6 +126,45 @@ def test_constructor_stores_all_inputs_without_work(monkeypatch):
     assert sim.weather is weather and sim.executable is executable
     assert Simulation(filex, treatment, weather).executable is None
     forbidden.assert_not_called()
+
+
+@pytest.mark.parametrize("suffix", [".FCX", ".fcx", ".FcX"])
+def test_forecast_filex_is_one_check_problem_and_never_runs(inputs, fake_dssat, monkeypatch, suffix):
+    filex = inputs.filex.with_suffix(suffix)
+    inputs.filex.rename(filex)
+    sim = Simulation(filex, 2, inputs.rows)
+    expected = (f"FileX {filex.name} is a forecast FileX: a Simulation "
+                "does not run forecast mode (Y). Call run() on the FileX instead.")
+    forbidden = Mock(side_effect=AssertionError("forecast must not run"))
+    monkeypatch.setattr(simulation_module, "run", forbidden)
+    before = sorted(filex.parent.iterdir())
+
+    assert sim.check() == [expected]
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+
+    assert error.value.problems == [expected]
+    forbidden.assert_not_called()
+    assert fake_dssat.calls == []
+    assert sorted(filex.parent.iterdir()) == before
+
+
+def test_run_treatments_reports_forecast_problem_before_running(inputs, fake_dssat, monkeypatch):
+    filex = inputs.filex.with_suffix(".FCX")
+    inputs.filex.rename(filex)
+    forbidden = Mock(side_effect=AssertionError("forecast must not run"))
+    monkeypatch.setattr(simulation_module, "run", forbidden)
+    before = sorted(filex.parent.iterdir())
+
+    with pytest.raises(DSSATCheckError) as error:
+        run_treatments(str(filex), inputs.rows)
+
+    assert error.value.problems == [
+        "Scenario 'base', treatment 2: FileX UFGA8201.FCX is a forecast FileX: "
+        "a Simulation does not run forecast mode (Y). Call run() on the FileX instead."]
+    forbidden.assert_not_called()
+    assert fake_dssat.calls == []
+    assert sorted(filex.parent.iterdir()) == before
 
 
 @pytest.mark.parametrize("station,weather_name", [
