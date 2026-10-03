@@ -27,7 +27,7 @@ _DETAIL_FIELDS = {
 }
 
 
-def _check_layers(layers, where, soil_depth):
+def _check_layers(layers, where):
     if not isinstance(layers, list) or not layers:
         return [f"{where}: expected a non-empty list of layer dicts. Supply layers "
                 "with depth, water, nh4 and no3 following the Experiment template."]
@@ -62,14 +62,10 @@ def _check_layers(layers, where, soil_depth):
                 problems.append(f"{field_location}: found {_show_value(value)}; allowed range "
                                 "is 0 or greater mg/kg (no upper limit). Supply nonnegative "
                                 "soil nitrogen in DSSAT's units.")
-    if depths and soil_depth is not None and max(depths) > soil_depth:
-        problems.append(f"{where}: deepest initial-condition layer {max(depths)} cm exceeds "
-                        f"the soil profile depth {soil_depth} cm. Supply layer bottom depths "
-                        "within the supplied soil profile.")
     return problems
 
 
-def _check_initial_conditions(data, where, soil_depth=None):
+def _check_initial_conditions(data, where):
     where = f"{where}, initial_conditions"
     if isinstance(data, str) and data == "off":
         return []
@@ -106,7 +102,7 @@ def _check_initial_conditions(data, where, soil_depth=None):
             problems.append(f"{location}: found {_show_value(value)}. "
                             f"Supply a number in the allowed range: {span}.")
     if "layers" in data:
-        problems.extend(_check_layers(data["layers"], f"{where}, layers", soil_depth))
+        problems.extend(_check_layers(data["layers"], f"{where}, layers"))
     return problems
 
 
