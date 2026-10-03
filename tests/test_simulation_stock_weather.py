@@ -33,6 +33,23 @@ def assert_copied(result, paths):
         assert (folder / path.name.upper()).read_bytes() == path.read_bytes()
 
 
+@pytest.mark.parametrize("ending", [b"\r\n\x1a", b"\x1a", b"\x1a\r\n"])
+def test_stock_weather_accepts_final_dos_eof(inputs, fake_dssat, tmp_path, ending):
+    path = weather_file(tmp_path, "UFGA8201.WTH", ("82055", "82056", "82057"))
+    path.write_bytes(path.read_bytes().rstrip(b"\r\n") + ending)
+    sim = lab.Simulation(inputs.filex, 2, path)
+    assert sim.check(verbose=False) == []
+    assert_copied(sim.run(), [path])
+
+
+@pytest.mark.parametrize("marker", [b"\x1a\n", b"\x1a"])
+def test_stock_weather_rejects_dos_eof_in_middle(inputs, tmp_path, marker):
+    path = weather_file(tmp_path, "UFGA8201.WTH", ("82055", "82056", "82057"))
+    path.write_bytes(path.read_bytes().replace(b"82056", marker + b"82056"))
+    problems = lab.Simulation(inputs.filex, 2, path).check(verbose=False)
+    assert any("invalid date" in problem and "\\x1a" in problem for problem in problems)
+
+
 @pytest.mark.parametrize("problem", ["station", "gap", "duplicate", "srad"])
 def test_stock_weather_has_one_usual_weather_problem(inputs, tmp_path, problem):
     source = stock_file(tmp_path, name="xyzz8201.wth" if problem == "station" else "ufga8201.wth")

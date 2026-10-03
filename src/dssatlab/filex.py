@@ -87,6 +87,10 @@ def _section_rows(text, section, key, level, required):
             for index, token in enumerate(tokens):
                 name = token.group().lstrip("@").rstrip(".")
                 end = token.end()
+                if section == "FIELDS" and index == 0 and len(tokens) > 1:
+                    # DSSAT InputModule/IPEXP.for, IPFLD FORMAT 60: I3,A8,1X,2A4.
+                    # The level includes the @ column: "  1UFGA0001" or " 12UFGA0001".
+                    end = tokens[1].start()
                 if name == "ID_SOIL":
                     # Its ten-character value extends past the short header, but
                     # never into the next column.

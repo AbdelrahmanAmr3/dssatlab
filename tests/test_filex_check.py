@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from dssatlab import Simulation
-from dssatlab.filex import _weather_filename
+from dssatlab.filex import _section_row, _weather_filename
 
 
 SAMPLE = """*TREATMENTS                        -------------FACTOR LEVELS------------
@@ -62,6 +62,27 @@ def weather(tmp_path):
 @pytest.mark.parametrize("treatment", [1, 2, 3, "2", "03"])
 def test_valid_treatment_and_fields_with_other_header_blocks(filex, weather, station, treatment):
     assert Simulation(filex(station=station), treatment, weather()).check() == []
+
+
+@pytest.mark.parametrize("level,soil_id", [(1, "IB00000001"), (2, "IB00000002"),
+                                         (12, "IB00000012")])
+def test_fields_three_character_levels_resolve_course_ids(filex, weather, level, soil_id):
+    # UFGA8222's I3 level touches ID_FIELD; only FIELDS differs from SAMPLE.
+    fields = """*FIELDS
+@L ID_FIELD WSTA....  FLSA  FLOB  FLDT  FLDD  FLDS  FLST SLTX  SLDP  ID_SOIL    FLNAME
+  1UFGA0001 UFGA       -99   -99   -99   -99   -99   -99 -99    -99  IB00000001 -99
+  2UFGA0001 UFGA       -99   -99   -99   -99   -99   -99 -99    -99  IB00000002 -99
+ 12UFGA0001 UFGA       -99   -99   -99   -99   -99   -99 -99    -99  IB00000012 -99
+
+"""
+    text = (SAMPLE.split("*FIELDS")[0] + fields + "*SIMULATION CONTROLS"
+            + SAMPLE.split("*SIMULATION CONTROLS")[1])
+    text = text.replace(" 1  1  0  1", f" 1 {level:2d}  0  1")
+    path = filex(text=text)
+    assert Simulation(path, 2, weather()).check(verbose=False) == []
+    selected = _section_row(text, "FIELDS", "L", level, ("ID_FIELD", "ID_SOIL"))
+    assert (selected["L"], selected["ID_FIELD"], selected["ID_SOIL"]) == (
+        str(level), "UFGA0001", soil_id)
 
 
 @pytest.mark.parametrize("station,sdate,expected", [

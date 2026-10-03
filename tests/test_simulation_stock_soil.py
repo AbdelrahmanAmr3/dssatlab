@@ -19,6 +19,22 @@ def stock_soil(folder, name="IB.SOL", ids=("IBOTHER001", "IBMZ910014")):
     return path
 
 
+@pytest.mark.parametrize("ending", [b"\r\n\x1a", b"\x1a", b"\x1a\r\n"])
+def test_stock_soil_accepts_final_dos_eof(inputs, fake_dssat, tmp_path, ending):
+    path = tmp_path / "IB.SOL"
+    path.write_bytes(b"*SOILS: stock profiles\r\n*IBMZ910014" + ending)
+    sim = lab.Simulation(inputs.filex, 2, inputs.weather, soil=path)
+    assert sim.check(verbose=False) == []
+    assert (sim.run().run_dir.parent / path.name).read_bytes() == path.read_bytes()
+
+
+def test_stock_soil_does_not_strip_dos_eof_in_middle(inputs, tmp_path):
+    path = tmp_path / "IB.SOL"
+    path.write_bytes(b"*IBMZ910014\x1a\r\n*IBOTHER001\r\n")
+    problems = lab.Simulation(inputs.filex, 2, inputs.weather, soil=path).check(verbose=False)
+    assert any("'IBMZ910014' is not in the file" in problem for problem in problems)
+
+
 @pytest.mark.parametrize("kind", ["id", "name", "missing", "empty", "case"])
 def test_stock_soil_reports_one_problem(inputs, fake_dssat, tmp_path, kind):
     name = {"name": "OTHER.SOL", "case": "IB.sol"}.get(kind, "IB.SOL")
