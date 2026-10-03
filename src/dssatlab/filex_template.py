@@ -43,7 +43,7 @@ planting:
 # within weather data; omit to harvest at maturity.
 # Values must fit DSSAT's fixed-width columns without rounding or truncation.
 
-# Rotation example: replace the single-crop form above with these lines.
+# Rotation example: replace the single-crop form with 2 to 99 components.
 # treatment_name: "Maize and fallow"
 # rotation:
 #   - crop: "maize"

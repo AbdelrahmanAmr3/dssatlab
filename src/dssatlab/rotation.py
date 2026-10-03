@@ -30,9 +30,9 @@ def _check_rotation_template(data, data_dir):
             problems.append(f"{where}, treatment_name: found {_show_value(name)}. "
                             "Supply 1-25 printable ASCII characters, not just spaces.")
     components = data["rotation"]
-    if not isinstance(components, list) or not 2 <= len(components) <= 9:
+    if not isinstance(components, list) or not 2 <= len(components) <= 99:
         problems.append(f"{where}, rotation: found {_show_value(components)}. "
-                        "Supply a list of 2 to 9 rotation components.")
+                        "Supply a list of 2 to 99 rotation components.")
     if not isinstance(components, list):
         return problems
     valid_components = {}
@@ -192,7 +192,7 @@ def _render_rotation(data, weather_rows, soil_rows):
             harvest_day = _dssat_date(date.fromisoformat(end))
             harvests.append(f"{mh:2d} {harvest_day} GS000   -99   -99   -99   -99 -99")
         cultivars.append(f"{number:2d} {crop} {code} -99")
-        treatments.append(f" 1 {number} 0 0 {name:<25} {number:2d}  1  0  0 {mp:2d}"
+        treatments.append(f" 1{number:2d} 0 0 {name:<25} {number:2d}  1  0  0 {mp:2d}"
                           f"  0  0  0  0  0  0 {mh:2d} {number:2d}")
         controls.extend(_control_lines(number, years if number == 1 else 1,
                                        day, name, model, symbi, bool(mh)))
