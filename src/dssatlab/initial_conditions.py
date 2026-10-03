@@ -6,7 +6,7 @@ import re
 from .experiment import _check_date, _check_fields, _check_number
 from .filex import _section_row
 from .filex_write import (_append_rows, _event_blocks, _event_row,
-                          _insert_section, _repoint)
+                          _insert_section, _new_level, _repoint)
 from .weather import _dssat_date, _show_value
 
 
@@ -120,7 +120,7 @@ def _initial_conditions_text(text, treatment, data):
         return "".join(lines)
     optional = {column for field, (column, _, _) in _DETAIL_FIELDS.items() if field not in data}
     blocks, highest = _event_blocks(lines, name, _HEADERS, optional_columns=optional)
-    level = highest + 1
+    level = _new_level(lines, treatment, "IC", highest, name)
     day = date.fromisoformat(data["date"])
     values = {"C": level, "PCR": data.get("previous_crop", -99),
               "ICDAT": _dssat_date(day),
