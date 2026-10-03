@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dssatlab.stock import _read_stock_weather
+from dssatlab.weather_files import _read_stock_weather, _walk_weather_files
 from dssatlab.weather import _parse_weather
 
 
@@ -133,7 +133,7 @@ def test_century_carries_across_yearly_files(tmp_path):
     ("UFGA.WTH", "UFGA7609"),
     ("UFGA7701.WTH", "UFGA7601"),
 ])
-def test_names_dssat_opens_are_accepted(tmp_path, name, station):
+def test_reader_decodes_names_before_selection(tmp_path, name, station):
     path = weather_file(tmp_path, name, par=False)
     rows, problems = read(path, station=station, end=date(1977, 1, 1))
     assert problems == []
@@ -141,15 +141,15 @@ def test_names_dssat_opens_are_accepted(tmp_path, name, station):
 
 
 @pytest.mark.parametrize("name,station,expected", [
-    ("UFGA7609.WTH", "UFGA", ["UFGA7601.WTH", "UFGA7701.WTH", "UFGA.WTH"]),
-    ("UFGA7801.WTH", "UFGA", ["UFGA7601.WTH", "UFGA7701.WTH", "UFGA.WTH"]),
-    ("OTHER.WTH", "UFGA7609", ["UFGA7609.WTH", "UFGA.WTH"]),
+    ("UFGA7609.WTH", "UFGA", "UFGA7601.WTH"),
+    ("UFGA7801.WTH", "UFGA", "UFGA7601.WTH"),
+    ("OTHER.WTH", "UFGA7609", "UFGA7609.WTH"),
 ])
-def test_wrong_name_reports_file_and_expected_names_once(tmp_path, name, station, expected):
+def test_wrong_name_reports_file_and_requested_name_once(tmp_path, name, station, expected):
     path = weather_file(tmp_path, name)
-    _, problems = read(path, station=station, end=date(1977, 1, 1))
+    _, problems = _walk_weather_files([path], station, "76001", date(1976, 1, 1), date(1976, 1, 1))
     assert len(problems) == 1
-    assert all(value in problems[0] for value in [str(path), *expected, "Rename"])
+    assert all(value in problems[0] for value in (name, expected, "Checked", "Supply"))
 
 
 def test_uppercase_name_collision_in_two_folders_is_one_problem(tmp_path):
