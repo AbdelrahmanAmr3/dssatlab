@@ -8,14 +8,17 @@ from .weather import _parse_weather
 
 
 def _reject_stock(source, kind):
-    stock_path = (isinstance(source, (str, Path))
-                  and Path(source).suffix.upper() in (".WTH", ".SOL"))
-    path_list = (isinstance(source, list) and source
-                 and all(isinstance(item, (str, Path)) for item in source))
-    if stock_path or path_list:
+    if isinstance(source, (str, Path)) and Path(source).suffix.upper() in (".WTH", ".SOL"):
+        file_kind = "weather" if Path(source).suffix.upper() == ".WTH" else "soil"
         raise DSSATCheckError([
-            f"summarize_{kind} reads the {kind} template, not stock {kind} file {source}. "
+            f"summarize_{kind} reads the {kind} template, not stock {file_kind} file {source}. "
             f"Checked the file suffix. Supply {kind} template rows, a CSV path or a "
+            f"DataFrame; Simulation copies stock {file_kind} files unchanged."])
+    if (isinstance(source, list) and source
+            and all(isinstance(item, (str, Path)) for item in source)):
+        raise DSSATCheckError([
+            f"summarize_{kind} reads the {kind} template, not a list of file paths {source}. "
+            f"Checked the source type. Supply {kind} template rows, a CSV path or a "
             f"DataFrame; Simulation copies stock {kind} files unchanged."])
 
 

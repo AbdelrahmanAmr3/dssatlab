@@ -163,15 +163,27 @@ def test_invalid_summary_matches_simulation_problems(tmp_path, filex, weather, s
 
 
 @pytest.mark.parametrize("kind", ["weather", "soil"])
-@pytest.mark.parametrize("source", ["stock.WTH", Path("stock.wth"), Path("stock.SOL"),
-                                    "stock.sol", ["one.WTH", Path("two.wth")],
-                                    [Path("one.SOL")], ["one.csv", Path("two.csv")]])
-def test_summary_rejects_stock_sources(kind, source):
+@pytest.mark.parametrize("source, file_kind", [
+    ("stock.WTH", "weather"), (Path("stock.wth"), "weather"),
+    (Path("stock.SOL"), "soil"), ("stock.sol", "soil")])
+def test_summary_rejects_stock_files(kind, source, file_kind):
     with pytest.raises(dssatlab.DSSATCheckError) as caught:
         getattr(dssatlab, f"summarize_{kind}")(source)
     assert caught.value.problems == [
-        f"summarize_{kind} reads the {kind} template, not stock {kind} file {source}. "
+        f"summarize_{kind} reads the {kind} template, not stock {file_kind} file {source}. "
         f"Checked the file suffix. Supply {kind} template rows, a CSV path or a "
+        f"DataFrame; Simulation copies stock {file_kind} files unchanged."]
+
+
+@pytest.mark.parametrize("kind", ["weather", "soil"])
+@pytest.mark.parametrize("source", [["one.WTH", Path("two.wth")], [Path("one.SOL")],
+                                    ["one.csv", Path("two.csv")]])
+def test_summary_rejects_path_lists(kind, source):
+    with pytest.raises(dssatlab.DSSATCheckError) as caught:
+        getattr(dssatlab, f"summarize_{kind}")(source)
+    assert caught.value.problems == [
+        f"summarize_{kind} reads the {kind} template, not a list of file paths {source}. "
+        f"Checked the source type. Supply {kind} template rows, a CSV path or a "
         f"DataFrame; Simulation copies stock {kind} files unchanged."]
 
 
