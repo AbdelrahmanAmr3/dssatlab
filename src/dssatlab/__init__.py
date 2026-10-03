@@ -13,6 +13,7 @@ from .outputs import (read_dssat_evaluation, read_plant_growth,
                       read_plant_nitrogen, read_soil_water, read_summary,
                       read_weather, to_dataframe)
 from .plot import plot_evaluation, plot_observed, plot_plant_growth
+from .power import import_nasa_power
 from .runner import run
 from .scenarios import (combine_summaries, run_treatments, summarize_seasons,
                         write_scenario_template)
@@ -23,7 +24,7 @@ from .weather import write_weather_template
 
 __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunError",
            "connect", "detect", "install", "run",
-           "Simulation", "write_weather_template", "write_soil_template",
+           "Simulation", "write_weather_template", "write_soil_template", "import_nasa_power",
            "evaluate", "write_observed_template", "plot_evaluation", "plot_observed",
            "read_dssat_observed",
            "write_management_template", "write_experiment_template", "write_filex_template", "DSSATCheckError",
