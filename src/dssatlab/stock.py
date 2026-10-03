@@ -79,6 +79,9 @@ def _read_weather_file(path):
     except (OSError, ValueError) as error:
         return [], [f"Cannot read stock weather file {path}: {error}. "
                     "Supply a readable stock weather file path."]
+    if lines:
+        # DOS EOF is accepted only at the end; stock bytes are copied unchanged.
+        lines[-1] = lines[-1].removesuffix("\x1a")
     station_columns, daily_columns, metadata = {}, {}, {}
     daily_start = None
     for index, line in enumerate(lines):
@@ -265,6 +268,8 @@ def _read_stock_soil(path, soil_id):
     except (OSError, ValueError) as error:
         return [f"Cannot read stock soil file {path}: {error}. "
                 "Supply a readable stock soil file path."]
+    if lines:
+        lines[-1] = lines[-1].removesuffix("\x1a")
     ids = []
     for line in lines:
         if line.startswith("*") and not line.upper().startswith("*SOILS"):
