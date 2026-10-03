@@ -70,6 +70,7 @@ nav:
           - adr/0023-reuse-free-levels-past-99.md
           - adr/0024-stock-weather-and-soil-files-copied-unchanged.md
           - adr/0025-nasa-power-imported-into-the-weather-template.md
+          - adr/0026-summaries-read-only-the-users-own-weather-and-soil-data.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md

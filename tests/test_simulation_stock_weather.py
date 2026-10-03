@@ -2,6 +2,8 @@
 
 from datetime import date
 from pathlib import Path
+import re
+import subprocess
 
 import pytest
 
@@ -33,6 +35,53 @@ def assert_copied(result, paths):
     assert sorted(p.name for p in folder.glob("*.WTH")) == sorted(p.name.upper() for p in paths)
     for path in paths:
         assert (folder / path.name.upper()).read_bytes() == path.read_bytes()
+
+
+@pytest.fixture
+def fallback_sequence(sequence, fake_dssat, tmp_path):
+    text = sequence.filex.read_text(encoding="latin-1")
+    text = re.sub(r"(?m)^ 1 [3-6] 1 0 .*\n", "", text)
+    text = text.replace("UFGA7801   -99", "UFGA       -99")
+    sequence.filex.write_text(text, encoding="latin-1")
+    sequence.executable = fake_dssat.executable
+    sequence.weather = stock_file(tmp_path, "UFGA.WTH", days=[
+        row["date"] for row in weather("1978-01-01", "1979-12-31")])
+    return sequence
+
+
+def test_mode_q_check_accepts_four_character_fallback(fallback_sequence):
+    sim = fallback_sequence
+    before = set(sim.filex.parent.iterdir())
+    assert sim.check(False) == []
+    assert set(sim.filex.parent.iterdir()) == before
+
+
+def test_mode_q_run_four_character_fallback_command_and_batch(
+        fallback_sequence, fake_dssat, monkeypatch):
+    sim = fallback_sequence
+    seen = {}
+    fake_run = subprocess.run
+
+    def record_inputs(command, *, cwd, **kwargs):
+        seen.update({p.name: p.read_bytes() for p in cwd.iterdir() if p.is_file()})
+        return fake_run(command, cwd=cwd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", record_inputs)
+    result = sim.run()
+    assert fake_dssat.calls == [
+        ([str(fake_dssat.executable), "Q", "DSSBatch.v48"], result.run_dir.parent,
+         {"stdin": subprocess.DEVNULL, "capture_output": True, "text": True})]
+    batch = (result.run_dir / "DSSBatch.v48").read_bytes()
+    assert seen["DSSBatch.v48"] == batch
+    assert batch.startswith(b"$BATCH(SEQUENCE)\r\n")
+    lines = batch.decode("latin-1").splitlines()[3:]
+    assert len(lines) == 2
+    for rotation, line in enumerate(lines, 1):
+        assert line[:92].rstrip() == "UFGA7804.SQX"
+        assert [int(line[i:i+7]) for i in range(92, 127, 7)] == [1, 1, rotation, 0, 0]
+    assert seen[sim.filex.name] == sim.filex.read_bytes()
+    assert [name for name in seen if name.endswith(".WTH")] == ["UFGA.WTH"]
+    assert_copied(result, [sim.weather])
 
 
 @pytest.mark.parametrize("overrides", [False, True])

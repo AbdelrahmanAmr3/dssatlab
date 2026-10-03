@@ -127,7 +127,8 @@ def _simulation_weather(sim, values, experiment_data, components):
         walk_end = end if harvest is not None or len(components) > 1 else None
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
         rows, problems = _walk_weather_files(paths, station, initial, start, walk_end,
-                                             wed=_weather_directory(sim.executable))
+                                             wed=_weather_directory(sim.executable),
+                                             mode="Q" if len(components) > 1 else "C")
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)

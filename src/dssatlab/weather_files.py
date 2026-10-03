@@ -189,6 +189,7 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
     e2e22 sections 2-6 prove these branches in mode A. Simulation's mode C
     fails the four-character fallback on 4.8.5.017 (e2e22 mode C caveat), so
     require yearly-named or eight-character literal files in mode C.
+    e2e23 proves mode Q reads the fallback throughout both rotation components.
     Installed weather is checked for shadowing, never used as supplied coverage.
     With no known end, stop at the end of the reachable supplied files.
     """

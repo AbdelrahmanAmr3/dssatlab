@@ -20,11 +20,13 @@ from .scenarios import (combine_summaries, run_treatments, summarize_seasons,
 from .simulation import Simulation
 from .sweep import run_sweep
 from .soil import write_soil_template
+from .summaries import summarize_soil, summarize_weather
 from .weather import write_weather_template
 
 __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunError",
            "connect", "detect", "install", "run",
            "Simulation", "write_weather_template", "write_soil_template", "import_nasa_power",
+           "summarize_weather", "summarize_soil",
            "evaluate", "write_observed_template", "plot_evaluation", "plot_observed",
            "read_dssat_observed",
            "write_management_template", "write_experiment_template", "write_filex_template", "DSSATCheckError",
@@ -34,4 +36,4 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "run_sweep", "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template",
            ]
 
-__version__ = "0.18.1"
+__version__ = "0.18.2"
