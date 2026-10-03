@@ -57,7 +57,7 @@ def test_long_rotation_columns_and_levels(rotation, genotype, rows, tmp_path, co
     rotation["rotation"] = _crop_components(rotation["rotation"][0], count)
     assert _check_filex_template(rotation, genotype) == []
     text = write_filex(rotation, *rows, tmp_path, data_dir=genotype).read_text()
-    treatments = _treatment_rows(text)
+    treatments = dict(_treatment_rows(text))
     assert list(treatments.values()) == [("1", str(n)) for n in range(1, count + 1)]
     for number, line in enumerate(treatments, 1):
         assert line[:2] == " 1"
