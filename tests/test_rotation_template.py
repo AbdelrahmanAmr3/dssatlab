@@ -1,13 +1,14 @@
 """Rotation FileX templates reuse crop checks and write one sequence."""
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, timedelta
+import hashlib
 from pathlib import Path
 
 import pytest
 
 from dssatlab import DSSATCheckError, write_filex_template
-from dssatlab.filex import _section_row
+from dssatlab.filex import _section_row, _treatment_rows
 from dssatlab.filex_skeleton import write_filex
 from dssatlab.filex_template import _check_filex_template, _load_filex_template
 from test_filex_template import data, data_dir, rows
@@ -32,11 +33,63 @@ def genotype(data_dir):
     return data_dir
 
 
-@pytest.mark.parametrize("value", [None, {}, "maize", (), [], [None], [None] * 10])
+@pytest.mark.parametrize("value", [None, {}, "maize", (), [], [None], [None] * 100])
 def test_rotation_list_shape(rotation, genotype, value):
     rotation["rotation"] = value
-    assert any("rotation:" in p and "list of 2 to 9" in p
+    assert any("rotation:" in p and "list of 2 to 99" in p
                for p in _check_filex_template(rotation, genotype))
+
+
+def _crop_components(crop, count):
+    components = []
+    for number in range(count):
+        component = deepcopy(crop)
+        planting = date(1978, 3, 15) + timedelta(days=2 * number)
+        component["planting"]["date"] = planting.isoformat()
+        component["harvest_date"] = (planting + timedelta(days=1)).isoformat()
+        components.append(component)
+    components[-1]["harvest_date"] = "1979-03-14"
+    return components
+
+
+@pytest.mark.parametrize("count", [10, 99])
+def test_long_rotation_columns_and_levels(rotation, genotype, rows, tmp_path, count):
+    rotation["rotation"] = _crop_components(rotation["rotation"][0], count)
+    assert _check_filex_template(rotation, genotype) == []
+    text = write_filex(rotation, *rows, tmp_path, data_dir=genotype).read_text()
+    treatments = _treatment_rows(text)
+    assert list(treatments.values()) == [("1", str(n)) for n in range(1, count + 1)]
+    for number, line in enumerate(treatments, 1):
+        assert line[:2] == " 1"
+        assert int(line[2:4]) == number
+        assert line[4:8] == " 0 0"
+        assert line[9:34] == "Rotation".ljust(25)
+        # Level references retain their original three-character columns.
+        for column in (34, 46, 67, 70):  # CU, MP, MH, SM
+            assert line[column:column + 3] == f"{number:3d}"
+        assert line[37:46] == "  1  0  0"
+        assert line[49:67] == "  0" * 6
+    assert list(treatments)[9][:8] == " 110 0 0"
+    if count == 99:
+        assert list(treatments)[98][:8] == " 199 0 0"
+
+
+@pytest.mark.parametrize("count", [1, 100])
+def test_rotation_component_count_rejected(rotation, genotype, rows, tmp_path, count):
+    rotation["rotation"] = _crop_components(rotation["rotation"][0], count)
+    expected = (f"FileX template, rotation: found {rotation['rotation']!r}. "
+                "Supply a list of 2 to 99 rotation components.")
+    with pytest.raises(DSSATCheckError) as error:
+        write_filex(rotation, *rows, tmp_path, data_dir=genotype)
+    assert error.value.problems == [expected]
+    assert not list(tmp_path.glob("*.SQX"))
+
+
+def test_crop_first_rotation_bytes_unchanged(rotation, genotype, rows, tmp_path):
+    path = write_filex(rotation, *rows, tmp_path, data_dir=genotype)
+    # Digest captured from the v0.16.1 renderer with this crop-first fixture.
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        "fee4e3c86d84708639bdd0b190e3d908cb52552e22cb16ea4ee5c1b38ba152a7")
 
 
 @pytest.mark.parametrize("key", ["crop", "cultivar", "planting", "harvest_date",
