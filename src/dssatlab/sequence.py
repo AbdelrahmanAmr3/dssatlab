@@ -7,7 +7,7 @@ import re
 from .controls import _selected_controls
 from .filex import _section_row, _treatment_rows
 from .filex_write import _columns
-from .runner import _run_command
+from .runner import _batch_text, _run_command, _run_mode
 
 
 def _rotation_components(source, treatment, *, text=None):
@@ -148,20 +148,12 @@ def _sequence_experiment_data(source, treatment, components):
     return problems, dict(source, treatments=checked)
 
 
-def _batch_text(filex_name, treatment, components):
-    """Render the fixed columns accepted by DSSAT's sequence mode."""
-    header = "@FILEX                                                                                        TRTNO     RP     SQ     OP     CO"
-    lines = ["$BATCH(SEQUENCE)", "", header]
-    lines.extend(f"{filex_name:<92}{int(treatment):7d}{1:7d}{int(row['R']):7d}{0:7d}{0:7d}"
-                 for row in components)
-    return "\r\n".join(lines) + "\r\n"
-
-
 def _run_sequence(filex, treatment, components, executable):
-    """Write the batch file before the runner snapshots the simulation folder."""
-    (filex.parent / "DSSBatch.v48").write_bytes(
-        _batch_text(filex.name, treatment, components).encode("latin-1"))
-    return _run_command(filex.parent, ["Q", "DSSBatch.v48"], executable)
+    """Run the sequence through the runner's batch file lifecycle."""
+    rows = [(int(treatment), row["R"]) for row in components]
+    mode = _run_mode(filex, treatment, rows)
+    return _run_command(filex.parent, [mode, "DSSBatch.v48"], executable,
+                        _batch_text(filex.name, mode, rows))
 
 
 def _parse_sdate(sdate):
