@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.18.0] - Unreleased
+## [0.18.0] - 2026-10-03
 
 ### Added
 - `weather=` accepts a stock `.WTH` path or a list of paths with a copied FileX. Files are copied byte for byte under upper-case names; checks read station metadata, dates and daily values without dropping extra columns ([ADR 0024](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0024-stock-weather-and-soil-files-copied-unchanged.md)).
