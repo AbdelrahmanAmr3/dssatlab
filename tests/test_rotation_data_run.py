@@ -246,3 +246,21 @@ def test_final_fallow_harvest_changes_default_cycle(sim, installed):
     written = next(result.run_dir.parent.glob('*.SQX')).read_text()
     assert _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS',))['NYERS'] == '2'
     assert _section_row(written, 'HARVEST DETAILS', 'H', 3, ('HDATE',))['HDATE'] == '80073'
+
+
+
+def test_later_first_planting_counts_years_from_sdate(rotation, rows, installed):
+    # The FileX keeps SDATE at the template's first planting, so NYERS counts from it.
+    rotation['rotation'][1]['end_date'] = '1979-11-14'
+    rotation['rotation'][2]['cultivar']['code'] = 'IB0488'
+    rotation['rotation'][2]['planting']['date'] = '1979-11-15'
+    rotation['rotation'][3]['end_date'] = '1980-03-13'
+    planting = dict(rotation['rotation'][0]['planting'], date='1979-03-15')
+    sim = Simulation(filex_template=rotation, soil=rows[1],
+                     weather=weather('1978-03-15', '1981-03-15'),
+                     management={'treatments': {1: {'rotation': {1: {'planting': planting}}}}})
+    assert sim.check(False) == []
+    result = sim.run()
+    written = next(result.run_dir.parent.glob('*.SQX')).read_text()
+    controls = _section_row(written, 'SIMULATION CONTROLS', 'N', 1, ('NYERS', 'SDATE'))
+    assert (controls['NYERS'], controls['SDATE']) == ('2', '78074')

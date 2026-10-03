@@ -136,17 +136,18 @@ def _check_cycle_closure(start_date, end_date, where):
     return problems
 
 
-def _rotation_cycle_years(components, experiment_data=None):
-    """Cycle years for checked components; the end plus one day gives the next cycle's year.
+def _rotation_cycle_years(components, experiment_data=None, start=None):
+    """Cycle years from start (SDATE) to the end plus one day, the next cycle's year.
 
     Date-order and cycle-closure checks belong to the caller. Do not clamp or
     repair dates here: the end plus one day determines the next cycle's year.
     """
     last = components[-1]
     end = last.get("end_date") if last["crop"] == "fallow" else last["harvest_date"]
-    start = date.fromisoformat(components[0]["planting"]["date"])
+    # SDATE stays put when the first planting is edited, so count years from it.
+    start = start or date.fromisoformat(components[0]["planting"]["date"])
     end = date.fromisoformat(end)
-    from .rotation_data import _calendar_date, _rotation_keys
+    from .rotation_data import _rotation_keys
     treatments = experiment_data.get('treatments', {}) if isinstance(experiment_data, dict) else {}
     if isinstance(treatments, dict):
         for key, entry in treatments.items():
@@ -155,10 +156,6 @@ def _rotation_cycle_years(components, experiment_data=None):
                 continue
             rows = [dict(R=str(i)) for i in range(1, len(components) + 1)]
             edits, _ = _rotation_keys(entry.get('rotation', {}), rows, '')
-            first = edits.get(1, {})
-            planting = first.get('planting') if isinstance(first, dict) else None
-            if isinstance(planting, dict):
-                start = _calendar_date(planting.get('date')) or start
             end = _harvest_end(edits.get(len(components)), end, 'R') or end
             break
     # Avoid overflowing datetime at 9999-12-31; only the resulting year is needed.
@@ -237,7 +234,7 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
                  or date.fromisoformat(data["rotation"][0]["planting"]["date"]))
         days = [row["date"] for row in weather.get(1, []) if "date" in row]
         template_problems.extend(_sequence_coverage(
-            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data)))
+            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data, start)))
         if days and start not in days:
             template_problems.append(f"Simulation start date {start} is not covered by weather "
                                      f"data ({min(days)} to {max(days)}). Supply weather for that date.")
@@ -269,7 +266,7 @@ def _write_rotation_controls(filex, experiment_data, start, components):
     # need NYERS/SDATE in level 1, so edit that level in this generated FileX.
     controls = _selected_controls(experiment_data, 1)
     lines = filex.read_text(encoding="ascii").splitlines(keepends=True)
-    years = controls.get('years', _rotation_cycle_years(components, experiment_data))
+    years = controls.get('years', _rotation_cycle_years(components, experiment_data, start))
     for key, column, value in (("years", "NYERS", years),
                                ("start_date", "SDATE", _dssat_date(start))):
         if key == 'years' or key in controls:
