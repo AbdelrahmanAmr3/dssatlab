@@ -9,7 +9,7 @@ from .controls import _controls_start_date, _selected_controls
 from .filex_skeleton import _field_lines, _control_lines, _parse_field_data
 from .filex_template import _check_template_crop, _template_genotype_files
 from .management import _check_management, _report_lines
-from .sequence import _sequence_coverage, _sequence_experiment_data
+from .sequence import _sequence_coverage, _sequence_experiment_data, _sequence_stop
 from .filex_write import _columns, _planting_row, _PLANTING_HEADER, _repoint
 from .weather import _dssat_date, _show_value
 from .operations import _harvest_end
@@ -179,11 +179,9 @@ def _rotation_cycle_years(components, experiment_data=None, start=None):
             edits, _ = _rotation_keys(entry.get('rotation', {}), rows, '')
             end = _harvest_end(edits.get(len(components)), end, 'R') or end
             break
-    # DSSAT stops the day before SDATE's day of year in year SDATE + NYERS
-    # (see sequence._sequence_coverage), so take the fewest years reaching the end.
+    # Keep the cycle-year choice tied to CSM's shared stopping boundary.
     years = 1
-    while (start.year + years <= date.max.year and
-           date(start.year + years, 1, 1) + timedelta(days=start.timetuple().tm_yday - 2) < end):
+    while (stop := _sequence_stop(start, years)) is not None and stop < end:
         years += 1
     return years
 
@@ -259,7 +257,8 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
                  or _rotation_start_date(data["rotation"]))
         days = [row["date"] for row in weather.get(1, []) if "date" in row]
         template_problems.extend(_sequence_coverage(
-            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data, start)))
+            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data, start),
+            template=data["rotation"]))
         if days and start not in days:
             template_problems.append(f"Simulation start date {start} is not covered by weather "
                                      f"data ({min(days)} to {max(days)}). Supply weather for that date.")

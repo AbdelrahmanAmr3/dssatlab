@@ -56,8 +56,9 @@ def test_leading_fallow_render_and_check(sim, rows, installed, tmp_path, end, ye
     (None, "77349", "1"), ("1976-12-15", "76350", "2"), ("1977-12-16", "77350", "1")])
 def test_leading_fallow_run_and_controls_override(sim, installed, override, sdate, years):
     start = override or "1977-12-15"
-    # A later SDATE shifts the stopping day too, so cover the extra day.
-    sim.weather = weather(start, "1978-12-15")
+    # The shifted stopping boundary falls after the final fallow's 1978 end.
+    # CSM starts the next leading fallow and finishes it on 1979-03-14.
+    sim.weather = weather(start, "1979-03-14" if override else "1978-12-14")
     if override:
         sim.management = {"treatments": {1: {"controls": {"start_date": override}}}}
     before = deepcopy(sim.filex_template)
@@ -73,6 +74,21 @@ def test_leading_fallow_run_and_controls_override(sim, installed, override, sdat
         [str(installed.executable), "Q", "DSSBatch.v48"], folder)
     assert (result.run_dir / "DSSBatch.v48").is_file()
     assert sim.filex_template == before
+
+
+@pytest.mark.parametrize('start,years', [('1976-12-15', 2), ('1977-12-16', 1)])
+def test_shifted_start_requires_next_leading_fallow_end(sim, installed, start, years):
+    sim.management = {'treatments': {1: {'controls': {'start_date': start}}}}
+    sim.weather = weather(start, '1978-12-15')
+    expected = [
+        f'FileX NYERS {years}: the sequence runs from {start} through 1979-03-14, '
+        'after the weather data ends (1978-12-15). Supply weather through 1979-03-14, '
+        'or fewer years.']
+    assert sim.check(False) == expected
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+    assert error.value.problems == expected
+    assert installed.calls == []
 
 
 @pytest.mark.parametrize("case,expected", [
@@ -117,7 +133,9 @@ def test_leading_fallow_invalid_date(sim, value):
 def test_closure_uses_leading_start_instead_of_crop_planting(sim, edited):
     sim.filex_template["rotation"][0]["start_date"] = "1978-01-15"
     sim.filex_template["rotation"][-1]["end_date"] = "1979-01-14" if edited else "1979-01-15"
-    sim.weather = weather("1978-01-15", "1980-01-14")
+    # Keep weather long enough to isolate the cycle-closure problem: the edited
+    # fixed end crosses NYERS on 1980-01-15, one day beyond the old boundary.
+    sim.weather = weather("1978-01-15", "1980-01-15")
     if edited:
         sim.management = {"treatments": {1: {"rotation": {
             3: {"harvest": [{"date": "1979-01-15"}]}}}}}

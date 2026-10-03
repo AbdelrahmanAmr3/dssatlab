@@ -135,9 +135,12 @@ class Simulation:
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate, days))
-        coverage = _sequence_coverage if len(components) > 1 else _season_coverage
-        filex_problems.extend(coverage(
-            experiment_data, self.treatment, start_date, days, values.get("NYERS")))
+        if len(components) > 1:
+            filex_problems.extend(_sequence_coverage(
+                experiment_data, self.treatment, start_date, days, values.get("NYERS"), filex=self.filex))
+        else:
+            filex_problems.extend(_season_coverage(
+                experiment_data, self.treatment, start_date, days, values.get("NYERS")))
         if override_start is not None and days:
             if override_start not in days:
                 filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "
