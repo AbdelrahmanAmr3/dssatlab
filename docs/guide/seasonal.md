@@ -228,3 +228,69 @@ Example output:
 
 Missing values (`-99`) are excluded from numeric calculations and counted in `missing`, ensuring
 incomplete seasons do not skew the statistics.
+
+## Compute net return from a price file
+
+`net_returns(rows, price_file)` computes each season's **net return in $/ha at
+expected prices** from a DSSAT `.PRI` [price file](../reference/glossary.md).
+DSSAT-CSM does not read this file; DSSATLab performs the arithmetic in Python,
+with zero runtime dependencies. Supply the price file explicitly, for example
+the course case's sibling `DTCM6401.PRI` or a file from DSSAT's `Economic` folder.
+
+```python
+import dssatlab as dl
+
+rows = dl.read_summary(result.run_dir)  # Summary.OUT or experiment-named .OSU
+returns = dl.net_returns(rows, "DTCM6401.PRI")
+stats = dl.summarize_seasons(returns, variables=["net_return"])
+for stat in stats:
+    print(stat["treatment"], stat["mean"], stat["missing"])
+```
+
+You can also pass `result.summary()` or `combine_summaries(results)` rows.
+The function returns copies retaining every column and adding `net_return`;
+the input rows stay unchanged. Price sections match each row's crop `CR` and
+FileX treatment `TRNO`, including fallow (`CR="FA"`); the scenario's `treatment`
+label is not used for price matching.
+
+Fixed prices (`IDIS=0`) use `PAR1`; uniform (`1`) and triangular (`2`) prices
+use their means, and normal (`3`) prices use `PAR1`. **Price risk is not
+modelled**: seasonal statistics describe variation in simulated quantities at
+these expected prices, without sampling price distributions. `IDIS=-1` omits
+a component entirely.
+
+Only components used by the matched price section need their Summary quantities:
+
+| Price component | Required Summary quantity |
+| --- | --- |
+| `GRAN` (harvested yield revenue) | `HWAH` |
+| `BYPR` (by-product revenue) | `BWAH` |
+| `BASE` (base cost) | None; a cost per hectare |
+| `NFER`, `NCOS` (N costs) | `NICM`, `NI#M`, respectively |
+| `IRRI`, `IRCO` (irrigation costs) | `IRCM`, `IR#M`, respectively |
+| `SCOS` (seed cost) | `DWAP` |
+| `RESM` (amendment cost) | `RECM` |
+| `PCOS`, `PFER` (P costs) | `PICM`, `PI#M`, respectively |
+| `KCOS`, `KFER` (K costs) | `KICM`, `KI#M`, respectively |
+
+Yield, by-product and amendment quantities in kg/ha are divided by 1000 for
+prices in $/t. Other quantities are multiplied directly by their prices or
+per-application costs; no further unit or currency conversion is performed.
+The formula and units are recorded in
+[ADR 0033](../adr/0033-net-returns-computed-in-python-at-expected-prices.md).
+
+**Summary.OUT alone may leave net returns missing.** `read_summary()` converts
+DSSAT's `-99` to `None`. If any used quantity is `None`, that row's `net_return`
+is `None`; an ignored component's missing quantity does not matter.
+`summarize_seasons()` counts these rows in `missing` and excludes them from
+numeric statistics. An absent required column or an invalid quantity raises
+`DSSATCheckError`, as do price-file and crop/treatment matching problems.
+
+The [real-DSSAT proof](../adr/0033-net-returns-computed-in-python-at-expected-prices.md#proof)
+found 30 numeric and 130 missing returns among DTCM6401's 160 rows because of
+missing N quantities and maize seed quantity `DWAP`. Stock UFGA8201's 180 rows
+all lack used `DWAP`, so all returns are missing. An explicitly modified
+probe-local price file with seed cost ignored (`SCOS IDIS=-1`) produced 180
+numeric returns and verified nonzero N and irrigation costs against an
+independent recomputation. Ignoring seed cost changes the economic comparison;
+the function does not replace missing quantities with zero.

@@ -136,6 +136,34 @@ Supplying daily weather when no selected treatment uses M is a problem because
 DSSAT would ignore it. Supplying a climate file when no selected treatment uses
 W or S is also a problem. Remove the unused input or select the matching method.
 
+## Override weather per scenario
+
+The unused-input check runs separately for each scenario. A shared
+`weather=["UFGA8201.WTH", "UFGA.CLI"]` is rejected when the base scenario uses
+only M and another scenario uses only W or S: each has an unused input.
+Supply measured weather as the base input and replace it with the climate file
+through the scenario's `weather` key:
+
+```python
+import dssatlab as dl
+
+results = dl.run_treatments(
+    "UFGA8201.MZX", treatments=[1], weather="UFGA8201.WTH",
+    management={"treatments": {1: {"controls": {"weather_source": "M"}}}},
+    scenarios={"wgen": {
+        "weather": "UFGA.CLI",
+        "management": {"treatments": {1: {"controls": {"weather_source": "W"}}}},
+    }},
+)
+```
+
+This runs treatment 1 under both `"base"` (measured weather) and `"wgen"`
+(generated weather). Each scenario override replaces the whole input; omitted
+keys inherit the base input. If the base `management` contains other settings
+you need, include them in the scenario's replacement too. The climate filename
+must still match the FileX's WSTA as described above. See
+[scenarios](scenarios.md#overrides-replace-the-whole-input) for the override rules.
+
 ## Verified course results
 
 The public-API proofs recorded in [ADR 0032](../adr/0032-generated-weather-from-a-copied-climate-file.md#real-dssat-proofs)
@@ -150,4 +178,5 @@ These equalities use the stock controls and seed. The seed override above
 demonstrates reproducibility and is not the course-reference setup. A locally
 altered `DTCM.CLI` changed yields, confirming DSSAT used the supplied copy.
 A stock Linux managed install was unavailable, so no Linux real-DSSAT proof
-was run. Economics from `.PRI` files remains outside this release.
+was run. To compute net returns from `.PRI` price files after a run, see
+[seasonal economics](seasonal.md#compute-net-return-from-a-price-file).

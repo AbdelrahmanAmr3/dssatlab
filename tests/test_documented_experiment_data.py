@@ -139,8 +139,11 @@ def test_guide_experiment_examples(label, experiment, sim_inputs, cultivar_table
         # Check the documented controls on a copied seasonal or sequence FileX.
         is_sequence = any(entry.get('controls', {}).get('replicates', 1) > 1
                           for entry in experiment['treatments'].values())
-        weather = tmp_path / 'UFGA.CLI'
-        weather.write_text(UFGA, encoding='ascii')
+        sources = [entry.get('controls', {}).get('weather_source')
+                   for entry in experiment['treatments'].values()]
+        if sources != ['M']:  # a measured-only example keeps the measured rows
+            weather = tmp_path / 'UFGA.CLI'
+            weather.write_text(UFGA, encoding='ascii')
         kwargs = dict(filex=sequence.filex if is_sequence else filex)
     elif any('rotation' in entry for entry in experiment['treatments'].values()):
         yaml = pytest.importorskip('yaml')

@@ -1,7 +1,7 @@
 import dssatlab
 from dssatlab import (DSSATError, DSSATOutputError, DSSATRunError, connect, detect,
-                     install, plot_plant_growth, read_plant_growth, read_summary, run,
-                     summarize_seasons, to_dataframe)
+                     install, net_returns, plot_plant_growth, read_plant_growth,
+                     read_summary, run, summarize_seasons, to_dataframe)
 
 
 def test_public_api_is_importable():
@@ -10,11 +10,13 @@ def test_public_api_is_importable():
     assert callable(install)
     assert callable(run)
     assert callable(summarize_seasons)
+    assert callable(net_returns)
     assert issubclass(DSSATRunError, DSSATError)
     assert "run" in dssatlab.__all__
     assert "summarize_seasons" in dssatlab.__all__
+    assert "net_returns" in dssatlab.__all__
     assert "DSSATRunError" in dssatlab.__all__
-    assert dssatlab.__version__ == "0.21.0"
+    assert dssatlab.__version__ == "0.21.1"
 
 
 def test_summary_public_api_is_exported():

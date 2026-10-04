@@ -408,6 +408,18 @@ _Avoid_: result file
 The parsed `Summary.OUT` of a run directory: one row per simulation and season (per rotation
 component run in a sequence), with DSSAT's own column names (`HWAM`, `ADAT`, `R#`, ...).
 
+**Price file**:
+A DSSAT `*.PRI` file of crop prices and production costs (for example from DSSAT's `Economic`
+folder), sectioned by crop and treatment number. Each price or cost is fixed or a distribution
+(IDIS); dssatlab uses its expected value. DSSAT-CSM itself never reads it.
+_Avoid_: cost file, economics file
+
+**Net return**:
+The money one Summary row earns per hectare at the price file's expected prices: harvested yield
+and by-product times their prices, minus base, fertilizer, irrigation, seed and amendment costs.
+Computed in Python by `net_returns()`; `None` when a quantity it needs is missing.
+_Avoid_: profit, gross margin, income
+
 **Plant growth**:
 The parsed `PlantGro.OUT` of a run directory: one row per simulation day, with DSSAT's own
 column names (`LAID`, `CWAD`, ...).

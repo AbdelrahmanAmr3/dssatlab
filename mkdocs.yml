@@ -77,7 +77,9 @@ nav:
           - adr/0028-soil-analysis-and-environment-as-new-levels.md
           - adr/0029-stock-weather-anchor-checked-as-a-window.md
           - adr/0030-new-cultivars-under-the-users-own-code.md
+          - adr/0031-crop-entries-for-mixed-crop-treatments.md
           - adr/0032-generated-weather-from-a-copied-climate-file.md
+          - adr/0033-net-returns-computed-in-python-at-expected-prices.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md
