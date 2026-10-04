@@ -2,6 +2,21 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.21.0] - Unreleased
+
+### Added
+- Generated weather from a supplied `.CLI` path through `weather=`, alone or with stock `.WTH` paths for mixed measured/generated treatments of a copied FileX. The climate file is copied unchanged under its upper-case name; checks follow the first four characters of WSTA, require WGEN parameters for W and monthly averages for S, and report missing or unused inputs. See [generated weather](guide/generated-weather.md) and [ADR 0032](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0032-generated-weather-from-a-copied-climate-file.md).
+- Experiment data controls `weather_source` (M, W or S), `replicates` (1 to 99999) and `random_seed` (0 to 99999). Replicates above 1 require a sequence with W or S; the three weather controls apply to every controls level the sequence uses. Seed 0 is passed as is, and a fixed seed repeats with the same inputs and DSSAT executable.
+- A generated-weather guide covering climate inputs, controls through `management=`, and every replicate row returned by `read_summary()`: P# identifies the replicate; RUNNO and WYEAR restart per block and R# identifies the rotation component.
+
+### Fixed
+- FileX template checks share crop-entry bounds and lookup, and report malformed `treatments` and `treatment_fields`, including both set to None, without raising `TypeError` ([#290](https://github.com/AbdelrahmanAmr3/dssatlab/issues/290), [#291](https://github.com/AbdelrahmanAmr3/dssatlab/issues/291)).
+
+### Notes
+- Real-DSSAT proofs on Windows 4.8.5.017: DTCM6401 with S and DTCM.CLI matches all 160 course-reference rows on the compared columns; UFGA7874 with W, NREPS 10 and UFGA.CLI matches all 910 sequence-reference rows. W and S with seed 1234 repeat, seed 4321 changes results, and an altered local climate file changes yields. Evidence and exact comparison columns are recorded in ADR 0032. No Linux real-DSSAT proof was run.
+- DSSAT ignores seasonal NREPS. FileX templates still use measured weather; economics from `.PRI` files remains outside this release.
+- Zero runtime dependencies are preserved.
+
 ## [0.20.1] - 2026-10-04
 
 ### Added

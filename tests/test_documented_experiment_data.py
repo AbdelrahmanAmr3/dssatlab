@@ -14,6 +14,8 @@ from test_management_file import sim_inputs as management_inputs
 from test_filex_template import data, rows
 from test_simulation_template import installed
 from test_simulation_run import fake_dssat
+from test_climate import UFGA
+from test_sequence import sequence
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -121,7 +123,7 @@ def test_guide_filex_templates(label, template, data, rows, installed):
 
 @pytest.mark.parametrize('label,experiment', EXAMPLES, ids=[label for label, _ in EXAMPLES])
 def test_guide_experiment_examples(label, experiment, sim_inputs, cultivar_table,
-                                  data, rows, installed):
+                                  data, rows, installed, sequence, tmp_path):
     filex, weather = sim_inputs
     # The narrow cultivar fixture omits the stock code used by the guide's scenario.
     cultivar = filex.parent / 'MZCER048.CUL'
@@ -133,7 +135,14 @@ def test_guide_experiment_examples(label, experiment, sim_inputs, cultivar_table
     first = date(1978, 1, 1)
     weather = [dict(weather[0], date=(first + timedelta(days=i)).isoformat())
                for i in range((date(1996, 1, 1) - first).days)]
-    if any('rotation' in entry for entry in experiment['treatments'].values()):
+    if label.startswith('generated-weather.md:'):
+        # Check the documented controls on a copied seasonal or sequence FileX.
+        is_sequence = any(entry.get('controls', {}).get('replicates', 1) > 1
+                          for entry in experiment['treatments'].values())
+        weather = tmp_path / 'UFGA.CLI'
+        weather.write_text(UFGA, encoding='ascii')
+        kwargs = dict(filex=sequence.filex if is_sequence else filex)
+    elif any('rotation' in entry for entry in experiment['treatments'].values()):
         yaml = pytest.importorskip('yaml')
         page = (ROOT / 'docs/guide/sequence.md').read_text(encoding='utf-8')
         template = next(yaml.safe_load(block) for block in
