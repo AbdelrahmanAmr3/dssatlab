@@ -64,3 +64,28 @@ data rows only (the header is timestamped). Evidence: `.work/probe-v021/<case>-<
    project, which aborts without its paraconf file, and no stock managed install. The Windows result
    (a climate file beside the FileX wins over DSSAT's climate folder, earlier `a/` and `b/` runs) is the
    evidence; a Linux managed install has no `CLD` entry, so the copied file is the only source there.
+
+## Real-DSSAT proofs
+
+Ticket #298, run 2026-10-04 on Windows DSSAT 4.8.5.017 with the public API from the feature branch
+(`Simulation`, `read_summary`). Local script, deliberately uncommitted: `.work/scripts/proof298.py`;
+evidence in `.work/proof298/<timestamp>/results.json` and each run directory. Every case uses a fresh
+copy of the course folder (`.work/dssat_test/2026-05-23/<case>/ref`) and the stock climate file
+`C:/DSSAT48/Weather/Climate/<STATION>.CLI`, passed as `weather=[path]`. Rerun from the main checkout:
+
+```powershell
+.venv/Scripts/python.exe -B -u .work/scripts/proof298.py        # all of (a)-(e)
+.venv/Scripts/python.exe -B -u .work/scripts/proof298.py b c    # chosen proofs
+```
+
+| | Proof | Result |
+|---|---|---|
+| a | Copied `DTCM6401.SNX` (WTHER S, NYERS 10, 16 treatments run one by one in mode C) with stock `DTCM.CLI` and no weather data | 160 rows; TRNO, CR, MODEL, SDAT, HWAM, ADAT, MDAT, HDAT equal the 160-row course reference `DTCM6401.OSU` (equal digests of the sorted rows) |
+| b | Treatment 1 switched with controls `weather_source: W`, `years: 3`, `random_seed: 1234` | `check()` reports no problems; 3 rows (HWAM 1357, 1340, 1077); a rerun is identical; seed 4321 differs (HWAM 1205, 1122, 1194) |
+| c | The same with `weather_source: S` | 3 rows (HWAM 683, 1205, 189); rerun identical; seed 4321 differs (HWAM 860, 789, 920) |
+| d | Treatment 1 with a locally altered `DTCM.CLI` (monthly RTOT halved) beside the FileX | The ten HWAM values change from 1387, 1250, 847, 877, 1114, 1510, 1222, 740, 216, 677 to 740, 754, 643, 456, 1085, 499, 391, 976, 653, 568 |
+| e | Copied `UFGA7874.SQX` (sequence, WTHER W, NREPS 10, NYERS 30, six components) with stock `UFGA.CLI` | `check()` reports no problems; 910 rows; RUNNO, TRNO, R#, P#, CR, MODEL, SDAT, HWAM, ADAT, MDAT, HDAT equal the 910-row Q reference `UFGA7874.OSU` |
+
+Linux managed install: not run. This machine has no stock Linux DSSAT (probe 6), so the Windows
+runs are the only real-DSSAT evidence; the Linux file lookup is the same relative-to-FileX rule.
+GAPS F11's WTHER/NREPS part is done; economics from a `.PRI` file stays open.
