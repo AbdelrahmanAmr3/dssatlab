@@ -93,7 +93,7 @@ treatments:
   - "Irrigated"
 ```
 
-Treatments are numbered 1..N in the order listed. In the written FileX, `EXP.DETAILS` and simulation controls (`SNAME`) use the first treatment name. Every treatment starts from the template's cultivar, planting details, and optional harvest date.
+Treatments are numbered 1..N in the order listed. In the written FileX, `EXP.DETAILS` uses the first treatment name. Simulation controls (`SNAME`) use that name for a single-crop template, or the first treatment name assigned to each crop entry in a mixed-crop template. Every treatment starts from the template's cultivar, planting details, and optional harvest date, or from its selected crop entry in a mixed-crop template.
 
 To vary treatments, supply **experiment data** keyed by treatment number (`treatments: {2: {...}, 3: {...}}`). Any section you give—such as `fertilizer`, `irrigation`, `cultivar`, `planting`, `residues`, `tillage`, `harvest`, `initial_conditions`, or `controls`—adds a new level and points that treatment to it:
 
@@ -121,6 +121,99 @@ treatments:
 - When you create a single `Simulation(filex_template="filex.yaml", treatment=k, ...)`, `treatment` can be any integer from 1 to N (`treatment=1` by default). Out-of-range treatment numbers are rejected by `check()` with the valid range.
 - When `sim.run()` executes, the generated FileX in the simulation folder holds the **whole experiment**: every treatment with its experiment data applied, so you can open or run the entire experiment in DSSAT. If a scenario name is supplied, it is written to the selected treatment row only. Only one weather file is written, for the selected treatment's start year, so give every treatment a start date in that year if you plan to run the whole experiment.
 - To run every treatment at once, pass `filex_template=` to `run_treatments()` (see [Run treatments and scenarios](scenarios.md)).
+
+### Mixed-crop treatments
+
+To compare different crops in one experiment, use `crops`: a list of 1 to 99
+**crop entries**, each with its own `crop`, `cultivar`, `planting` and optional
+`harvest_date`. These replace the four top-level fields. Supply `treatments`
+and `treatment_crops`, one entry number per treatment in treatment order, with
+values 1..K for K entries. Every entry must be used. Several treatments can share
+an entry, and two entries can name the same crop with different cultivars.
+
+Save this as `mixed_crops.yaml`, or uncomment the mixed-crops example from
+`write_filex_template()` after removing the single-crop fields and `treatment_name`:
+
+```yaml
+treatments: ["Maize control", "Maize fertilized", "Soybean", "Wheat"]
+treatment_crops: [1, 1, 2, 3]
+crops:
+  - crop: "maize"
+    cultivar: {code: "IB0035"}
+    planting:
+      date: "2021-03-01"
+      method: "S"
+      distribution: "R"
+      population: 7.2
+      row_spacing: 75
+      depth: 5
+  - crop: "soybean"
+    cultivar: {code: "IB0011"}
+    planting:
+      date: "2021-04-01"
+      method: "S"
+      distribution: "R"
+      population: 30
+      row_spacing: 50
+      depth: 5
+  - crop: "wheat"
+    cultivar: {code: "IB0488"}
+    planting:
+      date: "2021-03-01"
+      method: "S"
+      distribution: "R"
+      population: 150
+      row_spacing: 20
+      depth: 3
+    harvest_date: "2021-08-01"
+```
+
+Treatments 1 and 2 share maize entry 1; treatment 3 uses soybean entry 2, and
+treatment 4 uses wheat entry 3. All grow on field 1 unless you also supply
+`treatment_fields`. For several fields, supply weather and soil keyed by field
+number as described below. Choose installed cultivar codes with `list_cultivars()`
+and adapt the planting values to your experiment.
+
+Vary management through experiment data keyed by treatment number. Here only
+treatment 2 receives fertilizer; the name alone does not add it:
+
+```python
+import dssatlab as dl
+
+experiment = {"treatments": {2: {"fertilizer": [
+    {"date": "2021-03-15", "material": "FE005", "application": "AP001", "depth": 5, "n": 60},
+]}}}
+sim = dl.Simulation(
+    filex_template="mixed_crops.yaml", treatment=3,
+    weather="weather.csv", soil="soil.csv", management=experiment,
+)
+problems = sim.check()  # Checks the soybean treatment's start and weather coverage.
+results = dl.run_treatments(
+    filex_template="mixed_crops.yaml",
+    weather="weather.csv", soil="soil.csv", management=experiment,
+)
+```
+
+Each entry gets its own cultivar, planting and simulation controls levels, with
+its fixed crop model, legume nitrogen fixation setting and planting date as the
+simulation start. Entries with a harvest date get harvest levels in entry order;
+other entries harvest at maturity. Planting, potato and harvest checks are the
+same as for a single-crop template. Weather must cover each selected treatment's
+start and scheduled harvest, including any experiment controls overrides.
+Experiment data cultivar edits must keep the treatment's own crop; new cultivars
+are checked against that crop's `.CUL` table.
+
+The generated FileX uses the first entry's planting year and crop extension in
+its filename. DSSAT selects each treatment's crop from its cultivar level's `CR`
+column, so a `.MZX` can hold soybean and wheat treatments too. All entries' required
+genotype files are checked and copied into every simulation folder.
+
+`check()` reports conflicting crop forms, leftover top-level crop fields, malformed
+entries, missing or invalid mappings, and unused entries before writing. Supply
+exactly one of the single-crop form, `crops`, or `rotation`. Crop entries describe
+different treatments; a rotation describes components that follow each other in
+one sequence, and cannot be combined with `crops`. See [ADR 0031](../adr/0031-crop-entries-for-mixed-crop-treatments.md)
+for the decision and real-DSSAT proof.
 
 ### Several fields in one experiment
 
@@ -214,11 +307,11 @@ Template checks find the data directory beside the explicit or discovered DSSAT
 executable and read its `Genotype` folder without saving configuration or writing
 files. `management` and `name` work as with an existing FileX: checks inspect the
 skeleton in memory, then experiment overrides apply to the generated FileX.
-Cultivar overrides must keep the template's crop and use its fixed model's table.
+Cultivar overrides must keep the treatment's crop and use its fixed model's table.
 
 `sim.run()` creates a fresh simulation folder beside the YAML file, or in the
 current directory for a dict. It writes the FileX (holding all treatments), weather and `SOIL.SOL`, and
-copies the crop's required genotype files from `Genotype`. Your original files are unchanged.
+copies all template crops' required genotype files from `Genotype`. Your original files are unchanged.
 `run_treatments()` also accepts `filex_template=` to run all or selected template treatments (see [Run treatments and scenarios](scenarios.md)).
 
 ## Use stock weather files

@@ -6,7 +6,8 @@ import re
 from .experiment import _check_date, _check_fields
 from .cultivar import _CROPS
 from .controls import _controls_start_date, _selected_controls
-from .filex_skeleton import _field_lines, _control_lines, _parse_field_data
+from .filex_skeleton import _field_lines, _control_lines
+from .template_checks import _parse_field_data
 from .filex_template import _check_template_crop, _template_genotype_files
 from .management import _check_management, _report_lines
 from .sequence import _sequence_coverage, _sequence_experiment_data, _sequence_stop

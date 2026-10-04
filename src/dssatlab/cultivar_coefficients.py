@@ -125,8 +125,9 @@ def _check_cultivar_definition(path, data, codes, where, *, new_cultivars=None):
     else:
         problems.extend(_check_ecotype(path, ecotype, where))
     if new_cultivars is not None:
-        if code in new_cultivars:
-            previous, previous_where = new_cultivars[code]
+        key = (path, code)
+        if key in new_cultivars:
+            previous, previous_where = new_cultivars[key]
             if (data["crop"] != previous["crop"]
                     or ecotype != previous["ecotype"]
                     or data.get("name", code) != previous.get("name", code)
@@ -136,7 +137,7 @@ def _check_cultivar_definition(path, data, codes, where, *, new_cultivars=None):
                                 "coefficients across template treatments sharing the .CUL copy. "
                                 "Use identical definitions for this code or choose different codes.")
         else:
-            new_cultivars[code] = data, where
+            new_cultivars[key] = data, where
     return problems
 
 

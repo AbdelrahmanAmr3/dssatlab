@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 from .filex import _section_row
-from .cultivar import _check_cultivar
+from .cultivar import _CROPS, _check_cultivar
 from .filex_write import _event_text, _planting_text
 from .experiment import (_check_controls, _check_date, _check_fields,
                          _check_number, _check_treatment_key, _unknown_keys)
@@ -168,6 +168,12 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
             section_problems, lines = _check_irrigation(entry, number, where, text, weather_range)
         elif section == "planting":
             section_problems = _check_planting(entry[section], f"{where}, planting", start_date, weather_range)
+            if cultivar_path is not None and Path(cultivar_path).name[:2] == "PT":
+                for field in ("planting_material_weight", "sprout_length"):
+                    if not isinstance(entry[section], dict) or field not in entry[section]:
+                        section_problems.append(
+                            f"{where}, planting: missing {field!r}; treatment {number}'s crop is potato. "
+                            f"Checked the treatment's crop entry. Supply planting.{field}.")
             lines = _report_lines(label, section_problems)
         elif section in _OPERATION_FIELDS:
             section_problems, lines = _check_operation(entry, number, section, where, text, weather_range)
@@ -234,10 +240,12 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
                       *, text=None, cultivar_path=None, start_date_note=None,
-                      rotation_template=None, data_dir=None, check_harvest=True):
+                      rotation_template=None, filex_template=None, data_dir=None, check_harvest=True):
     """Check treatments without mutation; unreadable FileX still permits shape checks."""
     from .rotation_data import _check_rotation_data
     from .operations import _check_harvest
+    if filex_template is not None:
+        from .filex_template import _template_crop_entry, _template_treatment_names
 
     label = "Management data"
     if not isinstance(source, dict):
@@ -274,10 +282,26 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
     weather_range = (min(weather_dates), max(weather_dates)) if weather_dates else None
     report, seen_numbers = [], {}
     # Template treatments share one folder's .CUL copy; copied-FileX runs do not.
-    new_cultivars = {} if cultivar_path is not None else None
+    new_cultivars = {} if cultivar_path is not None or filex_template is not None else None
     for key, entry in source["treatments"].items():
         number, where, entry_problems = _check_treatment_key(key, seen_numbers, text, filex)
         is_selected = number is not None and number == selected_number
+        treatment_cultivar_path = cultivar_path
+        if isinstance(filex_template, dict):
+            treatment_cultivar_path = None
+            crop_entry = None
+            if number is not None and 1 <= number <= len(_template_treatment_names(filex_template)):
+                if "crops" not in filex_template:
+                    crop_entry = _template_crop_entry(filex_template, number)
+                else:
+                    entries = filex_template["crops"]
+                    numbers = filex_template.get("treatment_crops")
+                    if (isinstance(entries, list) and isinstance(numbers, list) and number <= len(numbers)
+                            and type(numbers[number - 1]) is int and 1 <= numbers[number - 1] <= len(entries)):
+                        crop_entry = _template_crop_entry(filex_template, number)
+            crop = crop_entry.get("crop") if isinstance(crop_entry, dict) else None
+            if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
+                treatment_cultivar_path = data_dir / "Genotype" / f"{_CROPS[crop][2]}.CUL"
         entry, rotation_problems, rotation_report = _check_rotation_data(
             entry, number, filex, text, start_date if is_selected else None,
             weather_range if is_selected else None, rotation_template, data_dir,
@@ -285,7 +309,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
-            cultivar_path,
+            treatment_cultivar_path,
             new_cultivars=new_cultivars,
             start_date_note=start_date_note if is_selected else
             "only the selected treatment has a resolved simulation start date")

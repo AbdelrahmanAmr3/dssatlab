@@ -299,7 +299,10 @@ cultivar, planting and harvest; experiment data keyed by treatment number varies
 from the experiment data plus the crop, station and soil profile. Instead of one crop it can hold a
 rotation: one sequence of 2 to 99 rotation components (crops or fallows), each crop with its own
 cultivar, planting and harvest, written as a sequence FileX. It starts on the first crop's planting
-date, or on the start date of a leading fallow.
+date, or on the start date of a leading fallow. Instead of one crop it can also hold numbered crop
+entries in `crops`, each with its own cultivar, planting and optional harvest date; `treatment_crops`
+points each named treatment at an entry. Several treatments can share an entry, and entries can
+name the same crop with different cultivars: different crops in different treatments.
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 
@@ -307,6 +310,13 @@ _Avoid_: FileX generator
 A crop the FileX template can write, with one fixed DSSAT model and its genotype files. A crop is
 a template crop only after a real DSSAT run proved it. Other crops still run from an existing FileX.
 _Avoid_: supported crop (ambiguous with every crop DSSAT has)
+
+**Crop entry**:
+One crop of a mixed-crop FileX template: a template crop with its own cultivar, planting and
+optional harvest date. Treatments pick an entry by number, as they pick a field. Each entry gets its
+own cultivar, planting and simulation controls levels, so each treatment runs its crop's model.
+Not the same as a rotation component, which follows the others in time within one sequence.
+_Avoid_: crop treatment, crop factor
 
 **Observed data**:
 The user's own measured values (for example yield, anthesis day, or LAI on a date), given per

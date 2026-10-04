@@ -113,9 +113,8 @@ def test_written_template_documents_loadable_alternative(tmp_path, data_dir, alt
     text = path.read_text()
     assert '# treatments: [' in text
     if alternative:
-        text = "\n".join("# " + line if line.startswith("treatment_name:") else
-                         line[2:] if line.startswith("# treatments:") else line
-                         for line in text.splitlines())
+        text = text.replace("\ntreatment_name:", "\n# treatment_name:", 1)
+        text = text.replace("\n# treatments:", "\ntreatments:", 1)
         path.write_text(text)
     loaded, problems = _load_filex_template(path)
     assert problems == []

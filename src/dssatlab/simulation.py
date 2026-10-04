@@ -7,7 +7,8 @@ import shutil
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
 from .filex import _check_filex_controls, _filex_date, _irrigation_dates, _read_filex
-from .filex_skeleton import _check_template_simulation, _write_template_simulation
+from .filex_skeleton import _write_template_simulation
+from .template_checks import _check_template_simulation
 from .filex_write import _identity_text, _write_management
 from .irrigation import _start_irrigation_code
 from .management import _check_management, _report_lines
