@@ -27,8 +27,8 @@ copies the events to its input file with formats that keep one decimal place for
 - An environment change is one of add, subtract, multiply or replace, with a number that fits the
   FileX's 4-character cell; event dates are strictly ascending. dssatlab does not copy DSSAT's
   input-file rounding: the docs say DSSAT may round a change.
-- Treatments only (copied FileX and FileX template). Rotation components and sweeps don't take
-  these sections.
+- Treatments only (copied FileX and FileX template). Rotation components don't take these
+  sections, and sweeps may keep them in the base experiment data but can't vary them as factors.
 - One module per section, `soil_analysis.py` and `environment.py`, as for the v0.6 sections.
 
 ## Consequences
