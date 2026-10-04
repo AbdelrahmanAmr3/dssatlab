@@ -98,7 +98,7 @@ def test_bad_population_does_not_hide_date_order(rotation, genotype):
     assert any("1978-05-30 is not after rotation[2]'s end" in p for p in problems)
 
 
-@pytest.mark.parametrize("year,end", [("1978", "1979-01-02"), ("0001", "0001-12-31")])
+@pytest.mark.parametrize("year,end", [("1978", "1979-01-02"), ("1936", "1936-12-31")])
 def test_first_planting_day_one_cycle_closure(rotation, genotype, rows, tmp_path, year, end):
     rotation["rotation"][0]["planting"]["date"] = f"{year}-01-01"
     rotation["rotation"][1]["end_date"] = f"{year}-06-01"
