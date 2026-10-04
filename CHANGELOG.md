@@ -2,6 +2,24 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.19.0] - Unreleased
+
+### Added
+- Experiment data `soil_analysis`: a required date, optional method codes and measured layer values, written as a new SOIL ANALYSIS level (SA). Checks require positive ascending depths, allowed value ranges and a first-layer value for any column supplied deeper down. Omitted values write -99; the quoted `"off"` sets SA to 0 ([ADR 0028](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0028-soil-analysis-and-environment-as-new-levels.md)).
+- Experiment data `environment`: strictly ascending dated events that add, subtract, multiply or replace day length, srad, tmax, tmin, rain, CO2, dew point or wind, written as a new ENVIRONMENT MODIFICATIONS level (ME). Changes must fit DSSAT's four-character cells and allowed ranges; `[]` sets ME to 0. DSSAT may round a change to one decimal place.
+- Guide field tables, commented examples in `write_management_template()` and tutorial Case 19 for both sections with a copied FileX.
+
+### Changed
+- Treatments of copied FileX and FileX template Simulations accept both sections, including scenarios and seasonal runs. Omitted sections keep their FileX levels. Sweeps keep them in base experiment data but cannot vary them as factors; rotation components reject them. Soil phosphorus only matters with `phosphorus: "Y"` in controls.
+
+### Fixed
+- Experiment data `harvest` dates under effective HARVS R are checked against the known simulation start and planting dates, including START E emergence and sequence component bounds, as inherited harvest dates are ([#254](https://github.com/AbdelrahmanAmr3/dssatlab/issues/254)).
+- Inherited dated irrigation under IRRIG R is checked against an unchanged FileX SDATE under START S, as it already is when `controls.start_date` is supplied ([#256](https://github.com/AbdelrahmanAmr3/dssatlab/issues/256)).
+
+### Notes
+- FileX dates checked against `$WEATHER` stock weather ([#253](https://github.com/AbdelrahmanAmr3/dssatlab/issues/253)) are planned for 0.19.1.
+- Zero runtime dependencies are preserved.
+
 ## [0.18.3] - 2026-10-03
 
 ### Fixed

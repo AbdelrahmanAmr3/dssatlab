@@ -66,6 +66,10 @@ Base experiment data comes from `management`: a dict, a YAML path, or `None`
 for no experiment data overrides. For each combination it is deep-copied, then
 each factor's section **replaces that section whole** for every selected
 treatment. Other sections, treatments and top-level keys stay unchanged.
+`soil_analysis` and `environment` can stay in this base experiment data for
+every combination, but neither is accepted as a factor. Rotation components
+reject both sections. See [soil analysis](experiment.md#soil-analysis) and
+[environment modifications](experiment.md#environment-modifications).
 Treatment keys such as `1`, `"1"` and `"01"` identify the same treatment. A
 missing treatment entry is added under its integer number. No section fields
 or event lists are partially merged. Original FileX, YAML and data files are

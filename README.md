@@ -19,6 +19,12 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.19.0 adds measured `soil_analysis` (SA) and dated `environment`
+modifications (ME) in experiment data for copied FileX and FileX template
+treatments. It also checks experiment-data harvest dates under HARVS R against
+the start and planting dates, and inherited START S irrigation against the start.
+See the [experiment data guide](docs/guide/experiment.md#soil-analysis).
+
 Version 0.18.1 adds `import_nasa_power()` for a downloaded daily CSV. Simulation
 checks use the effective planting date under START P for coverage and harvest
 bounds. Stock weather selection follows DSSAT's lookup. See the [NASA POWER tutorial](docs/guide/simulation.md#import-a-nasa-power-file).
@@ -46,6 +52,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Set DSSAT simulation options (including photosynthesis and CO2), initial-condition details, or initial conditions off through experiment data
 - [x] Set automatic irrigation and planting controls, day-based irrigation events, and irrigation efficiency through experiment data
+- [x] Supply measured soil analysis and dated environment modifications through experiment data
 - [x] Run all or selected FileX treatments and what-if scenarios in separate folders, and combine their summaries
 - [x] Read six DSSAT output files (`Summary.OUT`, `PlantGro.OUT`, `SoilWat.OUT`, `PlantN.OUT`, `Weather.OUT`, `Evaluate.OUT`) and plot plant growth
 - [x] Write a FileX from a template (single- or multi-treatment, one or several fields) for ten crops (maize, wheat, rice, soybean, potato, sorghum, pearl millet, barley, peanut, dry bean), and list installed crops and cultivars (`list_crops()`, `list_cultivars()`)
@@ -107,7 +114,7 @@ Values are in DSSAT's own units and nothing is converted:
 
 - **Weather template**: comma-separated UTF-8 CSV with `station`, `latitude`, `longitude`, `elevation`, `date` (`YYYY-MM-DD`), `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`, `wndht` (default -99). Optional daily `par` is in mol/m2 per day, finite and from 0 to 100 inclusive; fill every row or omit the column. Station and coordinates repeat on every row; one row per calendar day without gaps or duplicates.
 - **Soil template**: one soil profile, one row per layer. Required profile columns: `soil_id` (1 to 10 ASCII characters matching the FileX `ID_SOIL`), `salb`, `slro`, `sldr`, `slpf`. Required layer columns: `slb` (cm, strictly increasing), `slll`, `sdul`, `ssat` (strictly `slll < sdul < ssat`), `srgf`. Optional columns (`slnf`, `ssks`, `sbdm`, `sloc`, etc.) default to -99. Profile values repeat identically on every row.
-- **Management template**: YAML file or Python dict organized under `treatments -> {treatment_number: ...}` with optional `planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, `harvest`, `cultivar`, `initial_conditions`, and `controls` sections (`dl.write_experiment_template()` writes a commented file covering these sections; all are checked and applied to a copy of your FileX, see the Guide). All dates must be quoted ISO strings (`"YYYY-MM-DD"`). Omitted sections keep the FileX's original levels; empty lists (`[]`) specify no events (level 0). PyYAML is optional (`pip install pyyaml` or `pip install dssatlab[yaml]`) and only imported when loading a YAML path; plain dictionaries require zero runtime dependencies.
+- **Management template**: YAML file or Python dict organized under `treatments -> {treatment_number: ...}` with optional `planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, `harvest`, `cultivar`, `initial_conditions`, `soil_analysis`, `environment`, and `controls` sections (`dl.write_experiment_template()` writes a commented file covering these sections; all are checked and applied to a copy of your FileX, see the Guide). All dates must be quoted ISO strings (`"YYYY-MM-DD"`). Omitted sections keep the FileX's original levels; empty event lists (`[]`) set level 0, including `environment`. Use the quoted `"off"` for `initial_conditions` or `soil_analysis`. The two new sections apply to treatments; rotation components reject them, and sweeps keep them in base data but cannot vary them as factors. PyYAML is optional (`pip install pyyaml` or `pip install dssatlab[yaml]`) and only imported when loading a YAML path; plain dictionaries require zero runtime dependencies.
 
 Inputs for weather and soil can be given as a CSV path, a list of dicts, or a pandas DataFrame (pandas is never required). Management can be given as a YAML path or a plain dictionary.
 

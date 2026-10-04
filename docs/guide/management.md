@@ -75,6 +75,10 @@ For residue, tillage and harvest comments too, use
 `dl.write_experiment_template("experiment.yaml")`; `write_management_template()`
 continues to cover planting, irrigation and fertilizer.
 
+Both template writers also include commented examples of
+[soil analysis](experiment.md#soil-analysis) and
+[environment modifications](experiment.md#environment-modifications).
+
 ### Quoted ISO dates
 
 Every calendar date in YAML or dictionary management data must be a **quoted string** in
@@ -291,6 +295,10 @@ raising an exception.
 1. **Unknown keys are rejected**: Only documented template fields are accepted. Misspelled or extra keys fail immediately without guessing.
 2. **Dates within weather range**: Every event date (planting, irrigation, fertilizer, residues, tillage, harvest) for the selected treatment must fall within the range of dates provided in your weather data.
 3. **Planting on or after simulation start date**: Planting date cannot precede the simulation start date (`SDATE` when `START == "S"` in the FileX).
+   Inherited dated irrigation under IRRIG R is also checked against the effective
+   simulation start under START S or P, including an unchanged FileX SDATE under
+   START S ([#256](https://github.com/AbdelrahmanAmr3/dssatlab/issues/256)). Supplying
+   an irrigation section replaces the inherited events; START E skips this check.
 4. **Ascending and unique event timing**: Irrigation and fertilizer event lists must be strictly ordered without duplicates. Irrigation uses either dates or days after planting throughout the list, matching the effective IRRIG code above. Residue, tillage and harvest lists allow several events on the same date, in non-descending order.
 5. **Empty list versus omitted section**:
    - **Omitted section**: If `planting`, `irrigation`, `fertilizer`, `residues`, `tillage`, or `harvest` is omitted for a treatment, the FileX's original Level for that section is kept unchanged.

@@ -3,7 +3,8 @@
 [Management data](management.md) lets you change planting, irrigation and fertilizer without
 editing the FileX. **Experiment data** extends the same per-treatment YAML (or dict) with
 `residues`, `tillage`, `harvest`, which **cultivar** is grown, what the soil holds at the
-start (**initial conditions**), and how the simulation is **controlled**. dssatlab applies it to a copy of your FileX; the
+start (**initial conditions**), measured **soil analysis**, dated **environment modifications**,
+and how the simulation is **controlled**. dssatlab applies it to a copy of your FileX; the
 original is never changed. You still start from a FileX you already have.
 
 ## Generate the experiment template
@@ -81,6 +82,136 @@ the simulation start date. `controls.start_date` replaces SDATE under START S on
 The FileX `START` setting
 is left as it is. See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
 
+## Soil analysis
+
+`soil_analysis` supplies measured soil properties as a SOIL ANALYSIS level (SA).
+It works for treatments of a copied FileX or a FileX template. This example
+matches the comment in `write_management_template()`:
+
+```yaml
+treatments:
+  1:
+    soil_analysis:
+      date: "1982-02-25"
+      ph_buffer_method: "SA005"
+      p_method: "IB001"
+      k_method: "SA001"
+      layers:
+        - {depth: 15, bulk_density: 1.3, organic_carbon: 1, total_nitrogen: 0.1,
+           ph_water: 6.5, ph_buffer: 6, extractable_p: 12, exchangeable_k: 0.2, stable_carbon: 0}
+        - {depth: 30, extractable_p: 8}
+```
+
+| Field | DSSAT column | Required | Units / allowed values |
+|---|---|---|---|
+| `date` | SADAT | Yes | Valid quoted `"YYYY-MM-DD"` string |
+| `ph_buffer_method` | SMHB | No | Two ASCII letters + three digits (`[A-Za-z]{2}[0-9]{3}`) |
+| `p_method` | SMPX | No | Two ASCII letters + three digits |
+| `k_method` | SMKE | No | Two ASCII letters + three digits |
+| `layers` | Layer rows | Yes | Non-empty list of layer dicts |
+
+Each layer has these fields. Ranges include their endpoints unless stated otherwise:
+
+| Layer field | DSSAT column | Required | Units / allowed values |
+|---|---|---|---|
+| `depth` | SABL | Yes | Bottom-of-layer depth in cm, above 0, strictly ascending |
+| `bulk_density` | SADM | No | g/cm3, above 0 and at most 10 |
+| `organic_carbon` | SAOC | No | %, 0 to 100 |
+| `total_nitrogen` | SANI | No | %, 0 to 10 |
+| `ph_water` | SAPHW | No | pH, above 0 and at most 14 |
+| `ph_buffer` | SAPHB | No | pH, above 0 and at most 14 |
+| `extractable_p` | SAPX | No | mg/kg, 0 or greater (no upper range limit) |
+| `exchangeable_k` | SAKE | No | cmol/kg, 0 or greater (no upper range limit) |
+| `stable_carbon` | SASC | No | %, 0 to 100 |
+
+Numbers must be finite Python integers or floats, not strings or booleans, and
+fit five characters without rounding or truncation. This width still limits
+values with no upper range limit. Omitted methods and layer values write -99;
+DSSAT keeps the corresponding soil profile values. SANAME writes -99; SAEA
+and a custom analysis name are not offered. The bulk density, organic carbon
+and total nitrogen upper limits come from DSSAT's IPSLAN checks in
+`InputModule/IPSLIN.for`.
+
+**First-layer rule:** DSSAT uses an analysis column only when layer 1 has a
+value. A field supplied in any deeper layer must also appear in layer 1;
+otherwise `check()` rejects it. For example:
+
+```text
+Treatment 1, soil_analysis, layer 2, field 'extractable_p': DSSAT reads a soil analysis column only when the first layer has a value. Add extractable_p to layer 1 or remove it from the deeper layers.
+```
+
+Soil phosphorus only matters with `phosphorus: "Y"` in `controls` (PHOSP).
+The checks do not establish whether a soil contains enough phosphorus data for
+DSSAT's P model; missing P data can still produce a DSSAT run error.
+
+Omit `soil_analysis` to keep the FileX's SA level, or supply the quoted
+`soil_analysis: "off"` to set SA to 0 without adding a level. `[]`, an empty
+dict, `null` and unquoted `off` are rejected. Rotation components reject this
+section. Sweeps keep it in the base experiment data (`management`) but cannot
+vary it as a factor. See [sweeps](sweeps.md#base-inputs-and-section-replacement)
+and [ADR 0028](../adr/0028-soil-analysis-and-environment-as-new-levels.md).
+
+## Environment modifications
+
+`environment` is a list of dated changes, written as an ENVIRONMENT
+MODIFICATIONS level (ME) for a treatment of a copied FileX or a FileX template.
+From an event's date onwards, DSSAT uses that event until the next one; on each
+day it uses the last event dated on or before that day. The source weather file
+and dssatlab's weather checks stay unchanged.
+
+```yaml
+treatments:
+  1:
+    environment:
+      - {date: "1982-02-25", srad: {multiply: 0.5}, tmax: {add: 2}, co2: {replace: 550}}
+```
+
+This matches `write_management_template()`'s comment. Each event requires a
+quoted ISO `date` (ODATE) and at least one variable. Dates must be strictly
+ascending, with no two events on the same day. Event dates need no weather
+coverage. Each variable takes exactly one change kind:
+
+| Change kind | DSSAT code | Meaning | Allowed value |
+|---|---|---|---|
+| `add` | A | Add to the daily value | Variable range below |
+| `subtract` | S | Subtract from the daily value | Variable range below |
+| `multiply` | M | Multiply the daily value | 0 to 9.99 inclusive, also subject to the variable range |
+| `replace` | R | Replace the daily value | Variable range below |
+
+| Event field | DSSAT column | Units for add / subtract / replace | Allowed value |
+|---|---|---|---|
+| `date` | ODATE | Quoted `"YYYY-MM-DD"` string | Valid calendar date |
+| `day_length` | EDAY | hours | -9.9 to 99.9 inclusive |
+| `srad` | ERAD | MJ/m2/day | -9.9 to 99.9 inclusive |
+| `tmax` | EMAX | degrees C | -9.9 to 99.9 inclusive |
+| `tmin` | EMIN | degrees C | -9.9 to 99.9 inclusive |
+| `rain` | ERAIN | mm/day | -9.9 to 99.9 inclusive |
+| `co2` | ECO2 | ppm | Whole number from -89 to 9999 inclusive |
+| `dew_point` | EDEW | degrees C | -9.9 to 99.9 inclusive |
+| `wind` | EWIND | km/day | -9.9 to 99.9 inclusive |
+
+Multipliers are unitless. The CO2 whole-number rule also applies to multiply,
+so a CO2 multiplier must be a whole number from 0 to 9. Numbers must be finite
+Python integers or floats, not strings or booleans, and fit four characters
+without rounding or truncation. Unknown variables and change kinds are rejected.
+Omitted variables write `add: 0` (A 0), leaving them unchanged for that event;
+they do not carry forward an earlier event's changes. ENVNAME is not offered.
+
+These ranges protect values through DSSAT's own input-file handling:
+`InputModule/IPENV.for` replaces values at or below -90 with 0, and FILEIO in
+`InputModule/optempy2k.for` writes four-character F4.1, F4.2 or I4 cells.
+The multiply limit avoids overflowing F4.2; CO2 must be whole because FILEIO
+writes `INT(CO2ADJ)`. Every other variable uses -9.9 to 99.9 even for a
+temperature replacement, because another variable's multiply can select the
+F4.1 branch. **DSSAT may round an environment change to one decimal place**
+(for example, 0.25 to 0.3); dssatlab writes the value you supplied.
+
+Omit `environment` to keep the FileX's ME level. `environment: []` sets ME to 0;
+`"off"`, `null` and a dict are rejected. Rotation components reject this section.
+Sweeps keep it in the base experiment data but cannot vary it as a factor.
+See [ADR 0028](../adr/0028-soil-analysis-and-environment-as-new-levels.md) and
+the [tutorial notebook](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_tutorial.ipynb), Case 19.
+
 ## Residues, tillage and harvest
 
 ```yaml
@@ -147,8 +278,9 @@ effective HARVS R must have at least one usable dated harvest event: supplying
 `harvest: []` fails. If `harvest` is omitted, the inherited MH level must be
 nonzero and contain a usable HDATE. This check runs even without management
 edits, fixing [#192](https://github.com/AbdelrahmanAmr3/dssatlab/issues/192).
-An inherited HDATE under HARVS R must also be on or after both the known
-simulation start and planting dates, including experiment-data overrides. Under
+Both inherited HDATE and experiment data `harvest` events under HARVS R must
+be on or after the known simulation start and planting dates, including
+experiment-data overrides ([#254](https://github.com/AbdelrahmanAmr3/dssatlab/issues/254)). Under
 effective planting management A or F, DSSAT chooses the planting date, so the
 reported PDATE is ignored and only the simulation-start bound applies
 ([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)). Under START E,
@@ -340,9 +472,10 @@ problems = sim.check()
 result = sim.run()
 ```
 
-The copied FileX gets a new `CULTIVARS`, `INITIAL CONDITIONS` or `SIMULATION CONTROLS` level for
-each dict section you gave, and only the selected treatment is repointed. With
-`initial_conditions: "off"`, it points at IC 0 instead. The `.CUL`, `.ECO` and
+The copied FileX gets new levels for the sections you supplied, including
+`SOIL ANALYSIS` and `ENVIRONMENT MODIFICATIONS`, and only the selected treatment
+is repointed. With `initial_conditions: "off"` or `soil_analysis: "off"`, it
+points at IC 0 or SA 0 instead; `environment: []` points at ME 0. The `.CUL`, `.ECO` and
 `.SPE` files are copied to the simulation folder as before.
 
 ## Use it in scenarios
@@ -360,7 +493,7 @@ results = dl.run_treatments(
 
 ## Checked on real DSSAT
 
-Each section was overridden on a copy of DSSAT's own sample FileX (maize `UFGA8201`, wheat
+Cultivar, initial conditions and controls were overridden on a copy of DSSAT's own sample FileX (maize `UFGA8201`, wheat
 `KSAS8101`, treatment 1) and the yield (`HWAM`, kg/ha) moved as expected:
 
 | Change | Maize | Wheat |
