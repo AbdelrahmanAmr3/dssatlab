@@ -33,9 +33,10 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.17.0 | Sequence and forecast runs: `run()` picks mode Q for sequence treatments and Y for `.FCX` files with a generated `DSSBatch.v48`, rotation templates up to 99 components with a leading fallow, HARVS R harvest checks, and level reuse past 99 (ADR 0022, ADR 0023). See [run modes](../guide/run-filex.md#run-modes-sequences-and-forecasts). |
 | 0.18.0 | Stock weather and soil files copied unchanged, optional daily PAR, initial conditions deeper than the soil profile (ADR 0024), and fixes for sequence weather end, inherited harvest dates and identical treatment rows (#205, #206, #207). |
 | 0.18.1 | Import a NASA POWER daily CSV into the weather template (ADR 0025). START P uses the effective planting date for coverage and harvest bounds (#225); stock weather selection follows DSSAT's lookup (#223, #224). |
-| 0.18.2 (current) | Summarise weather and soil template data before a run: `summarize_weather()` and `summarize_soil()`. A sequence (mode Q) with only a four-character fallback weather file such as `UFGA.WTH` now passes `check()` (#236). See [summarise before a run](../guide/simulation.md#summarise-your-weather-and-soil-before-a-run). |
+| 0.18.2 | Summarise weather and soil template data before a run: `summarize_weather()` and `summarize_soil()`. A sequence (mode Q) with only a four-character fallback weather file such as `UFGA.WTH` now passes `check()` (#236). See [summarise before a run](../guide/simulation.md#summarise-your-weather-and-soil-before-a-run). |
+| 0.18.3 (current) | FileX and weather date rules: YYDDD dates use DSSAT's two-digit-year rule (00-35 is 2000-2035) instead of the weather for the century (#221), START E rejects an inherited harvest before emergence (#226), and stock weather spanning 1999/2000 passes in either order (#238). |
 
-FileX and weather date rules cut in review (#221, #226, #238) are planned for 0.18.3.
+The phosphorus soil analysis section and environment modifications are planned for 0.19.
 
 ## Deliberately not built yet
 
