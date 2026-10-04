@@ -106,9 +106,10 @@ def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None, 
             if cultivar_path is not None:
                 path = Path(cultivar_path)
                 if data["crop"] != path.name[:2]:
-                    problems.append(f"{where}: crop {data['crop']!r} differs from the "
-                                    f"FileX template crop {path.name[:2]!r}. Keep the template "
-                                    "crop and choose a cultivar from its fixed model.")
+                    problems.append(f"{where}: crop {data['crop']!r} differs from "
+                                    f"treatment {treatment}'s crop {path.name[:2]!r}. Checked its .CUL "
+                                    "file in the data directory. Keep the FileX template crop "
+                                    "and choose a cultivar from its fixed model.")
                 codes = _read_cultivar_codes(path)
             else:
                 path, codes = _cultivar_codes(filex, data["crop"])

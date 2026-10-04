@@ -3,7 +3,7 @@
 from datetime import date
 
 from .controls import _controls_start_date, _season_coverage
-from .cultivar import _CROPS, _template_data_dir
+from .cultivar import _template_data_dir
 from .errors import DSSATCheckError
 from .experiment import _check_date
 from .filex_template import (_check_filex_template, _load_filex_template,
@@ -113,10 +113,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         planting_date = entry["planting"].get("date")
         if not _check_date(planting_date, "planting date"):
             start = date.fromisoformat(planting_date)
-    text, cultivar_path = None, None
-    crop = entry.get("crop") if isinstance(entry, dict) else None
-    if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
-        cultivar_path = data_dir / "Genotype" / f"{_CROPS[crop][2]}.CUL"
+    text = None
     if not (weather_problems or soil_problems or template_problems):
         _, text = _render_filex(data, weather_fields, soil_fields)
     if isinstance(data, dict):
@@ -149,7 +146,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         else:
             found, lines = _check_management(
                 experiment_data, None, sim.treatment, weather, start,
-                text=text, cultivar_path=cultivar_path)
+                text=text, filex_template=data, data_dir=data_dir)
             problems.extend(found)
             report.extend(lines)
     if not problems and text is not None:
