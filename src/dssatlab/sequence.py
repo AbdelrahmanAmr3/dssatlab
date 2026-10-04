@@ -77,16 +77,6 @@ def _check_sequence(source, treatment, components):
         problems.append(f"Treatment {treatment} is a sequence whose components use fields "
                         f"{', '.join(fields[:-1])} and {fields[-1]}; dssatlab writes one weather "
                         "file and one soil profile, so give every component the same field (FL).")
-    try:
-        general = _section_row(Path(source).read_text(encoding="latin-1"),
-                               "SIMULATION CONTROLS", "N", int(components[0]["SM"]),
-                               ("GENERAL",))
-        nreps = general.get("NREPS", "1")
-    except ValueError:
-        nreps = "1"
-    if nreps not in ("", "-99") and (not nreps.lstrip("-").isdigit() or int(nreps) != 1):
-        problems.append(f"FileX NREPS {nreps} for sequence treatment {treatment}: with measured "
-                        "weather every replicate repeats the same rows. Set NREPS to 1.")
     span = f"{min(numbers)}-{max(numbers)}" if numbers else ", ".join(raw_numbers)
     crops = ", ".join(row["CR"] for row in components)
     report = (f"FileX: treatment {treatment} is a sequence of {len(components)} rotation "
@@ -217,11 +207,13 @@ def _sequence_experiment_data(source, treatment, components):
             continue  # Ordinary experiment checks report malformed entries.
         controls = entry.get("controls", {})
         if entry.keys() - {"controls", "rotation"} or (
-                isinstance(controls, dict) and controls.keys() - {"years", "start_date"}):
+                isinstance(controls, dict) and controls.keys() - {
+                    "years", "start_date", "weather_source", "replicates", "random_seed"}):
             if not problems:
                 problems.append(f"Treatment {int(treatment)} is a sequence of {len(components)} "
                                 "rotation components; experiment data for a sequence takes only "
-                                "controls years, start_date and rotation. Edit the components in the FileX "
+                                "controls years, start_date, weather_source, replicates, random_seed "
+                                "and rotation. Edit the components in the FileX "
                                 "for other changes.")
             checked[key] = {}
     return problems, dict(source, treatments=checked)

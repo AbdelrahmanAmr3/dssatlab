@@ -222,7 +222,11 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                     except ValueError as error:
                         section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
             else:
+                from .climate import _check_weather_controls
                 section_problems = _check_controls(entry[section], where)
+                if isinstance(entry[section], dict) and not entry_problems and text is not None:
+                    section_problems.extend(_check_weather_controls(
+                        text, number, entry[section], where, template=filex is None))
                 if not section_problems and not entry_problems and text is not None:
                     try:
                         _controls_text(text, number, entry[section])

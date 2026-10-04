@@ -7,7 +7,7 @@ import shutil
 
 from .controls import _controls_start_date, _selected_controls
 from .climate import (_copy_climate_file, _measured_weather_source, _split_weather_inputs,
-                      _template_climate_problems, _mixed_stock_weather)
+                      _template_climate_problems)
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
 from .irrigation import _effective_management
@@ -63,8 +63,6 @@ def _simulation_weather(sim, values, experiment_data, components):
     paths = _stock_weather_paths(source)
     if paths is None:
         return _parse_weather(source)
-    if (mixed := _mixed_stock_weather(sim, values, experiment_data, components, paths)) is not None:
-        return mixed
     if "WSTA" not in values:
         checked, checks = _read_filex(sim.filex, sim.treatment)
         if "WSTA" not in checked and checks:

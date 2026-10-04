@@ -30,6 +30,31 @@ def test_report_and_read_only_check(sim, installed, tmp_path, capsys):
     assert installed.calls == []
 
 
+def test_template_weather_controls_reach_every_sequence_level(sim, installed):
+    sim.management = {"treatments": {1: {"controls": {
+        "weather_source": "M", "replicates": 1, "random_seed": 99999,
+    }}}}
+    assert sim.check(False) == []
+    result = sim.run()
+    text = (result.run_dir.parent / "UFGA7801.SQX").read_text()
+    for level in range(1, 5):
+        general = _section_row(text, "SIMULATION CONTROLS", "N", level, ("GENERAL",))
+        assert general["NREPS"] == "1" and general["RSEED"] == "99999"
+        assert _section_row(text, "SIMULATION CONTROLS", "N", level, ("WTHER",))["WTHER"] == "M"
+
+
+@pytest.mark.parametrize("controls,detail", [
+    ({"weather_source": "S"}, "Use a copied FileX for generated weather"),
+    ({"replicates": 3}, "every replicate repeats the same rows"),
+])
+def test_template_weather_controls_reject_unsupported_runs(sim, installed, controls, detail):
+    sim.management = {"treatments": {1: {"controls": controls}}}
+    assert any(detail in p for p in sim.check(False))
+    with pytest.raises(DSSATCheckError):
+        sim.run()
+    assert installed.calls == []
+
+
 @pytest.mark.parametrize("name", [None, "a scenario name too long for a treatment row" * 2])
 @pytest.mark.parametrize("controls", [{}, {"years": 3}, {"years": 3, "start_date": "1978-03-16"}])
 def test_run_sequence_inputs(sim, installed, name, controls):
@@ -90,7 +115,8 @@ def test_sequence_coverage(sim, years, override, last, short):
 def test_experiment_data_limit(sim, installed, entry):
     sim.management = {"treatments": {1: entry}}
     expected = ("Treatment 1 is a sequence of 4 rotation components; experiment data for a "
-                "sequence takes only controls years, start_date and rotation. Edit the components "
+                "sequence takes only controls years, start_date, weather_source, replicates, random_seed "
+                "and rotation. Edit the components "
                 "in the FileX for other changes.")
     assert sim.check(False) == [expected]
     with pytest.raises(DSSATCheckError):

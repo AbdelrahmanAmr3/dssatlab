@@ -1,10 +1,9 @@
 """Select weather inputs and narrowly check copied DSSAT climate files."""
 
-from math import isfinite
 from pathlib import Path
-import re
 import shutil
 
+from .climate_file import _read_climate_file
 from .controls import _selected_controls
 from .filex import _section_row
 from .experiment import _overrides_section
@@ -118,255 +117,107 @@ def _check_weather_requirements(sim, experiment_data, components, rows=()):
                 if method not in checked_methods:
                     problems.extend(_read_climate_file(climate[0], method))
                     checked_methods.add(method)
-    if climate and requirements and not any(method in ("W", "S") for _, method, _ in requirements):
-        problems.append(f"Supplied climate file {climate[0].name} is unused. Checked all run "
-                        "treatments' weather sources. Remove the climate file or use WTHER W or S.")
-    if source is not None and any(method in ("W", "S") for _, method, _ in requirements) and not any(
-            method == "M" for _, method, _ in requirements):
-        problems.append("Supplied weather data is unused. Checked all run treatments' weather "
-                        "sources. Remove the weather data or use WTHER M.")
-    if _mixed_weather(sim, experiment_data, components):
-        days = {row["date"] for row in rows if "date" in row}
-        for level, start, end, _ in _measured_periods(sim, experiment_data, components):
-            for label, day in (("start", start), ("end", end)):
-                if day is not None and days and day not in days:
-                    problems.append(f"Measured component in controls level {level}: {label} date "
-                                    f"{day} is not covered by weather data. Checked only WTHER M "
-                                    f"periods. Supply weather for {day}.")
+    methods = {method for _, method, _ in requirements}
+    problems.extend(_unused_weather_problems(source, climate, methods))
+    if len(components) > 1:
+        if len(methods) > 1:
+            problems.append(f"Sequence treatment {sim.treatment} has different WTHER codes "
+                            f"({', '.join(sorted(methods))}). Checked every component's controls "
+                            "level after experiment edits. Use one WTHER across the sequence.")
+        controls = _selected_controls(experiment_data, sim.treatment)
+        if methods == {"M"} and "replicates" not in controls:
+            try:
+                general = _section_row(Path(sim.filex).read_text(encoding="latin-1"),
+                                       "SIMULATION CONTROLS", "N", int(components[0]["SM"]),
+                                       ("GENERAL",))
+                nreps = general.get("NREPS", "1")
+            except ValueError:
+                nreps = "1"
+            if nreps not in ("", "-99") and (not nreps.lstrip("-").isdigit() or int(nreps) != 1):
+                problems.append(f"FileX NREPS {nreps} for sequence treatment {sim.treatment}: with "
+                                "measured weather every replicate repeats the same rows. Checked "
+                                "the first component's GENERAL NREPS and sequence WTHER. Set NREPS to 1.")
     return problems
 
 
-def _mixed_weather(sim, experiment_data, components):
-    """Whether a sequence reads both measured and generated weather."""
-    methods = {method for _, method, _ in _weather_requirements(sim, experiment_data, components)}
-    return "M" in methods and bool(methods & {"W", "S"})
+def _unused_weather_problems(source, climate, methods):
+    """Check supplied input against weather sources across the selected run treatments."""
+    problems = []
+    if climate and methods and not methods & {"W", "S"}:
+        problems.append(f"Supplied climate file {climate[0].name} is unused. Checked all run "
+                        "treatments' weather sources. Remove the climate file or use WTHER W or S.")
+    if source is not None and methods & {"W", "S"} and "M" not in methods:
+        problems.append("Supplied weather data is unused; DSSAT would ignore it. Checked all run "
+                        "treatments' weather sources. Remove it from weather= or set WTHER to M.")
+    return problems
 
 
 def _coverage_weather_rows(sim, experiment_data, components, rows):
-    """Use ordinary coverage for M-only runs; mixed periods are checked separately."""
-    return [] if _mixed_weather(sim, experiment_data, components) else rows
+    """Check daily coverage only for a uniform measured-weather treatment."""
+    methods = {method for _, method, _ in _weather_requirements(sim, experiment_data, components)}
+    return rows if not methods or methods == {"M"} else []
 
 
-def _measured_periods(sim, experiment_data, components):
-    """Locate scheduled M periods; stop when a run-time harvest makes timing unknown."""
-    from datetime import timedelta
-    from .filex import _filex_date, _section_rows
-    from .operations import _component_management
-    from .rotation_data import _calendar_date, _known_dates
-    from .sequence import _sequence_shift, _sequence_stop, _simulation_start
+def _check_weather_controls(text, treatment, controls, where, *, template=False):
+    """Check replicate edits in their run context; templates retain measured weather."""
+    from .sequence import _rotation_components
 
-    if any(not row["R"].isdigit() or not row["SM"].isdigit() for row in components):
-        return []  # Ordinary sequence checks report unreadable references.
-    text = Path(sim.filex).read_text(encoding="latin-1")
-    controls = _selected_controls(experiment_data, sim.treatment)
-    entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}
-    entries = entries if isinstance(entries, dict) else {}
-    entry = next((v for k, v in entries.items() if str(k).isascii() and str(k).isdigit()
-                  and int(k) == int(sim.treatment) and isinstance(v, dict)), {})
-    edits = entry.get("rotation", {})
-    edits = {int(k): v for k, v in edits.items() if str(k).isascii() and str(k).isdigit() and isinstance(v, dict)
-             } if isinstance(edits, dict) else {}
-    known, _ = _known_dates(components, None, text, edits, "")
-    current = _simulation_start(text, sim.treatment, experiment_data)
-    try:
-        general = _section_row(text, "SIMULATION CONTROLS", "N", int(components[0]["SM"]), ("NYERS",))
-        stop = _sequence_stop(current, int(controls.get("years", general["NYERS"]))) if current else None
-    except (ValueError, TypeError, OverflowError):
-        stop = None
-    if stop is None:
-        return []
-    methods = {level: method for level, method, _ in _weather_requirements(sim, experiment_data, components)}
-    periods, run = [], 0
-    while current <= stop:
-        for row, (_, planting, end, crop) in zip(components, known):
-            actual_end = None
-            code = _component_management(text, row, "HARVS", "R" if end else "M")
-            if (end is not None and code in ("R", "W", "X", "Y", "Z") and
-                    (crop == "FA" or planting is not None and _component_management(text, row, "PLANT") == "R")):
-                override = edits.get(int(row["R"]), {}).get("harvest")
-                if isinstance(override, list):
-                    first = next((_calendar_date(e.get("date")) for e in override
-                                  if isinstance(e, dict) and _calendar_date(e.get("date"))), None)
-                else:
-                    first = next((_filex_date(h["HDATE"]) for h in _section_rows(
-                        text, "HARVEST DETAILS", "H", int(row["MH"]), ("HDATE",))), end)
-                if first is not None:
-                    shift = 0
-                    if crop != "FA" or run:
-                        anchor = first if crop == "FA" else planting
-                        moved = _sequence_shift(anchor, current.year)
-                        if moved < current:
-                            moved = _sequence_shift(anchor, current.year + 1)
-                        shift = moved.year - anchor.year
-                    actual_end = _sequence_shift(end, end.year + shift) if first < current else end
-            level = int(row["SM"])
-            if methods.get(level) == "M":
-                periods.append((level, current, actual_end, row))
-            if actual_end is None or actual_end < current or actual_end >= stop:
-                return periods
-            current = actual_end + timedelta(days=1)
-            run += 1
-    return periods
+    problems = []
+    components = _rotation_components(None, treatment, text=text) if text else []
+    if template and controls.get("weather_source") in ("W", "S"):
+        problems.append(f"{where}, controls, field 'weather_source': generated weather needs a copied "
+                        "FileX. Checked the FileX template controls. Use a copied FileX for generated weather.")
+    reps = controls.get("replicates")
+    if type(reps) is not int or not 1 < reps <= 99999:
+        return problems
+    if not text:
+        return problems  # Ordinary checks explain an unreadable FileX.
+    if len(components) < 2:
+        problems.append(f"{where}, controls, field 'replicates': DSSAT ignores NREPS outside a sequence. "
+                        "Checked the treatment's TREATMENTS rows. Set replicates to 1 or use a sequence.")
+    else:
+        methods = set()
+        for component in components:
+            method = controls.get("weather_source")
+            if method is None:
+                try:
+                    method = _section_row(text, "SIMULATION CONTROLS", "N", int(component["SM"]),
+                                          ("WTHER",))["WTHER"]
+                except ValueError:
+                    method = "M"
+            methods.add("M" if method in ("", "-99") else str(method))
+        if "M" in methods:
+            problems.append(f"{where}, controls, field 'replicates': with measured weather every "
+                            "replicate repeats the same rows. Checked the sequence's effective WTHER. "
+                            "Set replicates to 1 or use weather_source W or S with a climate file.")
+    return problems
 
 
-def _mixed_stock_weather(sim, values, experiment_data, components, paths):
-    """Walk and check only known measured periods of a mixed sequence."""
-    if not _mixed_weather(sim, experiment_data, components):
-        return None
-    from .weather import _parse_weather
-    from .filex import _filex_date
-    from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory,
-                                _weather_anchor_problems)
+def _select_batch_weather(simulations, source):
+    """Check unused input across one scenario, then give each Simulation its required kind."""
+    from .management_file import _load_management
+    from .sequence import _rotation_components
 
-    rows, problems = {}, []
-    _, problems = _read_stock_weather(paths)
+    daily, climate, problems = _split_weather_inputs(source)
     if problems:
-        return [], problems
-    periods = _measured_periods(sim, experiment_data, components)
-    if not periods:
-        daily, problems = _read_stock_weather(paths, _filex_date(values.get("SDATE")))
-        if daily:
-            daily, checks = _parse_weather(daily)
-            problems.extend(checks)
-        return daily, problems
-    for _, start, end, component in periods:
-        station = _section_row(Path(sim.filex).read_text(encoding="latin-1"), "FIELDS", "L",
-                               int(component["FL"]), ("WSTA",))["WSTA"]
-        if _overrides_section(experiment_data, sim.treatment) and component["FL"] == components[0]["FL"]:
-            if station[:4] != paths[0].name[:4].upper():
-                station = paths[0].name[:4].upper()
-        daily, checks, anchor = _walk_weather_files(paths, station, values.get("SDATE", ""), start, end,
-                                               wed=_weather_directory(sim.executable), mode="Q")
-        dates = [("Measured component start", start)]
-        if end is not None:
-            dates.append(("Measured component end", end))
-        checks.extend(_weather_anchor_problems(anchor, dates))
-        if daily:
-            daily, parsed = _parse_weather(daily)
-            checks.extend(parsed)
-        problems.extend(checks)
-        rows.update((row["date"], row) for row in daily if "date" in row)
-    return list(rows.values()), problems
+        return problems  # Keep malformed sources intact for the ordinary checks.
+    selected, methods = [], set()
+    for sim in simulations:
+        data, _ = _load_management(sim.management)
+        needs = {method for _, method, _ in _weather_requirements(
+            sim, data, _rotation_components(sim.filex, sim.treatment))}
+        methods.update(needs)
+        selected.append((sim, needs))
+    problems.extend(_unused_weather_problems(daily, climate, methods))
+    for sim, needs in selected:
+        if needs == {"M"}:
+            sim.weather = daily
+        elif needs and needs <= {"W", "S"}:
+            sim.weather = climate[0] if climate else None
+    return problems
 
 
 def _copy_climate_file(source, folder):
     """Copy the checked CLI unchanged under its uppercase filename."""
     for path in _split_weather_inputs(source)[1]:
         shutil.copy2(path, folder / path.name.upper())
-
-
-def _climate_rows(lines):
-    """Read one header and its rows, stopping at the next header or section."""
-    columns, rows = {}, []
-    for number, line in lines:
-        if not line.strip() or line.lstrip().startswith("!"):
-            continue
-        if line.startswith("*"):
-            break
-        if line.startswith("@"):
-            if columns:
-                break
-            start = 0
-            # Stock CLI fields end at their header labels, as stock WTH fields do.
-            for token in re.finditer(r"\S+", line.split("!", 1)[0]):
-                name = token.group().lstrip("@").upper()
-                if name:
-                    columns[name] = slice(start, token.end())
-                    start = token.end() + 1
-        elif columns:
-            rows.append((number, {name: line[span].strip()
-                                  for name, span in columns.items()}))
-    return columns, rows
-
-
-def _climate_number_problems(row, fields, where, *, missing=False):
-    """Check only required numeric fields; station -99 stays numeric by spec."""
-    problems = []
-    for field in fields:
-        value = row.get(field, "")
-        try:
-            number = float(value)
-        except ValueError:
-            number = float("nan")
-        if not isfinite(number) or (missing and number == -99):
-            requirement = "finite numeric value other than -99" if missing else "finite numeric value"
-            problems.append(f"{where}: {field} {value!r} is not a {requirement}. "
-                            f"Checked the {field} column. Supply a {requirement} for {field}.")
-    return problems
-
-
-def _read_climate_file(path, method):
-    """Return problems for W (WGEN) or S (SIMMETEO), without changing the file.
-
-    Only the first line, station row and the method's required table are checked.
-    The required WGEN column names come from stock UFGA.CLI and DTCM.CLI;
-    real-DSSAT table-requirement probes remain unverified (ADR 0032).
-    """
-    if method not in ("W", "S"):
-        raise ValueError("Climate-file method must be W or S.")
-    path = Path(path)
-    try:
-        lines = path.read_text(encoding="latin-1").splitlines()
-    except (OSError, ValueError) as error:
-        return [f"Cannot read climate file {path}: {error}. Checked the supplied path. "
-                "Supply a readable climate file path."]
-    problems = []
-    where = f"Climate file {path}"
-    if not lines or not lines[0].startswith("*CLIMATE"):
-        problems.append(f"{where}: missing *CLIMATE header. Checked the first line. "
-                        "Supply a climate file whose first line starts with *CLIMATE.")
-    numbered = list(enumerate(lines, 1))
-    station_start = next((i for i, line in enumerate(lines)
-                          if line.startswith("@")
-                          and line.lstrip("@").split()[:1] == ["INSI"]), None)
-    if station_start is None:
-        problems.append(f"{where}: missing @ INSI station row. Checked station headers. "
-                        "Supply @ INSI with INSI, LAT, LONG, ELEV, TAV and AMP.")
-    else:
-        _, rows = _climate_rows(numbered[station_start:])
-        if not rows:
-            problems.append(f"{where}: missing station values. Checked the @ INSI row. "
-                            "Supply INSI, LAT, LONG, ELEV, TAV and AMP beneath @ INSI.")
-        else:
-            number, row = rows[0]
-            insi = row.get("INSI", "")
-            station = path.name[:4]
-            if insi.upper() != station.upper():
-                problems.append(f"{where}: INSI {insi!r} differs from filename station {station!r}. "
-                                "Checked @ INSI against the filename's first four characters "
-                                "(case-insensitive). Correct INSI or supply the matching climate file.")
-            problems.extend(_climate_number_problems(
-                row, ("LAT", "LONG", "ELEV", "TAV", "AMP"), f"{where}, line {number}"))
-
-    section = "MONTHLY AVERAGES" if method == "S" else "WGEN PARAMETERS"
-    fields = (("SAMN", "XAMN", "NAMN", "RTOT", "RNUM") if method == "S" else
-              ("SDMN", "SDSD", "SWMN", "SWSD", "XDMN", "XDSD", "XWMN", "XWSD",
-               "NAMN", "NASD", "ALPHA", "RTOT", "PDW", "RNUM"))
-    start = next((i for i, line in enumerate(lines) if line.startswith("*" + section)), None)
-    if start is None:
-        problems.append(f"{where}: missing *{section} for method {method}. "
-                        f"Checked climate section headers. Supply *{section} with months 1 to 12.")
-        return problems
-    columns, rows = _climate_rows(numbered[start + 1:])
-    absent = [field for field in ("MTH",) + fields if field not in columns]
-    if absent:
-        problems.append(f"{where}: *{section} is missing required columns {', '.join(absent)}. "
-                        f"Checked its @ MTH header for method {method}. "
-                        f"Supply the missing columns in *{section}.")
-        return problems
-    months = set()
-    for number, row in rows:
-        month = row["MTH"]
-        if not month.isascii() or not month.isdigit() or not 1 <= int(month) <= 12:
-            problems.append(f"{where}, *{section}, line {number}: invalid MTH {month!r}. "
-                            "Checked the month number. Supply a whole month number from 1 to 12.")
-            continue
-        months.add(int(month))
-        problems.extend(_climate_number_problems(
-            row, fields, f"{where}, *{section}, month {int(month)}, line {number}", missing=True))
-    for month in range(1, 13):
-        if month not in months:
-            problems.append(f"{where}: *{section} is missing month {month}. "
-                            f"Checked MTH rows for months 1 to 12 for method {method}. "
-                            f"Supply month {month} in *{section}.")
-    return problems

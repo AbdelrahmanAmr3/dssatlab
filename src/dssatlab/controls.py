@@ -167,6 +167,35 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
 
 
 def _controls_text(text, treatment, controls):
+    """Copy selected controls; sequence weather keys reach every used SM level.
+
+    Other sequence controls apply to its first component as before. Each copied
+    level retains omitted cells and each original level stays unchanged.
+    """
+    from .sequence import _rotation_components
+
+    components = _rotation_components(None, treatment, text=text)
+    text = _controls_level_text(text, treatment, controls)
+    shared = {key: value for key, value in controls.items()
+              if key in ("weather_source", "replicates", "random_seed")}
+    if len(components) < 2 or not shared:
+        return text
+    first = _section_row(text, "TREATMENTS", "N", treatment, ("SM",))["SM"]
+    copied = {components[0]["SM"]: int(first)}
+    for component in components[1:]:
+        base, rotation = component["SM"], int(component["R"])
+        if base not in copied:
+            text = _controls_level_text(text, treatment, shared, base=int(base), rotation=rotation)
+            edited = _rotation_components(None, treatment, text=text)
+            copied[base] = int(next(row["SM"] for row in edited if int(row["R"]) == rotation))
+        else:
+            lines = text.splitlines(keepends=True)
+            _repoint(lines, treatment, "SM", copied[base], rotation=rotation)
+            text = "".join(lines)
+    return text
+
+
+def _controls_level_text(text, treatment, controls, *, base=None, rotation=None):
     """Dry-run the same copy operation used by run(), preserving other cells.
 
     Header token ends follow the DSSAT 4.8 UFGA8201.MZX layout. Copy all
@@ -178,7 +207,7 @@ def _controls_text(text, treatment, controls):
     section = "SIMULATION CONTROLS"
     treatment_row = _section_row(text, "TREATMENTS", "N", treatment, ("SM",))
     try:
-        base = int(treatment_row["SM"])
+        base = int(treatment_row["SM"]) if base is None else base
     except ValueError:
         raise ValueError(f"TREATMENTS: invalid SM {treatment_row['SM']!r}. "
                          "Supply an integer level.") from None
@@ -224,7 +253,7 @@ def _controls_text(text, treatment, controls):
                 selected.append((marker, header, columns, line.rstrip("\r\n")))
                 marker = None
 
-    level = _new_level(lines, treatment, "SM", highest, section)
+    level = _new_level(lines, treatment, "SM", highest, section, rotation=rotation)
     body, applied = [], set()
     for marker, header, columns, row in selected:
         if marker is not None:
@@ -247,6 +276,6 @@ def _controls_text(text, treatment, controls):
         names = ", ".join(f"{block}/{column}" for block, column in sorted(missing))
         raise ValueError(f"{section} level {base} has no row with columns {names}. "
                          "Supply the needed headers and selected level rows.")
-    _repoint(lines, treatment, "SM", level)
+    _repoint(lines, treatment, "SM", level, rotation=rotation)
     _append_rows(lines, insert_at, ["", *body])
     return "".join(lines)

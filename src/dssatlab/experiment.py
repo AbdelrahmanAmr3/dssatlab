@@ -11,6 +11,9 @@ from .weather import _show_value
 # Field -> block, column, codes. Automatic values also carry a correction:
 # a method pattern, "date", or (minimum, maximum, exclusive minimum) for numbers.
 _CONTROL_OPTIONS = {
+    "weather_source": ("METHODS", "WTHER", ("M", "W", "S")),
+    "replicates": ("GENERAL", "NREPS", (1, 99999, False), "a whole number from 1 to 99999"),
+    "random_seed": ("GENERAL", "RSEED", (0, 99999, False), "a whole number from 0 to 99999"),
     "water": ("OPTIONS", "WATER", ("Y", "N")),
     "nitrogen": ("OPTIONS", "NITRO", ("Y", "N")),
     "photosynthesis": ("METHODS", "PHOTO", ("C", "R", "L", "V")),
@@ -95,7 +98,8 @@ def _check_controls(data, where):
     """Check the controls section's keys and value types, without FileX edits.
 
     Cultivar and initial conditions have their own checks. The start date
-    follows the existing strict ISO contract.
+    follows the existing strict ISO contract. Replicates and random_seed are
+    whole numbers; random_seed 0 selects DSSAT's default seed 2510.
     """
     where = f"{where}, controls"
     if not isinstance(data, dict):
@@ -131,11 +135,13 @@ def _check_controls(data, where):
                 else:
                     minimum, maximum, exclusive = rule
                     valid = (not _check_number(value, location)
+                             and (field not in ("replicates", "random_seed") or type(value) is int)
                              and (minimum is None or (value > minimum if exclusive else value >= minimum))
                              and (maximum is None or value <= maximum))
                 if not valid:
+                    checked = f"Checked the DSSAT {column} value. " if field in ("replicates", "random_seed") else ""
                     problems.append(f"{location}: found {_show_value(value)}. "
-                                    f"Supply {spec[3]} (DSSAT {column}).")
+                                    f"{checked}Supply {spec[3]} (DSSAT {column}).")
             elif type(value) is not type(rule[0]) or value not in rule:
                 if field in ("water", "nitrogen"):
                     instruction = 'Supply the quoted string "Y" or "N".'
@@ -143,8 +149,8 @@ def _check_controls(data, where):
                     choices = ", ".join(f'"{code}"' if isinstance(code, str) else str(code)
                                         for code in rule)
                     instruction = f"Supply one of {choices} (DSSAT {column})."
-                problems.append(f"{location}: found {_show_value(value)}. "
-                                f"{instruction}")
+                checked = f"Checked the DSSAT {column} code. " if field == "weather_source" else ""
+                problems.append(f"{location}: found {_show_value(value)}. {checked}{instruction}")
     return problems
 
 

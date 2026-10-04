@@ -337,21 +337,21 @@ def test_checks_write_nothing_and_reread_inputs(filex, weather, tmp_path):
     ("W", "N", [
         "FileX WTHER 'W' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
         "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder.",
-        "Supplied weather data is unused. Checked all run treatments' weather sources. "
-        "Remove the weather data or use WTHER M."
+        "Supplied weather data is unused; DSSAT would ignore it. Checked all run treatments' weather sources. "
+        "Remove it from weather= or set WTHER to M."
     ]),
     ("M", "Y", []),
     ("W", "Y", [
         "FileX WTHER 'W' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
         "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder.",
-        "Supplied weather data is unused. Checked all run treatments' weather sources. "
-        "Remove the weather data or use WTHER M."
+        "Supplied weather data is unused; DSSAT would ignore it. Checked all run treatments' weather sources. "
+        "Remove it from weather= or set WTHER to M."
     ]),
     ("S", "N", [
         "FileX WTHER 'S' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
         "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder.",
-        "Supplied weather data is unused. Checked all run treatments' weather sources. "
-        "Remove the weather data or use WTHER M."
+        "Supplied weather data is unused; DSSAT would ignore it. Checked all run treatments' weather sources. "
+        "Remove it from weather= or set WTHER to M."
     ]),
     ("G", "N", [
         "FileX WTHER 'G' in controls level 1 (treatment 1): unsupported weather source. "
@@ -496,7 +496,8 @@ def test_run_treatments_labels_controls_problem(filex, weather):
         run_treatments(filex=path, weather=weather(), treatments=[1])
     problems = exc_info.value.problems
     assert len(problems) == 2
-    assert problems[0] == (
+    assert "Scenario 'base', treatment all:" in problems[0] and "unused" in problems[0]
+    assert problems[1] == (
         "Scenario 'base', treatment 1: FileX WTHER 'W' in controls level 1 (treatment 1): "
         "missing climate file UFGA.CLI. Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder."
     )

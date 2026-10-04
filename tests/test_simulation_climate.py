@@ -140,28 +140,17 @@ def mixed_sequence(sim):
     change_component(sim, 0, "MH", 1)
 
 
-def test_mixed_sequence_needs_daily_weather_only_through_measured_component(sequence, tmp_path):
+@pytest.mark.parametrize("second", ["W", "S"])
+def test_mixed_sequence_weather_sources_are_a_problem(sequence, tmp_path, second):
     mixed_sequence(sequence)
+    sequence.filex.write_text(sequence.filex.read_text().replace(" 2 ME              S", f" 2 ME              {second}"))
     path = tmp_path / "UFGA.CLI"
     path.write_text(UFGA)
-    daily = weather("1978-04-20", "1978-09-01")  # First harvest: 1978 day 244.
-    source = stock_file(tmp_path, "UFGA7801.WTH", [r["date"] for r in daily])
-    sequence.weather = [source, path]
-    assert sequence.check(False) == []
-
-
-def test_mixed_sequence_climate_name_follows_edited_field_station(sequence, tmp_path, fake_dssat):
-    mixed_sequence(sequence)
-    climate = tmp_path / "DTCM.CLI"
-    climate.write_text(DTCM)
-    daily = stock_file(tmp_path, "DTCM7801.WTH", [r["date"] for r in sequence.weather])
-    sequence.weather = [daily, climate]
-    sequence.management = {"treatments": {1: {"controls": {"years": 1}}}}
-    assert sequence.check(False) == []
-    result = sequence.run()
-    copied = (result.run_dir.parent / sequence.filex.name).read_text()
-    assert _section_row(copied, "FIELDS", "L", 1, ("WSTA",))["WSTA"].startswith("DTCM")
-    assert (result.run_dir.parent / "DTCM.CLI").read_bytes() == climate.read_bytes()
+    sequence.weather = [stock_file(tmp_path, "UFGA7801.WTH", [r["date"] for r in sequence.weather]), path]
+    problems = sequence.check(False)
+    assert any("Sequence treatment 1" in p and "different WTHER" in p and "Checked" in p for p in problems)
+    with pytest.raises(DSSATCheckError):
+        sequence.run()
 
 
 @pytest.mark.parametrize("entries", [None, [], {"\u00b2": {}}, {1: {"rotation": {"\u00b2": {}}}}])

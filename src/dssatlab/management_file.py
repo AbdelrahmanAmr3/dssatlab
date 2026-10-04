@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .errors import DSSATError
 from .filex import read_treatment_numbers
+from .input_yaml import _load_management, _load_yaml
 
 
 _MANAGEMENT_TEMPLATE_TEXT = """# DSSATLab Management Template
@@ -112,6 +113,15 @@ treatments:
 """
 
 
+_MANAGEMENT_CONTROLS_TEXT = """
+    # Optional controls; omitted values keep the FileX controls level.
+    # controls:
+      # weather_source: "M"       # DSSAT WTHER: "M", "W", "S"; W/S need a climate file and a copied FileX.
+      # replicates: 1             # DSSAT NREPS: whole 1-99999; above 1 needs a sequence with W/S.
+      # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 selects DSSAT's default seed 2510.
+"""
+
+
 _EXPERIMENT_SECTIONS_TEXT = """
     # Field operations: lists; omit to keep MR/MT/MH, or [] for none for this treatment.
     # Required date (RDATE/TDATE/HDATE): quoted ISO string in weather range, non-descending; same date allowed.
@@ -175,6 +185,9 @@ _EXPERIMENT_SECTIONS_TEXT = """
       nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
       output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column
       # years: 9                 # Number of seasons (DSSAT NYERS), positive integer
+      # weather_source: "M"       # DSSAT WTHER: "M", "W", "S"; W/S need a climate file and a copied FileX.
+      # replicates: 1             # DSSAT NREPS: whole 1-99999; above 1 needs a sequence with W/S.
+      # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 selects DSSAT's default seed 2510.
       # Simulation options: quoted, case-sensitive letter codes; soil_layers is an integer.
       # photosynthesis: "C"       # DSSAT PHOTO: "C", "R", "L", "V"
       # co2: "M"                  # DSSAT CO2: "M", "W", "D", "R"
@@ -215,7 +228,7 @@ _EXPERIMENT_SECTIONS_TEXT = """
 def write_management_template(path: str | Path, filex: str | Path | None = None) -> None:
     """Write a UTF-8 YAML management template with commented examples.
 
-    Documents every planting, irrigation, and fertilizer field and its unit.
+    Documents planting, irrigation, fertilizer and optional weather controls.
     Dates must be quoted ISO calendar strings ("YYYY-MM-DD").
     An existing destination raises DSSATError, preserving the user's data.
 
@@ -227,7 +240,9 @@ def write_management_template(path: str | Path, filex: str | Path | None = None)
     Raises:
         DSSATError: If the destination exists or FileX treatments cannot be read.
     """
-    _write_template(path, _MANAGEMENT_TEMPLATE_TEXT, "Management", filex)
+    text = _MANAGEMENT_TEMPLATE_TEXT.replace("    # For a sequence,", _MANAGEMENT_CONTROLS_TEXT +
+                                             "\n    # For a sequence,", 1)
+    _write_template(path, text, "Management", filex)
 
 
 def write_experiment_template(path: str | Path, filex: str | Path | None = None) -> None:
@@ -265,76 +280,3 @@ def _write_template(path, text, label, filex):
             stream.write(text)
     except FileExistsError as error:
         raise DSSATError(message) from error
-
-
-def _load_management(source):
-    """Return (loaded data, problems) from a YAML path or a passed-through dict."""
-    return _load_yaml(source, "Management", "a 'treatments' key")
-
-
-def _load_yaml(source, label, mapping_hint):
-    """Shared optional, strict YAML loading; dict inputs pass through unchanged."""
-    if source is None:
-        return None, []
-    if isinstance(source, (str, Path)):
-        path = Path(source)
-        try:
-            import yaml
-        except ImportError:
-            return None, [
-                f"{label} file {path}: PyYAML is not installed. "
-                f"Install PyYAML with 'pip install pyyaml' to load {label.lower()} YAML files."
-            ]
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as error:
-            return None, [
-                f"{label} file {path}: cannot read file: {error}. "
-                "Check that the path exists and is readable."
-            ]
-        except UnicodeDecodeError as error:
-            return None, [
-                f"{label} file {path}: cannot read file: {error}. "
-                "Supply a UTF-8 encoded YAML file."
-            ]
-
-        class _StrictSafeLoader(yaml.SafeLoader):
-            pass
-
-        def _construct_mapping(loader, node, deep=False):
-            loader.flatten_mapping(node)
-            mapping = {}
-            for key_node, value_node in node.value:
-                key = loader.construct_object(key_node, deep=deep)
-                if key in mapping:
-                    raise yaml.constructor.ConstructorError(
-                        "while constructing a mapping",
-                        node.start_mark,
-                        f"found duplicate key {key!r}",
-                        key_node.start_mark,
-                    )
-                mapping[key] = loader.construct_object(value_node, deep=deep)
-            return mapping
-
-        _StrictSafeLoader.add_constructor(
-            yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-            _construct_mapping,
-        )
-
-        try:
-            data = yaml.load(text, Loader=_StrictSafeLoader)
-        except yaml.constructor.ConstructorError as error:
-            if "found duplicate key" in str(error):
-                return None, [f"{label} file {path}: duplicate key: {error}"]
-            return None, [f"{label} file {path}: invalid YAML: {error}"]
-        except yaml.YAMLError as error:
-            return None, [f"{label} file {path}: invalid YAML: {error}"]
-
-        if not isinstance(data, dict):
-            return None, [
-                f"{label} file {path}: expected a YAML mapping document. "
-                f"Supply a YAML mapping with {mapping_hint}."
-            ]
-        return data, []
-
-    return source, []
