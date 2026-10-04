@@ -89,7 +89,8 @@ def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None):
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply crop and code from the "
                 "Experiment template or omit cultivar to keep the FileX level."]
-    problems = _check_fields(data, ("crop", "code"), ("coefficients",), where, "Experiment")
+    problems = _check_fields(data, ("crop", "code"), ("coefficients", "ecotype", "name"),
+                             where, "Experiment")
     for field, pattern, hint in (
         ("crop", r"[A-Z]{2}", "two uppercase ASCII letters for CR"),
         ("code", r"[!-~]{6}", "six printable ASCII characters without spaces for INGENO"),
@@ -111,11 +112,8 @@ def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None):
                 codes = _read_cultivar_codes(path)
             else:
                 path, codes = _cultivar_codes(filex, data["crop"])
-            if "coefficients" in data and data["code"] in codes:
-                from .cultivar_coefficients import _check_coefficients
-                problems.extend(_check_coefficients(path, data["code"], data["coefficients"], where))
-            if data["code"] not in codes:
-                problems.append(_unknown_cultivar(data["code"], codes, path, data["crop"], where))
+            from .cultivar_coefficients import _check_cultivar_definition
+            problems.extend(_check_cultivar_definition(path, data, codes, where))
         except (OSError, ValueError) as error:
             problems.append(f"{where}: cannot check .CUL: {error}")
     if text is not None and treatment is not None:
