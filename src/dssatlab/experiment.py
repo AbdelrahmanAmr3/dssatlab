@@ -99,7 +99,7 @@ def _check_controls(data, where):
 
     Cultivar and initial conditions have their own checks. The start date
     follows the existing strict ISO contract. Replicates and random_seed are
-    whole numbers; random_seed 0 selects DSSAT's default seed 2510.
+    whole numbers; random_seed 0 is passed to DSSAT unchanged.
     """
     where = f"{where}, controls"
     if not isinstance(data, dict):

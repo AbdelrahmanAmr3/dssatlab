@@ -53,7 +53,7 @@ class Simulation:
             per treatment. Construction only stores it; check() checks every entry
             and prints a report. Controls include weather_source M/W/S, replicates
             1-99999 (above 1 needs a generated-weather sequence) and random_seed
-            0-99999 (0 selects DSSAT's default seed 2510).
+            0-99999 (a fixed seed repeats; 0 is passed as is).
         name (str | None): Scenario name written to the copied treatment, even
             without experiment overrides. None and "base" keep the FileX name.
             Sequences keep their component names. Other names must fit the column.

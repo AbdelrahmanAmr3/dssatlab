@@ -118,7 +118,7 @@ _MANAGEMENT_CONTROLS_TEXT = """
     # controls:
       # weather_source: "M"       # DSSAT WTHER: "M", "W", "S"; W/S need a climate file and a copied FileX.
       # replicates: 1             # DSSAT NREPS: whole 1-99999; above 1 needs a sequence with W/S.
-      # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 selects DSSAT's default seed 2510.
+      # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 is passed as is; a fixed seed repeats.
 """
 
 
@@ -187,7 +187,7 @@ _EXPERIMENT_SECTIONS_TEXT = """
       # years: 9                 # Number of seasons (DSSAT NYERS), positive integer
       # weather_source: "M"       # DSSAT WTHER: "M", "W", "S"; W/S need a climate file and a copied FileX.
       # replicates: 1             # DSSAT NREPS: whole 1-99999; above 1 needs a sequence with W/S.
-      # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 selects DSSAT's default seed 2510.
+      # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 is passed as is; a fixed seed repeats.
       # Simulation options: quoted, case-sensitive letter codes; soil_layers is an integer.
       # photosynthesis: "C"       # DSSAT PHOTO: "C", "R", "L", "V"
       # co2: "M"                  # DSSAT CO2: "M", "W", "D", "R"
