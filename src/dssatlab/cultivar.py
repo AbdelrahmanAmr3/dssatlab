@@ -83,7 +83,7 @@ def _unknown_cultivar(code, codes, path, crop, where):
             f" ({len(codes)} codes in the file; open it to see all).")
 
 
-def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None):
+def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None, new_cultivars=None):
     """Check fields, local cultivar availability and the edit before any write."""
     where = f"{where}, cultivar"
     if not isinstance(data, dict):
@@ -113,7 +113,8 @@ def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None):
             else:
                 path, codes = _cultivar_codes(filex, data["crop"])
             from .cultivar_coefficients import _check_cultivar_definition
-            problems.extend(_check_cultivar_definition(path, data, codes, where))
+            problems.extend(_check_cultivar_definition(path, data, codes, where,
+                                                       new_cultivars=new_cultivars))
         except (OSError, ValueError) as error:
             problems.append(f"{where}: cannot check .CUL: {error}")
     if text is not None and treatment is not None:

@@ -146,7 +146,7 @@ def _check_events(events, section, where, weather_range=None):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
-                 cultivar_path, *, start_date_note=None):
+                 cultivar_path, *, start_date_note=None, new_cultivars=None):
     from .irrigation import _check_irrigation
     from .operations import _OPERATION_FIELDS, _check_operation
 
@@ -196,7 +196,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         report.extend(lines)
     if "cultivar" in entry:
         section_problems = _check_cultivar(entry["cultivar"], where, filex, text, number,
-                                          cultivar_path=cultivar_path)
+                                          cultivar_path=cultivar_path, new_cultivars=new_cultivars)
         problems.extend(section_problems)
         report.extend(_report_lines("    cultivar", section_problems))
     else:
@@ -273,6 +273,8 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
                      if isinstance(r, dict) and isinstance(r.get("date"), date)] if weather_rows else []
     weather_range = (min(weather_dates), max(weather_dates)) if weather_dates else None
     report, seen_numbers = [], {}
+    # Template treatments share one folder's .CUL copy; copied-FileX runs do not.
+    new_cultivars = {} if cultivar_path is not None else None
     for key, entry in source["treatments"].items():
         number, where, entry_problems = _check_treatment_key(key, seen_numbers, text, filex)
         is_selected = number is not None and number == selected_number
@@ -284,6 +286,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
             cultivar_path,
+            new_cultivars=new_cultivars,
             start_date_note=start_date_note if is_selected else
             "only the selected treatment has a resolved simulation start date")
         treatment_problems.extend(rotation_problems)

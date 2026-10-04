@@ -1,7 +1,6 @@
 """New cultivar lines stay in each simulation copy under the user's code."""
 
 from pathlib import Path
-import shutil
 
 import pytest
 
@@ -25,10 +24,8 @@ from test_simulation_template import installed
     b"\n! trailing comment\n@OTHER\nOT0001 Another table\n",
     b"\n*NEXT SECTION\n", b"",
 ])
-def test_new_line_exact_bytes_and_first_table_placement(tmp_path, newline, name, padded, following):
-    from dssatlab.cultivar_coefficients import _new_cultivar
-
-    source = tmp_path / "MZCER048.CUL"
+def test_new_line_exact_bytes_and_first_table_placement(inputs, newline, name, padded, following):
+    sim, source = inputs
     first = CUL.encode("ascii").replace(b"\n", newline)
     # Comments with six printable characters must not be mistaken for rows.
     last = b"IB0060 Last cultivar"
@@ -36,16 +33,15 @@ def test_new_line_exact_bytes_and_first_table_placement(tmp_path, newline, name,
     after = following.replace(b"\n", newline)
     original = before + after
     source.write_bytes(original)
-    folder = tmp_path / "simulation"
-    folder.mkdir()
-    copied = folder / source.name
-    shutil.copyfile(source, copied)
     cultivar = dict(crop="MZ", code="NC0001", ecotype="IB0002",
                     coefficients={"PHINT": 43.0, "P2": -2.5, "P1": 300})
     if name is not None:
         cultivar["name"] = name
 
-    assert _new_cultivar(folder / "TEST2101.MZX", cultivar) == cultivar
+    sim.management["treatments"][1]["cultivar"] = cultivar
+    assert sim.check(False) == []
+    folder = sim.run().run_dir.parent
+    copied = folder / source.name
     expected = b"NC0001 " + padded + b"      .IB0002   300  -2.5  43.0" + newline
     suffix = after[len(newline):] if after else b""
     assert copied.read_bytes() == before + newline + expected + suffix
@@ -75,15 +71,24 @@ def test_new_cultivar_runs_keep_user_code(inputs, newline):
         assert Path(sim.filex).read_bytes() == filex_original
 
 
-def test_template_reuses_one_new_line_for_identical_definitions(data, rows, installed):
+@pytest.mark.parametrize("treatment", [1, 2])
+@pytest.mark.parametrize("explicit_defaults", [False, True])
+def test_template_reuses_one_new_line_for_identical_definitions(
+        data, rows, installed, treatment, explicit_defaults):
     source = installed.executable.parent / "Genotype/MZCER048.CUL"
     source.write_bytes(CUL.encode("ascii"))
     source.with_suffix(".ECO").write_bytes(ECO.encode("ascii"))
     del data["treatment_name"]
     data["treatments"] = ["First", "Second"]
-    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1],
-                     management={"treatments": {i: {"cultivar": new_cultivar()} for i in (1, 2)}})
+    second = new_cultivar()
+    if explicit_defaults:
+        second.update(name="NC0001", coefficients={"PHINT": 43.0, "P2": 1.193, "P1": 259.0})
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=treatment,
+                     executable=installed.executable,
+                     management={"treatments": {1: {"cultivar": new_cultivar()},
+                                                2: {"cultivar": second}}})
 
+    assert sim.check(False) == []
     folder = sim.run().run_dir.parent
     assert (folder / source.name).read_bytes().count(b"NC0001 NC0001") == 1
     text = (folder / "TEST2101.MZX").read_text()

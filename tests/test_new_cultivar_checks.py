@@ -2,7 +2,7 @@
 
 import pytest
 
-from dssatlab import Simulation
+from dssatlab import DSSATCheckError, Simulation
 from test_cultivar import cultivar_inputs, simulation
 from test_filex_template import data, rows
 from test_management_file import sim_inputs
@@ -39,6 +39,39 @@ def inputs(request, cultivar_inputs, data, rows, installed):
 
 def definition(sim):
     return sim.management["treatments"][1]["cultivar"]
+
+
+@pytest.mark.parametrize("treatment", [1, 2])
+@pytest.mark.parametrize("different", [
+    {"crop": "SB"}, {"ecotype": "IB0002"}, {"name": "Another name"},
+    {"coefficients": {"P1": 320, "P2": 1.193, "PHINT": 43}},
+])
+def test_template_rejects_conflicting_new_code_definitions(
+        data, rows, installed, tmp_path, treatment, different):
+    source = installed.executable.parent / "Genotype/MZCER048.CUL"
+    source.write_bytes(CUL.encode("ascii"))
+    source.with_suffix(".ECO").write_bytes(ECO.encode("ascii"))
+    del data["treatment_name"]
+    data["treatments"] = ["First", "Second"]
+    first = new_cultivar()
+    first["coefficients"]["P1"] = 200
+    second = {**first, **different}
+    sim = Simulation(filex_template=data, weather=rows[0], soil=rows[1], treatment=treatment,
+                     executable=installed.executable,
+                     management={"treatments": {1: {"cultivar": first},
+                                                "2": {"cultivar": second}}})
+
+    before = snapshot(tmp_path)
+    problems = sim.check(False)
+    assert any("NC0001" in p and "treatment 1" in p and "treatment 2" in p
+               and "conflicting" in p and "Checked" in p
+               and "crop, ecotype, name and coefficients" in p
+               and "Use" in p for p in problems)
+    with pytest.raises(DSSATCheckError) as error:
+        sim.run()
+    assert error.value.problems == problems
+    assert snapshot(tmp_path) == before
+    assert not list(tmp_path.glob("dssat_sim_*"))
 
 
 @pytest.mark.parametrize("name", [None, "New cultivar", "1234567890123456", ""])

@@ -68,7 +68,7 @@ def _check_coefficients(path, code, coefficients, where, *, spans=None):
     return problems
 
 
-def _check_cultivar_definition(path, data, codes, where):
+def _check_cultivar_definition(path, data, codes, where, *, new_cultivars=None):
     """Check an existing or new cultivar without changing the genotype files."""
     from .cultivar import _unknown_cultivar
 
@@ -124,6 +124,19 @@ def _check_cultivar_definition(path, data, codes, where):
                         "quoted string with six printable ASCII characters without spaces.")
     else:
         problems.extend(_check_ecotype(path, ecotype, where))
+    if new_cultivars is not None:
+        if code in new_cultivars:
+            previous, previous_where = new_cultivars[code]
+            if (data["crop"] != previous["crop"]
+                    or ecotype != previous["ecotype"]
+                    or data.get("name", code) != previous.get("name", code)
+                    or coefficients != previous["coefficients"]):
+                problems.append(f"{where}: new cultivar code {code!r} has conflicting definitions "
+                                f"here and in {previous_where}. Checked crop, ecotype, name and "
+                                "coefficients across template treatments sharing the .CUL copy. "
+                                "Use identical definitions for this code or choose different codes.")
+        else:
+            new_cultivars[code] = data, where
     return problems
 
 
