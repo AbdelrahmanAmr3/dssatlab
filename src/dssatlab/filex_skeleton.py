@@ -9,7 +9,7 @@ from .cultivar import _CROPS, _template_data_dir
 from .errors import DSSATCheckError
 from .filex_template import (_check_filex_template, _load_filex_template,
                              _template_treatment_fields, _template_treatment_names,
-                             _template_crop_entry, _template_genotype_files)
+                             _template_crop_entry, _template_crop_entries, _template_genotype_files)
 from .filex_write import _columns, _planting_row, _PLANTING_HEADER, _write_management
 from .initial_conditions import _HEADERS as _INITIAL_HEADERS
 from .runner import _create_dated_folder
@@ -92,7 +92,7 @@ def _render_filex(data, weather_rows, soil_rows):
         # Import only at dispatch: rotation uses the shared skeleton helpers.
         from .rotation import _render_rotation
         return _render_rotation(data, weather_rows, soil_rows)
-    first = data["crops"][0] if "crops" in data else _template_crop_entry(data, 1)
+    first = _template_crop_entries(data)[0]
     crop = _CROPS[first["crop"]][0]
     day = date.fromisoformat(first["planting"]["date"])
     # Four station characters + YY + 01, then .<crop>X: exactly 8.3 characters.
@@ -105,7 +105,7 @@ def _render_filex(data, weather_rows, soil_rows):
 
 def _skeleton_text(data, weather_rows, soil_rows, stem):
     """Layout references: UFGA8201.MZX and KSAS8101.WHX in tests/fixtures/filex_template."""
-    entries = data["crops"] if "crops" in data else [_template_crop_entry(data, 1)]
+    entries = _template_crop_entries(data)
     crop = _CROPS[entries[0]["crop"]][0]
     names = _template_treatment_names(data)
     fields = _template_treatment_fields(data)
