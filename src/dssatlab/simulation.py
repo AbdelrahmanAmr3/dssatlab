@@ -86,13 +86,9 @@ class Simulation:
     def _check_inputs(self, experiment_data=None, load_problems=None):
         """Collect input problems, using the loaded experiment data dict when supplied.
 
-        Performs strict validation: checks weather data column names, value
-        ranges, date order, duplicates, and gaps; reads the FileX for treatment
-        validity, field station code (WSTA), and start controls (START, SDATE);
-        ensures FileX filename is at most 12 characters and weather data covers
-        the simulation start under START S/P. Checks soil and scenario name.
-        With experiment overrides, checks field edits in memory; otherwise
-        requires matching weather station and soil profile IDs.
+        Checks weather columns, values and dates; FileX treatment, WSTA,
+        START/SDATE and filename; START S/P coverage, soil and scenario name.
+        Experiment overrides edit field identity; otherwise station and soil IDs must match.
         """
         if (self.filex is None) == (self.filex_template is None):
             raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
@@ -126,12 +122,14 @@ class Simulation:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
                                   "accepts at most 12. Rename the FileX to at most 12 "
                                   "characters, including the extension (DSSAT's 8.3 style).")
+        paths = _stock_weather_paths(self.weather)
         stations = {row["station"] for row in rows if "station" in row}
+        if not rows and not weather_problems and paths:
+            stations = {path.name[:4].upper() for path in paths}
         if not edit_identity and "WSTA" in values and len(stations) == 1:
             station = stations.pop()
             expected = values["WSTA"][:4]
             if station != expected:
-                paths = _stock_weather_paths(self.weather)
                 source = f"stock weather file {paths[0].name}" if paths else "the weather template"
                 filex_problems.append(f"FileX WSTA {values['WSTA']!r} expects station "
                                      f"{expected!r}, but {source} has station "
@@ -230,9 +228,8 @@ class Simulation:
         With experiment overrides, writes the weather station and supplied soil
         ID into that field. Independently writes name into the copied treatment,
         except for sequences, None and "base", which retain the FileX names.
-        With soil=, writes template soil to SOIL.SOL or copies stock soil unchanged
-        under its own name, and copies no sibling .SOL files. With soil=None,
-        copies all sibling .SOL files. Invokes the DSSAT executable for the
+        With soil=, writes SOIL.SOL or copies stock soil and copies no sibling .SOL
+        files. With soil=None, copies all sibling .SOL files. Invokes the DSSAT executable for the
         treatment and scans WARNING.OUT for missing weather records. Soil
         failures use the existing run error, keeping ERROR.OUT in the run directory.
 
