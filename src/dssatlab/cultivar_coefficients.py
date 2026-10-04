@@ -151,6 +151,35 @@ def _check_ecotype(cul_path, ecotype, where):
     return []
 
 
+def _new_cultivar(filex, cultivar):
+    """Append a checked new cultivar to the first table in the folder copy."""
+    from .cultivar import _cultivar_codes
+
+    path, codes = _cultivar_codes(filex, cultivar["crop"])
+    if cultivar["code"] in codes:
+        return cultivar  # Identical definitions across template treatments share one line.
+    lines, index, spans = _coefficient_line(path)
+    ending = "\r\n" if any(line.endswith("\r\n") for line in lines) else "\n"
+    insert_at = index + 1
+    for i in range(index + 1, len(lines)):
+        line = lines[i]
+        if line.startswith(("@", "*")):
+            break
+        if (not line.lstrip().startswith(("!", "$"))
+                and re.fullmatch(r"[!-~]{6}", line[:6])):
+            insert_at = i + 1
+    line = (cultivar["code"] + " " + cultivar.get("name", cultivar["code"]).ljust(16)
+            + ".".rjust(7) + cultivar["ecotype"])
+    for name, (start, end) in spans.items():
+        line = line.ljust(end)
+        line = line[:start] + _coefficient_text(cultivar["coefficients"][name]).rjust(end - start) + line[end:]
+    if not lines[insert_at - 1].endswith(("\r", "\n")):
+        lines[insert_at - 1] += ending
+    lines.insert(insert_at, line + ending)
+    path.write_bytes("".join(lines).encode("latin-1"))
+    return cultivar
+
+
 def _changed_cultivar(filex, cultivar):
     """Insert a changed cultivar in the folder copy, returning its FileX identifiers."""
     if "coefficients" not in cultivar:

@@ -372,8 +372,10 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
             text = path.read_bytes().decode("latin-1")
             if "cultivar" in entry:
                 from .cultivar import _cultivar_text
-                from .cultivar_coefficients import _changed_cultivar
-                text = _cultivar_text(text, int(treatment), _changed_cultivar(path, entry["cultivar"]))
+                from .cultivar_coefficients import _changed_cultivar, _new_cultivar
+                cultivar = entry["cultivar"]
+                writer = _new_cultivar if "ecotype" in cultivar else _changed_cultivar
+                text = _cultivar_text(text, int(treatment), writer(path, cultivar))
             if "planting" in entry:
                 text = _planting_text(text, int(treatment), entry["planting"])
             for section in ("irrigation", "fertilizer", *_OPERATION_FIELDS):
