@@ -14,7 +14,8 @@ from .rotation_data import _calendar_date, _level_date
 from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
-from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory)
+from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory,
+                            _weather_anchor_problems)
 
 
 def _stock_weather_paths(source):
@@ -81,8 +82,9 @@ def _simulation_weather(sim, values, experiment_data, components):
         planting = planting_entry.get("planting")
         start = (_calendar_date(planting.get("date")) if isinstance(planting, dict) else
                  _level_date(text, components[0], "MP", "PLANTING DETAILS", "P", "PDATE"))
-    if (start is None and values.get("START") == "S"
-            and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))):
+    if (_filex_date(values.get("SDATE")) is None
+            and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))
+            and (int(values["SDATE"]) > 0 or values.get("START") == "S")):
         sdate = values["SDATE"]
         year = _filex_date(sdate[:2] + "001").year
         last = date(year, 12, 31).timetuple().tm_yday
@@ -102,11 +104,13 @@ def _simulation_weather(sim, values, experiment_data, components):
         years = 1  # Ordinary controls checks report invalid years.
     end = _sequence_stop(start, years) or date.max
     harvest = None
+    fixed_harvest = None
     if len(components) == 1:
         code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
         if code == "R":
             harvest = _harvest_end(entry, _level_date(
                 text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
+            fixed_harvest = harvest
             if harvest is not None:
                 try:
                     harvest = _sequence_shift(harvest, harvest.year + years - 1)
@@ -139,9 +143,28 @@ def _simulation_weather(sim, values, experiment_data, components):
         # the files reachable through DSSAT's selection walk.
         walk_end = end if harvest is not None or len(components) > 1 else None
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
-        rows, problems = _walk_weather_files(paths, station, initial, start, walk_end,
-                                             wed=_weather_directory(sim.executable),
-                                             mode="Q" if len(components) > 1 else "C")
+        rows, problems, anchor = _walk_weather_files(paths, station, initial, start, walk_end,
+                                                     wed=_weather_directory(sim.executable),
+                                                     mode="Q" if len(components) > 1 else "C")
+        where = f"treatments.{int(sim.treatment)}"
+        sdate_field = (f"{where}.controls.start_date"
+                       if _controls_start_date(experiment_data, sim.treatment) is not None
+                       else "FileX SDATE")
+        dates = [(sdate_field, _filex_date(values.get("SDATE")))]
+        if values.get("START") == "P":
+            if len(components) > 1:
+                where += f".rotation.{int(components[0]['R'])}"
+            field = f"{where}.planting.date" if isinstance(planting, dict) else "FileX PDATE"
+            dates.append((field, start))
+        if fixed_harvest is not None:
+            events = entry.get("harvest")
+            field = "FileX HDATE"
+            if isinstance(events, list):
+                index = next(i for i, event in enumerate(events) if isinstance(event, dict)
+                             and _calendar_date(event.get("date")) == fixed_harvest)
+                field = f"{where}.harvest.{index}.date"
+            dates.append((field, fixed_harvest))
+        problems.extend(_weather_anchor_problems(anchor, dates))
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)
