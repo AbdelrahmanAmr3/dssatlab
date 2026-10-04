@@ -161,6 +161,22 @@ to a Simulation as its weather. It is copied unchanged, under its upper-case nam
 folder; the checks read only its station, coordinates, dates and srad, tmax, tmin and rain.
 _Avoid_: raw weather, native weather
 
+**Generated weather**:
+Daily weather DSSAT makes itself from a climate file instead of reading measured days: WTHER W
+(WGEN) or S (SIMMETEO) in the simulation controls. A run treatment with generated weather needs a
+climate file and no weather data.
+_Avoid_: synthetic weather, simulated weather, gap filling
+
+**Climate file**:
+A DSSAT `*.CLI` file of station monthly averages (for example from DSSAT's `Weather/Climate`
+folder), handed to a Simulation through `weather=`. DSSAT reads `<first four characters of WSTA>.CLI`
+beside the FileX; it is copied unchanged, under its upper-case name, into the simulation folder.
+The checks read only its header, station and the twelve monthly averages rows.
+
+**Replicate**:
+One repetition of a treatment's seasons with a different random weather series (DSSAT NREPS,
+seeded by RSEED). Replicates only differ under generated weather.
+
 **Daily PAR**:
 Photosynthetically active radiation for one day (DSSAT PAR, mol/m2 per day). An optional weather
 template column; a weather file carries it when the weather data has it.
