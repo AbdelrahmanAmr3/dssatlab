@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.20.1] - Unreleased
+## [0.20.1] - 2026-10-04
 
 ### Added
 - Different crops in different FileX template treatments through `crops`, a list of 1 to 99 crop entries, and `treatment_crops`, one entry number per named treatment. Each entry has its own cultivar, planting and optional harvest date, fixed crop model and nitrogen fixation setting. Treatments can share an entry; entries can name the same crop with different cultivars. See [mixed-crop treatments](guide/simulation.md#mixed-crop-treatments) and [ADR 0031](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0031-crop-entries-for-mixed-crop-treatments.md).
