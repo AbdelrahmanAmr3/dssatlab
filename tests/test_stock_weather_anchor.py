@@ -13,8 +13,9 @@ def no_installed_weather(monkeypatch):
 
 
 def anchored_sim(tmp_path, sdate="88150", harvest="88151", *, planting=None,
-                 station="AZMC8801", codes=("1988150", "1988151"), wide=True):
-    sim = simulation(tmp_path, level=1, harvest=harvest)
+                 station="AZMC8801", codes=("1988150", "1988151"), wide=True,
+                 sequence=False, code="R"):
+    sim = simulation(tmp_path, level=1, harvest=harvest, sequence=sequence, code=code)
     text = sim.filex.read_text().replace("82056", sdate)
     text = text.replace("UFGA       -99", f"{station:8s}   -99")
     if planting is not None:
@@ -212,4 +213,77 @@ def test_classic_weather_and_weather_rows_add_no_anchor_problem(tmp_path, source
                         "longitude": -82.37, "elevation": 10, "srad": 20,
                         "tmax": 25, "tmin": 15, "rain": 0}
                        for day in ("1988-05-29", "1988-05-30")]
+    assert anchor_problems(sim) == []
+
+
+@pytest.mark.parametrize("source", ["filex", "experiment"])
+@pytest.mark.parametrize("harvest,day,relation", [
+    ("36059", "1936-02-28", "before"),
+    ("36060", "1936-02-29", None),
+    ("35060", "2035-03-01", None),
+    ("35061", "2035-03-02", "more than 99 years after"),
+])
+def test_later_rotation_harvest_anchor_boundaries(tmp_path, source, harvest, day, relation):
+    sim = anchored_sim(tmp_path, "36060", harvest if source == "filex" else "35061",
+                       codes=("1936060", "2035060", "2035061"), sequence=True)
+    if source == "experiment":
+        sim.management = {"treatments": {"07": {"rotation": {"02": {
+            "harvest": [{"date": day}],
+        }}}}}
+    problems = anchor_problems(sim)
+    if relation is None:
+        assert problems == []
+        return
+    field = ("FileX HDATE (rotation component 2)" if source == "filex" else
+             "treatments.7.rotation.2.harvest.0.date")
+    value = harvest if source == "filex" else day
+    advice = "on or before" if relation == "before" else "within 99 years before"
+    assert problems == [
+        f"{field} {value} reads as {day}, {relation} 1936-02-29, the first date "
+        "of stock weather AZMC8801.WTH. A $WEATHER file anchors FileX years to "
+        "its first date: DSSAT reads this date in another century or stops. "
+        f"Checked {field.removeprefix('FileX ')} against AZMC8801.WTH. "
+        f"Supply weather starting {advice} {day}, or move the date."]
+
+
+@pytest.mark.parametrize("source", ["filex", "experiment"])
+@pytest.mark.parametrize("first_reported", [False, True])
+def test_rotation_checks_each_harvest_in_each_reported_component(tmp_path, source, first_reported):
+    sim = anchored_sim(tmp_path, harvest="88100", sequence=True)
+    text = sim.filex.read_text()
+    if first_reported:
+        text = text.replace(" 1 MA              R     R     R     N     M",
+                            " 1 MA              R     R     R     N     R")
+    if source == "filex":
+        text = text.replace(
+            " 1 88100 GS000   -99   -99   100     0 -99",
+            " 1 88100 GS000   -99   -99   100     0 -99\n"
+            " 1 88101 GS000   -99   -99   100     0 -99\n"
+            " 1 88151 GS000   -99   -99   100     0 -99")
+    else:
+        events = [{"date": "1988-04-09"}, {"date": "1988-04-10"}, {"date": "1988-05-30"}]
+        sim.management = {"treatments": {7: {"rotation": {
+            1: {"harvest": events}, 2: {"harvest": events},
+        }}}}
+    sim.filex.write_text(text)
+    problems = anchor_problems(sim)
+    components = [1, 2] if first_reported else [2]
+    fields = [(f"FileX HDATE (rotation component {component})" if source == "filex" else
+               f"treatments.7.rotation.{component}.harvest.{event}.date")
+              for component in components for event in range(2)]
+    values = ["88100", "88101"] if source == "filex" else ["1988-04-09", "1988-04-10"]
+    assert len(problems) == len(fields)
+    for i, (field, problem) in enumerate(zip(fields, problems)):
+        assert problem.startswith(f"{field} {values[i % 2]} reads as ")
+        assert "before 1988-05-29" in problem
+
+
+@pytest.mark.parametrize("source", ["filex", "experiment"])
+@pytest.mark.parametrize("code", ["M", "A", "D"])
+def test_rotation_non_reported_harvest_has_no_anchor_problem(tmp_path, source, code):
+    sim = anchored_sim(tmp_path, harvest="88100", sequence=True, code=code)
+    if source == "experiment":
+        sim.management = {"treatments": {7: {"rotation": {2: {
+            "harvest": [{"date": "1988-04-09"}],
+        }}}}}
     assert anchor_problems(sim) == []
