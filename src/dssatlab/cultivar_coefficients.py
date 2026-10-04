@@ -1,26 +1,35 @@
 """Check and write fixed-width cultivar coefficients in a simulation .CUL copy."""
 
 import re
+from difflib import get_close_matches
 
 from .experiment import _check_number
 from .weather import _show_value
 
 
-def _coefficient_line(path, code):
-    """Locate the first listed cultivar and its own table's header spans."""
+def _coefficient_line(path, code=None):
+    """Locate a cultivar's spans, or the first row of the first @VAR# table."""
     lines = [line.decode("latin-1") for line in path.read_bytes().splitlines(keepends=True)]
     tokens = []
     for index, line in enumerate(lines):
         if line.startswith("@"):
+            if code is None and tokens:
+                break
             tokens = list(re.finditer(r"[^\s@]+", line)) if line.split()[0] == "@VAR#" else []
         elif line.startswith("*"):
+            if code is None and tokens:
+                break
             tokens = []
-        elif tokens and not line.lstrip().startswith("!") and line[:6] == code:
+        elif tokens and not line.lstrip().startswith(("!", "$")) and (
+                line[:6] == code if code is not None else re.fullmatch(r"[!-~]{6}", line[:6])):
             eco = next((i for i, token in enumerate(tokens) if token.group() == "ECO#"), None)
             spans = None if eco is None else {
                 tokens[i].group(): (tokens[i - 1].end(), tokens[i].end())
                 for i in range(eco + 1, len(tokens))}
             return lines, index, spans
+    if code is None:
+        raise ValueError(f".CUL file {path} has no cultivar row in its first @VAR# table. "
+                         "Supply a standard .CUL table with a cultivar line.")
     raise ValueError(f".CUL file {path} has no cultivar {code!r} under @VAR#.")
 
 
@@ -28,11 +37,12 @@ def _coefficient_text(value):
     return str(value) if isinstance(value, int) else (f"{value:.1f}" if value.is_integer() else repr(value))
 
 
-def _check_coefficients(path, code, coefficients, where):
+def _check_coefficients(path, code, coefficients, where, *, spans=None):
     if not isinstance(coefficients, dict) or not coefficients:
         return [f"{where}, field 'coefficients': found {_show_value(coefficients)}. Supply a "
                 "non-empty dict of .CUL coefficient names to numbers, such as {'P1': 300}."]
-    _, _, spans = _coefficient_line(path, code)
+    if spans is None:
+        _, _, spans = _coefficient_line(path, code)
     if spans is None:
         return [f"{where}: .CUL file {path} has no ECO# column, so coefficients cannot be "
                 "located. Remove 'coefficients' or supply a standard .CUL file."]
@@ -56,6 +66,89 @@ def _check_coefficients(path, code, coefficients, where):
                                 f"column in {path.name} holds {end - start - 1}. "
                                 "Supply a value with fewer digits.")
     return problems
+
+
+def _check_cultivar_definition(path, data, codes, where):
+    """Check an existing or new cultivar without changing the genotype files."""
+    from .cultivar import _unknown_cultivar
+
+    # DSSAT scans readable rows across the whole file, including later tables.
+    for line in path.read_text(encoding="latin-1").splitlines():
+        code = line[:6]
+        if (not line.lstrip().startswith(("!", "@", "*", "$"))
+                and re.fullmatch(r"[!-~]{6}", code) and code not in codes):
+            codes.append(code)
+    code = data["code"]
+    if code in codes:
+        fields = [field for field in ("ecotype", "name") if field in data]
+        problems = ([f"{where}: code {code!r} is an existing cultivar in {path}. "
+                     f"Remove {', '.join(repr(field) for field in fields)} to use or change it, "
+                     "or choose a new code."] if fields else [])
+        if "coefficients" in data and not fields:
+            problems.extend(_check_coefficients(path, code, data["coefficients"], where))
+        return problems
+
+    complete = "ecotype" in data and "coefficients" in data
+    problems = [] if complete else [_unknown_cultivar(code, codes, path, data["crop"], where)]
+    lines, index, spans = _coefficient_line(path)
+    header = next(line for line in lines[:index] if line.split() and line.split()[0] == "@VAR#")
+    if header[30:36] != "  ECO#" or spans is None:
+        problems.append(f"{where}: .CUL file {path} has an unsupported layout: ECO# must be "
+                        "in columns 31-36 of the first @VAR# header. Supply a standard .CUL file.")
+        return problems
+    if not complete:
+        problems.append(f"{where}: to define a new cultivar, supply ecotype and coefficients "
+                        f"with every required coefficient: {', '.join(spans)}.")
+        return problems
+
+    if code.startswith(("!", "@", "*", "$")):
+        problems.append(f"{where}, field 'code': found {code!r}. Supply a code not starting with "
+                        "!, @, * or $ so DSSAT reads the cultivar line.")
+    if re.fullmatch(r"DL[0-9]{4}", code) and code != "DL0000":
+        problems.append(f"{where}, field 'code': {code!r} is reserved for changed cultivars "
+                        "(DL0001-DL9999). Choose a different new cultivar code.")
+    coefficients = data["coefficients"]
+    if isinstance(coefficients, dict):
+        missing = [name for name in spans if name not in coefficients]
+        if missing:
+            problems.append(f"{where}, field 'coefficients': missing required coefficients: "
+                            f"{', '.join(missing)}. Supply every coefficient from the first @VAR# table.")
+    problems.extend(_check_coefficients(path, None, coefficients, where, spans=spans))
+    if "name" in data and (not isinstance(data["name"], str)
+                           or not re.fullmatch(r"[ -~]{0,16}", data["name"])):
+        problems.append(f"{where}, field 'name': found {_show_value(data['name'])}. Supply a "
+                        "quoted string of at most 16 printable ASCII characters for columns 8-23.")
+    ecotype = data["ecotype"]
+    if not isinstance(ecotype, str) or not re.fullmatch(r"[!-~]{6}", ecotype):
+        problems.append(f"{where}, field 'ecotype': found {_show_value(ecotype)}. Supply a "
+                        "quoted string with six printable ASCII characters without spaces.")
+    else:
+        problems.extend(_check_ecotype(path, ecotype, where))
+    return problems
+
+
+def _check_ecotype(cul_path, ecotype, where):
+    from .cultivar import _CROPS
+
+    path = cul_path.with_suffix(".ECO")
+    if not path.exists():
+        if any(cul_path.stem.upper() == prefix and "ECO" in extensions
+               for _, _, prefix, extensions, _ in _CROPS.values()):
+            return [f"{where}, field 'ecotype': required .ECO file {path} is missing. "
+                    "Supply it beside the .CUL file to check the ecotype."]
+        return []
+    try:
+        codes = list(dict.fromkeys(line[:6] for line in path.read_text(encoding="latin-1").splitlines()
+                    if not line.lstrip().startswith(("!", "@", "*", "$"))
+                    and re.fullmatch(r"[!-~]{6}", line[:6])))
+    except OSError as error:
+        return [f"{where}, field 'ecotype': cannot read .ECO file {path}: {error}. "
+                "Supply a readable .ECO file beside the .CUL file."]
+    if ecotype not in codes:
+        return [f"{where}, field 'ecotype': code {ecotype!r} is missing from .ECO file {path}. "
+                f"Closest codes: {', '.join(get_close_matches(ecotype, codes, 5, 0))} "
+                f"({len(codes)} codes in the file). Choose an ecotype listed in that file."]
+    return []
 
 
 def _changed_cultivar(filex, cultivar):
