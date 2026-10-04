@@ -40,10 +40,7 @@ _OPERATION_FIELDS = {
 
 def _check_operation_field(value, rule):
     """Return a correction for an invalid value, otherwise None."""
-    if rule == "date":
-        if _check_date(value, ""):
-            return "a valid ISO calendar date as a quoted YYYY-MM-DD string"
-    elif rule == "code":
+    if rule == "code":
         if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z]{2}[0-9]{3}", value):
             return "two ASCII letters followed by three digits for the DSSAT code"
     elif rule == "text":
@@ -224,7 +221,17 @@ def _check_operation_events(events, section, where, weather_range=None, *, code=
                 if field not in event and not required:
                     continue
                 value = event.get(field)
-                correction = _check_operation_field(value, rule)
+                if rule == "date":
+                    date_problems = _check_date(
+                        value, f"{location}, field {field!r}",
+                        iso_advice="a valid ISO calendar date as a quoted YYYY-MM-DD string "
+                                   f"(DSSAT {column})")
+                    found.extend(date_problems)
+                    if date_problems:
+                        continue
+                    correction = None
+                else:
+                    correction = _check_operation_field(value, rule)
                 if correction is None and rule == "date":
                     day = date.fromisoformat(value)
                     if previous is not None and day < previous:

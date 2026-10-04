@@ -217,7 +217,7 @@ def test_report_mode_a_continuous_fallback_keeps_selected_file(tmp_path, station
         wed = tmp_path / "wed"
         wed.mkdir()
         stock_file(wed, "UFGA8301.WTH", days=days("1983-01-01", "1983-01-30"))
-    rows, problems = _walk_weather_files(paths, station, "82350", date(1982, 12, 16),
+    rows, problems, _ = _walk_weather_files(paths, station, "82350", date(1982, 12, 16),
                                          date(1983, 1, 30), wed=wed, mode="A")
     assert problems == []
     assert len(rows) == 1096  # Only the continuous file, with no competitor appended.
@@ -226,7 +226,7 @@ def test_report_mode_a_continuous_fallback_keeps_selected_file(tmp_path, station
 @pytest.mark.parametrize("start", [date(1982, 2, 25), date(1983, 2, 26), date(1984, 2, 29)])
 def test_report_mode_a_fallback_satisfies_both_lookup_stages(tmp_path, start):
     first = stock_file(tmp_path, "UFGA.WTH", days=days("1982-01-01", "1984-12-31"))
-    rows, problems = _walk_weather_files([first], "UFGA", "82056", start, start, mode="A")
+    rows, problems, _ = _walk_weather_files([first], "UFGA", "82056", start, start, mode="A")
     assert problems == []
     assert start in {row["date"] for row in rows}
 
@@ -236,7 +236,7 @@ def test_report_mode_a_fallback_satisfies_both_lookup_stages(tmp_path, start):
 def test_report_mode_a_exhausted_fallback_stays_selected(tmp_path, last, missing, next_name):
     first = stock_file(tmp_path, "UFGA.WTH", days=days("1982-01-01", last))
     second = stock_file(tmp_path, next_name, days=days(missing, missing))
-    _, problems = _walk_weather_files([first, second], "UFGA", "82350", date(1982, 12, 16),
+    _, problems, _ = _walk_weather_files([first, second], "UFGA", "82350", date(1982, 12, 16),
                                       date.fromisoformat(missing), mode="A")
     assert len(problems) == 1
     assert all(part in problems[0] for part in ("UFGA.WTH", missing, "Checked", "Supply"))
@@ -247,7 +247,7 @@ def test_report_mode_a_exhausted_fallback_stays_selected(tmp_path, last, missing
                                               ("UFGA9901", date(1982, 12, 16), date(1983, 1, 30))])
 def test_report_mode_a_long_and_explicit_missing_literal_fallback(tmp_path, station, start, end):
     first = stock_file(tmp_path, "UFGA.WTH", days=days("1982-01-01", "2012-12-31"), wide=True)
-    rows, problems = _walk_weather_files([first], station, "82001", start, end, mode="A")
+    rows, problems, _ = _walk_weather_files([first], station, "82001", start, end, mode="A")
     assert problems == []
     assert len(rows) == 11323
     assert {start, end}.issubset({row["date"] for row in rows})
@@ -290,7 +290,7 @@ def test_rollover_file_with_old_year_records_fails_in_that_file(tmp_path, monkey
         return read(path, *args)
 
     monkeypatch.setattr(weather_files, "_read_stock_weather", read_once)
-    _, problems = _walk_weather_files([first, second], "UFGA", "82364", date(1982, 12, 30),
+    _, problems, _ = _walk_weather_files([first, second], "UFGA", "82364", date(1982, 12, 30),
                                       date(1983, 1, 2))
     assert len(problems) == 1
     assert all(part in problems[0] for part in ("UFGA8301.WTH", "1983-01-01", "Checked", "Supply"))

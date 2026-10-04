@@ -54,15 +54,22 @@ def _unknown_keys(data, allowed, where, template="Management"):
             for key in data if key not in allowed]
 
 
-def _check_date(value, location):
+def _check_date(value, location, *, iso_advice=None):
+    """Check quoted calendar dates that will be written as FileX YYDDD dates."""
     try:
         if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
             raise ValueError
-        date.fromisoformat(value)
+        day = date.fromisoformat(value)
     except ValueError:
+        if iso_advice is not None:
+            return [f"{location}: found {_show_value(value)}. Supply {iso_advice}."]
         return [f"{location}: found {_show_value(value)}. Supply a "
                 'valid ISO calendar date as a quoted YYYY-MM-DD string '
                 '(for example "2024-05-10"); quote the date, even in a dict.']
+    if not 1936 <= day.year <= 2035:
+        return [f"{location}: {value} cannot be written in a FileX: DSSAT stores two-digit years "
+                "and reads 00-35 as 2000-2035 and 36-99 as 1936-1999. "
+                "Use a date from 1936-01-01 to 2035-12-31."]
     return []
 
 
@@ -116,7 +123,9 @@ def _check_controls(data, where):
             _, column, rule = spec[:3]
             if len(spec) == 4:
                 if rule == "date":
-                    valid = not _check_date(value, location)
+                    problems.extend(_check_date(value, location,
+                                                iso_advice=f"{spec[3]} (DSSAT {column})"))
+                    continue
                 elif isinstance(rule, str):
                     valid = isinstance(value, str) and re.fullmatch(rule, value)
                 else:

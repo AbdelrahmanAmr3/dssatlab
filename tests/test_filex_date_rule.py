@@ -34,7 +34,7 @@ def test_long_weather_resolves_start_in_2025(filex, fake_dssat):
                      executable=fake_dssat.executable)
     assert sim.check(False) == []
     sim.management = {'treatments': {1: {'planting': dict(
-        date='1925-01-01', method='S', distribution='R', population=8,
+        date='1940-01-01', method='S', distribution='R', population=8,
         row_spacing=75, depth=5)}}}
     problems = sim.check(False)
     assert len(problems) == 1
@@ -44,9 +44,9 @@ def test_long_weather_resolves_start_in_2025(filex, fake_dssat):
 
 @pytest.mark.parametrize('sdate', ['35001', 'bad!!', '35366'])
 def test_controls_start_date_wins_over_sdate(filex, fake_dssat, sdate):
-    sim = Simulation(filex(sdate=sdate), weather=weather('1935-01-01', '1935-12-31'),
+    sim = Simulation(filex(sdate=sdate), weather=weather('1936-01-01', '1936-12-31'),
                      executable=fake_dssat.executable,
-                     management={'treatments': {1: {'controls': {'start_date': '1935-01-01'}}}})
+                     management={'treatments': {1: {'controls': {'start_date': '1936-01-01'}}}})
     assert sim.check(False) == []
 
 
@@ -92,9 +92,9 @@ def test_inherited_irrigation_uses_filex_century(filex, fake_dssat):
     sim = Simulation(filex(sdate='40001', text=text),
                      weather=weather('1940-01-01', '2040-01-02'),
                      executable=fake_dssat.executable,
-                     management={'treatments': {1: {'controls': {'start_date': '2040-01-01'}}}})
+                     management={'treatments': {1: {'controls': {'start_date': '2000-01-01'}}}})
     assert sim.check(False) == [
-        "Controls start_date '2040-01-01' is after the FileX's first irrigation date "
+        "Controls start_date '2000-01-01' is after the FileX's first irrigation date "
         "1940-01-01; DSSAT stops with error IPIRR. Start on or before that date, "
         "or give irrigation in the management data."]
 
@@ -108,7 +108,7 @@ def test_inherited_irrigation_start_bound_only_for_irrig_r(filex, fake_dssat, co
     sim = Simulation(filex(sdate='40001', text=text),
                      weather=weather('1940-01-01', '2040-01-02'),
                      executable=fake_dssat.executable,
-                     management={'treatments': {1: {'controls': {'start_date': '2040-01-01'}}}})
+                     management={'treatments': {1: {'controls': {'start_date': '2000-01-01'}}}})
     assert sim.check(False) == []
 
 

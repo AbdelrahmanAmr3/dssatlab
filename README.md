@@ -19,11 +19,8 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
-Version 0.19.0 adds measured `soil_analysis` (SA) and dated `environment`
-modifications (ME) in experiment data for copied FileX and FileX template
-treatments. It also checks experiment-data harvest dates under HARVS R against
-the start and planting dates, and inherited START S irrigation against the start.
-See the [experiment data guide](docs/guide/experiment.md#soil-analysis).
+Version 0.19.1 checks FileX dates against the stock weather anchor and the
+1936-2035 range. See [FileX dates](docs/guide/simulation.md#filex-dates).
 
 Version 0.18.1 adds `import_nasa_power()` for a downloaded daily CSV. Simulation
 checks use the effective planting date under START P for coverage and harvest

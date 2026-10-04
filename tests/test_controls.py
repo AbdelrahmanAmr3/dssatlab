@@ -137,7 +137,7 @@ def test_missing_or_unwritable_layout_reported(sim, fake_dssat, old, new, word):
 
 
 @pytest.mark.parametrize("start,valid", [("1982-02-26", True), ("1982-02-25", False),
-                                           ("2082-02-26", False)])
+                                           ("1983-02-26", False)])
 def test_override_replaces_old_weather_check_with_exact_calendar_date(sim, start, valid):
     sim.weather = [row for row in sim.weather if row["date"] >= "1982-02-26"]
     sim.management["treatments"][3]["controls"] = {"start_date": start}

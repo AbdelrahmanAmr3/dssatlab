@@ -35,9 +35,8 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.18.1 | Import a NASA POWER daily CSV into the weather template (ADR 0025). START P uses the effective planting date for coverage and harvest bounds (#225); stock weather selection follows DSSAT's lookup (#223, #224). |
 | 0.18.2 | Summarise weather and soil template data before a run: `summarize_weather()` and `summarize_soil()`. A sequence (mode Q) with only a four-character fallback weather file such as `UFGA.WTH` now passes `check()` (#236). See [summarise before a run](../guide/simulation.md#summarise-your-weather-and-soil-before-a-run). |
 | 0.18.3 | FileX and weather date rules: YYDDD dates use DSSAT's two-digit-year rule (00-35 is 2000-2035) instead of the weather for the century (#221), START E rejects an inherited harvest before emergence (#226), and stock weather spanning 1999/2000 passes in either order (#238). |
-| 0.19.0 (current) | Experiment data `soil_analysis` (phosphorus and other measured layer values, SA level) and `environment` (dated day length, srad, tmax, tmin, rain, CO2, dew point and wind modifications, ME level), written into a copied FileX. |
-
-FileX dates read against `$WEATHER` stock weather (#253) and a shared check for FileX dates outside 1936-2035 (#266) are planned for 0.19.1.
+| 0.19.0 | Experiment data `soil_analysis` (phosphorus and other measured layer values, SA level) and `environment` (dated day length, srad, tmax, tmin, rain, CO2, dew point and wind modifications, ME level), written into a copied FileX. |
+| 0.19.1 (current) | FileX start, planting and fixed harvest dates checked against the stock `$WEATHER` anchor (#253); experiment data FileX dates limited to 1936-2035 (#266); shared inherited-level view code for environment and soil analysis writers (#265). See [FileX dates](../guide/simulation.md#filex-dates). |
 
 ## Deliberately not built yet
 

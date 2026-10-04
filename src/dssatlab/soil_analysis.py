@@ -5,8 +5,8 @@ import re
 
 from .experiment import _check_date, _check_fields, _check_number
 from .filex import _section_row
-from .filex_write import (_append_rows, _cell, _event_blocks, _insert_section,
-                          _new_level, _repoint, _section_bounds)
+from .filex_write import (_append_rows, _cell, _inherited_level, _insert_section,
+                          _repoint)
 from .weather import _dssat_date, _show_value
 
 
@@ -108,23 +108,8 @@ def _soil_analysis_text(text, treatment, data):
     if isinstance(data, str) and data == "off":
         _repoint(lines, treatment, "SA", 0)
         return "".join(lines)
-    # IPSLAN reads inherited levels as I3. Give the header-based helpers an I2
-    # view for discovery and reuse, while preserving the original rows' bytes.
-    level_lines = list(lines)
-    bounds = _section_bounds(lines, name)
-    if bounds is not None:
-        for index in range(bounds[0] + 1, bounds[1]):
-            try:
-                inherited = int(lines[index][:3])
-            except ValueError:
-                continue
-            level_lines[index] = f"{inherited:2d} " + lines[index][3:]
-    blocks, highest = _event_blocks(level_lines, name, _HEADERS, optional_columns=("SASC",))
-    level = _new_level(level_lines, treatment, "SA", highest, name)
-    if bounds is not None:
-        for index in range(bounds[0] + 1, bounds[1]):
-            if not level_lines[index]:
-                lines[index] = ""  # Remove only rows of a reused, unreferenced level.
+    blocks, level = _inherited_level(lines, treatment, "SA", name, _HEADERS,
+                                     optional_columns=("SASC",))
     # Two-character level plus blank also works with DSSAT's I2 level selection.
     prefix = _cell(level, 2, name, "A", first_column=True) + " "
     surface = prefix + _dssat_date(date.fromisoformat(data["date"]))

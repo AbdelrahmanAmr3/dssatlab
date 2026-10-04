@@ -233,6 +233,26 @@ def _append_rows(lines, index, rows):
     lines[index:index] = [prefix + newline.join(rows) + newline]
 
 
+def _inherited_level(lines, treatment, column, section, headers, *, optional_columns=()):
+    """Discover and reuse I3 levels through an I2 view, preserving retained bytes."""
+    level_lines = list(lines)
+    bounds = _section_bounds(lines, section)
+    if bounds is not None:
+        for index in range(bounds[0] + 1, bounds[1]):
+            try:
+                inherited = int(lines[index][:3])
+            except ValueError:
+                continue
+            level_lines[index] = f"{inherited:2d} " + lines[index][3:]
+    blocks, highest = _event_blocks(level_lines, section, headers, optional_columns=optional_columns)
+    level = _new_level(level_lines, treatment, column, highest, section)
+    if bounds is not None:
+        for index in range(bounds[0] + 1, bounds[1]):
+            if not level_lines[index]:
+                lines[index] = ""  # Remove only rows of a reused, unreferenced level.
+    return blocks, level
+
+
 def _event_blocks(lines, section, headers, *, optional_columns=()):
     """Check every header and find the last insertion point for each block."""
     expected = [_columns(header) for header in headers]

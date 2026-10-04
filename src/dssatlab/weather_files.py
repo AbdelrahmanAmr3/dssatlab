@@ -195,41 +195,46 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
     e2e23 proves mode Q reads the fallback throughout both rotation components.
     Installed weather is checked for shadowing, never used as supplied coverage.
     With no known end, stop at the end of the reachable supplied files.
+    Return rows, problems and (first date, filename) for the initial $WEATHER file.
     """
     supplied = {path.name.upper(): path for path in paths}
     fallback = f"{station[:4]}.WTH"
     initial = f"{station}.WTH" if len(station) == 8 else f"{station}{sdate[:2]}01.WTH"
-    selected = None
+    selected, anchor = None, None
     for name in dict.fromkeys([initial, f"{station}.WTH" if len(station) == 8
                               else f"{station}{start.year % 100:02d}01.WTH"]):
         if name in supplied:
             selected = name
-            continue
-        checked = f"Checked supplied names: {', '.join(supplied)}"
-        if wed is not None and (wed / name).is_file() and fallback in supplied:
+        elif wed is not None and (wed / name).is_file() and fallback in supplied:
             return [], [f"Installed weather file {wed / name} shadows supplied {fallback}. "
-                        f"{checked} and DSSATPRO WED {wed}. "
-                        f"Supply {name} in the simulation folder to take priority."]
-        if fallback in supplied and mode != "C":
+                        f"Checked supplied names: {', '.join(supplied)} and DSSATPRO WED {wed}. "
+                        f"Supply {name} in the simulation folder to take priority."], anchor
+        elif fallback in supplied and mode != "C":
             selected = fallback
-            continue
-        reason = f"; {fallback} is not usable as a fallback in mode C" if fallback in supplied else ""
-        return [], [f"DSSAT requests {name}, but no supplied file meets this lookup{reason}. "
-                    f"{checked}; installed weather cannot supply coverage. "
-                    f"Supply {name}, or correct the FileX WSTA and start dates."]
+        else:
+            reason = f"; {fallback} is not usable as a fallback in mode C" if fallback in supplied else ""
+            return [], [f"DSSAT requests {name}, but no supplied file meets this lookup{reason}. "
+                        f"Checked supplied names: {', '.join(supplied)}; installed weather cannot supply coverage. "
+                        f"Supply {name}, or correct the FileX WSTA and start dates."], anchor
+        if name == initial:
+            raw, problems = _read_weather_file(supplied[selected])
+            if not problems and raw and len(raw[0][1]["date"]) == 7:
+                first = _weather_date(raw[0][1]["date"], start.year)
+                if first is not None:
+                    anchor = first, selected
 
     rows, current = [], start
     while selected is not None:
         file_rows, problems = _read_stock_weather(supplied[selected], current)
         if problems:
-            return rows, problems
+            return rows, problems, anchor
         if not file_rows:
             return rows, [f"DSSAT requests records in {selected}, but it has no daily rows. "
-                          "Checked the selected stock weather file. Supply daily weather in that file."]
+                          "Checked the selected stock weather file. Supply daily weather in that file."], anchor
         rows.extend(file_rows)
         first, last = min(r["date"] for r in file_rows), max(r["date"] for r in file_rows)
         if end is not None and last >= end:
-            return rows, []
+            return rows, [], anchor
         if (last >= current and first.year == last.year
                 and len(selected) == 12 and selected[6:8] == "01"
                 and last == date(last.year, 12, 31)):
@@ -238,18 +243,41 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
             if selected in supplied:
                 continue  # All supplied files are copied beside FileX: retain that directory.
             if end is None:
-                return rows, []
+                return rows, [], anchor
             return rows, [f"DSSAT requests {selected} at rollover on {current}. "
                           "Checked supplied weather in the selected simulation folder; "
                           "rollover does not search WED or use the four-character fallback. "
-                          f"Supply {selected} beside the FileX."]
+                          f"Supply {selected} beside the FileX."], anchor
         if end is None and last >= current:
-            return rows, []
+            return rows, [], anchor
         missing = max(current, last + timedelta(days=1))
         return rows, [f"DSSAT requests {missing} in {selected}, but its records end on {last}. "
                       "Checked the selected file; DSSAT keeps multi-year and four-character files "
                       "selected instead of borrowing another file. "
-                      f"Supply weather through {end} in {selected}."]
-    return rows, []
+                      f"Supply weather through {end} in {selected}."], anchor
+    return rows, [], anchor
+
+
+def _weather_anchor_problems(anchor, dates):
+    """Compare fixed FileX dates to MAKEFILEW's initial first-date window."""
+    if anchor is None:
+        return []
+    first, name = anchor
+    limit = first.year * 1000 + first.timetuple().tm_yday + 99000
+    problems = []
+    for field, day in dates:
+        if day is None or first <= day and day.year * 1000 + day.timetuple().tm_yday <= limit:
+            continue
+        before = day < first
+        relation = "before" if before else "more than 99 years after"
+        advice = "on or before" if before else "within 99 years before"
+        code = f"{day.year % 100:02d}{day.timetuple().tm_yday:03d}" if field.startswith("FileX ") else day
+        checked = field.removeprefix("FileX ")
+        problems.append(f"{field} {code} reads as {day}, {relation} {first}, the first date "
+                        f"of stock weather {name}. A $WEATHER file anchors FileX years to "
+                        "its first date: DSSAT reads this date in another century or stops. "
+                        f"Checked {checked} against {name}. Supply weather starting {advice} "
+                        f"{day}, or move the date.")
+    return problems
 
 
