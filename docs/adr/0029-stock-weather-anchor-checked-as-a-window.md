@@ -32,5 +32,9 @@ and DSSAT stops when the result is beyond F plus 99 years. Second, an experiment
 
 ## Consequences
 
-- Real-DSSAT proof pending in `.work/e2e28` (v0.19.1 ticket T4).
+- Real-DSSAT proof done on Windows 4.8.5.017 (`.work/e2e28/FINDINGS.md`, local): four of five scenarios pass
+  (fixed-rule dates kept on and after F; a planting date a year before F shifts 1986 to 2086; environment
+  2036-01-01 rejected by `check()`; fixed HDATE before F stops the run). Scenario 2 (a valid date before F in
+  F's year) cannot be built from the stock AZMC8832.WTH, which starts on 1988-01-01; only an invalid-day probe
+  was run (DSSAT exit 99). The five course cases report no new problems.
 - Dates in other levels (fertilizer, initial conditions, soil analysis, ...) are not window-checked.
