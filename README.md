@@ -19,6 +19,10 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.21.0 adds generated weather from a supplied climate file, sequence
+replicates and a fixed random seed through experiment data controls. See the
+[generated weather guide](docs/guide/generated-weather.md).
+
 Version 0.20.0 adds new cultivars under your own code through experiment data
 `cultivar.ecotype`, optional `name`, and every required coefficient. It also checks
 each rotation component's fixed harvest dates against the stock weather anchor
@@ -47,6 +51,7 @@ The project can get a working DSSAT into Python, run an existing experiment file
 - [x] Build DSSAT-CSM from the official release on Linux and Colab
 - [x] Run one existing FileX
 - [x] Turn your own daily weather into a strictly checked simulation and run it
+- [x] Run a copied FileX with [generated weather from a climate file](docs/guide/generated-weather.md), sequence replicates and a fixed random seed
 - [x] Turn your own soil data into a strictly checked simulation and run it
 - [x] Turn your own management data (planting, irrigation, fertilizer) into a strictly checked simulation and run it
 - [x] Set DSSAT simulation options (including photosynthesis and CO2), initial-condition details, or initial conditions off through experiment data

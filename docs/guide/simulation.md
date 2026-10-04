@@ -599,8 +599,9 @@ filename must also fit the 12-character limit.
 For every simulation controls level used by the selected treatment (or each rotation
 component in a sequence), `check()` also validates the simulation methods and outputs:
 
-- `METHODS` `WTHER` must be `M` (measured weather). If set to `W` (weather generator),
-  DSSAT would generate artificial weather and silently ignore your supplied weather data.
+- `METHODS` `WTHER` accepts `M` (measured weather), `W` (WGEN) or `S` (SIMMETEO).
+  With W or S, supply a climate file through `weather=` instead of daily weather.
+  See [generated weather](generated-weather.md) for climate checks and controls.
 - `OUTPUTS` `FNAME=Y` is accepted: DSSAT names outputs after the experiment
   (such as `UFGA7804.OSU`), and the readers find them when standard names are absent.
   See [Standard and experiment-named output files](reading-results.md#standard-and-experiment-named-output-files).
