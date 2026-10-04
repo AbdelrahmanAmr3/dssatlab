@@ -165,7 +165,8 @@ def test_off_keeps_weather_coverage_problem(sim):
     sim.weather[0]["date"] = "1982-02-26"
     problems = sim.check(verbose=False)
     assert len(problems) == 1
-    assert "FileX start year 82 day 056 is not covered by weather data" in problems[0]
+    assert "FileX SDATE '82056' is 1982-02-25" in problems[0]
+    assert "not covered by weather data" in problems[0]
 
 
 @pytest.mark.parametrize("value", [False, None, 0, "OFF", "other", [], True])

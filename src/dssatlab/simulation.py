@@ -1,13 +1,15 @@
 """Check and run one Simulation with a copied or generated FileX and user data."""
 
+from datetime import date
 from pathlib import Path
 import shutil
 
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
-from .filex import _check_filex_controls, _irrigation_dates, _read_filex
+from .filex import _check_filex_controls, _filex_date, _irrigation_dates, _read_filex
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
+from .irrigation import _start_irrigation_code
 from .management import _check_management, _report_lines
 from .experiment import _overrides_section
 from .operations import _check_harvest
@@ -86,13 +88,9 @@ class Simulation:
     def _check_inputs(self, experiment_data=None, load_problems=None):
         """Collect input problems, using the loaded experiment data dict when supplied.
 
-        Performs strict validation: checks weather data column names, value
-        ranges, date order, duplicates, and gaps; reads the FileX for treatment
-        validity, field station code (WSTA), and start controls (START, SDATE);
-        ensures FileX filename is at most 12 characters and weather data covers
-        the simulation start under START S/P. Checks soil and scenario name.
-        With experiment overrides, checks field edits in memory; otherwise
-        requires matching weather station and soil profile IDs.
+        Checks weather columns, values and dates; FileX treatment, WSTA,
+        START/SDATE and filename; START S/P coverage, soil and scenario name.
+        Experiment overrides edit field identity; otherwise station and soil IDs must match.
         """
         if (self.filex is None) == (self.filex_template is None):
             raise DSSATCheckError(["Supply exactly one of filex or filex_template."])
@@ -126,12 +124,14 @@ class Simulation:
             filex_problems.append(f"FileX filename {name!r} has {len(name)} characters; DSSAT "
                                   "accepts at most 12. Rename the FileX to at most 12 "
                                   "characters, including the extension (DSSAT's 8.3 style).")
+        paths = _stock_weather_paths(self.weather)
         stations = {row["station"] for row in rows if "station" in row}
+        if not rows and paths:
+            stations = {path.name[:4].upper() for path in paths}
         if not edit_identity and "WSTA" in values and len(stations) == 1:
             station = stations.pop()
             expected = values["WSTA"][:4]
             if station != expected:
-                paths = _stock_weather_paths(self.weather)
                 source = f"stock weather file {paths[0].name}" if paths else "the weather template"
                 filex_problems.append(f"FileX WSTA {values['WSTA']!r} expects station "
                                      f"{expected!r}, but {source} has station "
@@ -140,13 +140,20 @@ class Simulation:
         days = [row["date"] for row in rows if "date" in row]
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
-                                   else _simulation_start_date(sdate, days))
+                                   else _simulation_start_date(sdate))
+        if days and start_date is None and _parse_sdate(sdate) is not None:
+            year = _filex_date(sdate[:2] + "001").year
+            last = date(year, 12, 31).timetuple().tm_yday
+            filex_problems.append(f"FileX {self.filex}: SDATE {sdate!r} is invalid: "
+                                 f"day {int(sdate[2:])} does not exist in {year} (DSSAT reads "
+                                 "years 00-35 as 2000-2035 and 36-99 as 1936-1999). "
+                                 f"Supply a day of year from 1 to {last}.")
         if values.get("START") == "P":
             try:
                 text = Path(self.filex).read_text(encoding="latin-1")
             except (OSError, TypeError, ValueError):
                 text = ""
-            start_date = _simulation_start(text, self.treatment, experiment_data, days)
+            start_date = _simulation_start(text, self.treatment, experiment_data)
             skip_reason = None if start_date is not None else "START P planting date is unavailable; check PDATE"
         if len(components) > 1:
             filex_problems.extend(_sequence_coverage(
@@ -159,14 +166,11 @@ class Simulation:
                 filex_problems.append(f"Controls start_date {override_start.isoformat()!r} is not "
                                      f"covered by weather data ({min(days)} to {max(days)}). "
                                      "Supply weather for the simulation's start date.")
-        elif sdate is not None and days:
-            parsed = _parse_sdate(sdate)
-            if parsed is not None and not any(
-                    (day.year % 100, day.timetuple().tm_yday) == parsed for day in days):
-                start = values["SDATE"]
-                filex_problems.append(f"FileX start year {start[:2]} day {start[2:]} is not "
-                                     f"covered by weather data ({min(days)} to {max(days)}). "
-                                     "Supply weather for the simulation's start date.")
+        elif sdate is not None and start_date is not None and days and start_date not in days:
+            filex_problems.append(f"FileX SDATE {sdate!r} is {start_date} (DSSAT reads two-digit "
+                                 "years 00-35 as 2000-2035 and 36-99 as 1936-1999), not "
+                                 f"covered by weather data ({min(days)} to {max(days)}). "
+                                 f"Supply weather for {start_date}, or set controls.start_date.")
         if values.get("START") == "P" and start_date is not None and days and start_date not in days:
             filex_problems.append(f"Simulation start date {start_date.isoformat()!r} is not "
                                  f"covered by weather data ({min(days)} to {max(days)}). "
@@ -174,8 +178,11 @@ class Simulation:
         if (override_start is not None or values.get("START") == "P") and start_date is not None and days and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
-            irrigation = [_simulation_start_date(text, days)[0]
-                          for text in _irrigation_dates(self.filex, self.treatment)]
+            # DSSAT-CSM v4.8.6.0, InputModule/IPMAN.for, IPIRR: only IRRIG R
+            # events are calendar dates that must not precede the start.
+            code = _start_irrigation_code(experiment_data, self.filex, self.treatment, components)
+            irrigation = [_filex_date(text) for text in _irrigation_dates(self.filex, self.treatment)
+                          if code in ("R", None)]
             irrigation = [day for day in irrigation if day is not None]
             if irrigation and min(irrigation) < start_date:
                 label = "Controls start_date" if override_start is not None else "Simulation start date"
@@ -230,9 +237,8 @@ class Simulation:
         With experiment overrides, writes the weather station and supplied soil
         ID into that field. Independently writes name into the copied treatment,
         except for sequences, None and "base", which retain the FileX names.
-        With soil=, writes template soil to SOIL.SOL or copies stock soil unchanged
-        under its own name, and copies no sibling .SOL files. With soil=None,
-        copies all sibling .SOL files. Invokes the DSSAT executable for the
+        With soil=, writes SOIL.SOL or copies stock soil and copies no sibling .SOL
+        files. With soil=None, copies all sibling .SOL files. Invokes the DSSAT executable for the
         treatment and scans WARNING.OUT for missing weather records. Soil
         failures use the existing run error, keeping ERROR.OUT in the run directory.
 

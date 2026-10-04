@@ -242,28 +242,21 @@ def _parse_sdate(sdate):
     return None
 
 
-def _simulation_start_date(sdate, days):
-    """Resolve SDATE using weather years, or return the reason it cannot be checked."""
+def _simulation_start_date(sdate):
+    """Read SDATE as a FileX date, or explain why it cannot be checked."""
     if sdate is None:
         return None, "START is not S or SDATE is unavailable; check the FileX start controls"
     parsed = _parse_sdate(sdate)
     if parsed is None:
         return None, f"SDATE {sdate!r} is not a DSSAT date (yyddd); correct SDATE"
-    if not days:
-        return None, "weather unreadable"
-    yy, doy = parsed
-    years = [y for y in range(min(d.year for d in days), max(d.year for d in days) + 1) if y % 100 == yy]
-    if not years:
-        return None, f"no weather year matches SDATE year {yy:02d}; supply weather for the start year"
-    if len(years) > 1:
-        return None, f"ambiguous start year (candidate years: {', '.join(map(str, years))}); supply controls.start_date"
-    year = years[0]
-    if not 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
-        return None, f"day {doy} does not exist in {year}; correct SDATE"
-    return date(year, 1, 1) + timedelta(days=doy - 1), None
+    day = _filex_date(sdate)
+    if day is None:
+        year = _filex_date(sdate[:2] + "001").year
+        return None, f"day {parsed[1]} does not exist in {year}; correct SDATE"
+    return day, None
 
 
-def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> date | None:
+def _simulation_start(text, treatment, experiment_data) -> date | None:
     """Return the effective S/P start of the first component."""
     from .experiment import _check_date
 
@@ -273,7 +266,7 @@ def _simulation_start(text, treatment, experiment_data, weather_dates=()) -> dat
                                ("GENERAL", "START", "SDATE"))
         if general["START"] == "S":
             return (_controls_start_date(experiment_data, treatment)
-                    or _simulation_start_date(general["SDATE"], weather_dates)[0])
+                    or _filex_date(general["SDATE"]))
         if general["START"] != "P":
             return None
         entries = experiment_data.get("treatments", {}) if isinstance(experiment_data, dict) else {}

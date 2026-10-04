@@ -124,7 +124,9 @@ def test_filex_year_zero_leap_day_through_rotation(tmp_path):
     assert not any('2100' in p for p in problems)
 
 
-@pytest.mark.parametrize('year,first', [('40', '2040-01-01'), ('41', '1941-01-01')])
+@pytest.mark.parametrize('year,first', [
+    ('35', '2035-01-01'), ('36', '1936-01-01'), ('40', '1940-01-01'), ('41', '1941-01-01'),
+])
 def test_filex_cutoff_year_in_inherited_harvest(tmp_path, year, first):
     sim = dated_simulation(tmp_path, year + '002', year + '002', year + '001', first)
     problems = sim.check(False)

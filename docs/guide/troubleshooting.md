@@ -177,11 +177,14 @@ equal the first four characters of that treatment's `WSTA`, including case.
 Replace the weather template's example `DEMO` station with the correct code.
 
 ```text
-FileX start year {start[:2]} day {start[2:]} is not covered by weather data ({min(days)} to {max(days)}). Supply weather for the simulation's start date.
+FileX SDATE '35001' is 2035-01-01 (DSSAT reads two-digit years 00-35 as 2000-2035 and 36-99 as 1936-1999), not covered by weather data (1935-01-01 to 1935-12-31). Supply weather for 2035-01-01, or set controls.start_date.
 ```
 
 For `START S`, include the date identified by `SDATE`, as well as the days needed
-after it. Fill gaps with your weather data; dssatlab does not fill them for you.
+after it. FileX years 00-35 mean 2000-2035 and 36-99 mean 1936-1999; weather
+written by dssatlab never chooses the century. Supply weather for that date or
+set `controls.start_date`. Fill gaps with your weather data; dssatlab does not
+fill them for you.
 
 ```text
 Soil data row {line}, column 'soil_id': found {value!r}. Use 1 to 10 ASCII letters or digits.

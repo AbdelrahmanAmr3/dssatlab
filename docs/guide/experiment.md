@@ -151,10 +151,16 @@ An inherited HDATE under HARVS R must also be on or after both the known
 simulation start and planting dates, including experiment-data overrides. Under
 effective planting management A or F, DSSAT chooses the planting date, so the
 reported PDATE is ignored and only the simulation-start bound applies
-([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)). FileX YYDDD dates
-use DSSAT's cutoff: years 00 through 40 mean 2000 through 2040, and 41 through
-99 mean 1941 through 1999. The message names the harvest level and each failed
-bound, for example:
+([#206](https://github.com/AbdelrahmanAmr3/dssatlab/issues/206)). Under START E,
+the first component's simulation-start bound is the effective emergence date:
+`planting.emergence_date` when a planting section is supplied, otherwise FileX
+EDATE. An omitted emergence date in that section, or an unknown EDATE, adds no
+bound. This applies even with automatic planting; later sequence components
+start after the previous component ends.
+
+FileX YYDDD dates use DSSAT's rule: years 00-35 are 2000-2035 and 36-99 are
+1936-1999. Weather written by dssatlab never chooses their century. The message
+names the harvest level and each failed bound, for example:
 
 ```text
 Treatment 1: FileX HDATE '82054' (1982-02-23) in harvest level 1 is before simulation start date (1982-02-25) and planting date (1982-02-25). Move HDATE on or after these bounds, or change the start or planting date.

@@ -121,16 +121,16 @@ def _read_weather_file(path):
     return rows, []
 
 
-def _read_stock_weather(source, start_date) -> tuple[list[dict], list[str]]:
+def _read_stock_weather(source, start_date=None) -> tuple[list[dict], list[str]]:
     """Read a stock path or list of paths into weather template rows and problems.
 
-    start_date supplies the weather century. Files and rows keep their given
-    order, including duplicate days. The selection walk decides which files
-    DSSAT opens; this reader only decodes bytes without repairing them.
+    Without start_date, check structure and leave date codes unresolved.
+    Otherwise start_date supplies the weather century. Files and rows keep
+    their given order, including duplicate days; the walk selects DSSAT's files.
     """
     paths = source if isinstance(source, list) else [source]
     rows, problems, seen = [], [], {}
-    previous_year = start_date.year
+    previous_year = start_date.year if start_date is not None else None
     initial_record = True
     for source_path in paths:
         path = Path(source_path)
@@ -144,6 +144,9 @@ def _read_stock_weather(source, start_date) -> tuple[list[dict], list[str]]:
         raw, read_problems = _read_weather_file(path)
         problems.extend(read_problems)
         if read_problems:
+            continue
+        if start_date is None:
+            rows.extend(row for _, row in raw)
             continue
         for line, row in raw:
             day = _weather_date(row["date"], previous_year,
