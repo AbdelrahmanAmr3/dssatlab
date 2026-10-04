@@ -74,10 +74,12 @@ def _check_template_simulation(sim, experiment_data, load_problems):
                                           experiment_data, load_problems)
     fields = _template_treatment_fields(data) if isinstance(data, dict) else [1]
     # Template checks report malformed field lists; skip comparing their keys.
-    count = max(fields) if not any("treatment_fields" in p for p in template_problems) else None
     if (not isinstance(fields, list) or not fields
             or any(type(k) is not int or not 1 <= k <= 99 for k in fields)):
         fields = [1]
+        count = None
+    else:
+        count = max(fields) if not any("treatment_fields" in p for p in template_problems) else None
     weather_fields, weather_problems, weather_report = _parse_field_data(sim.weather, count, "weather")
     soil_fields, soil_problems, soil_report = _parse_field_data(sim.soil, count, "soil")
     for rows, found, kind in ((weather_fields, weather_problems, "weather"),
@@ -98,16 +100,9 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         else:
             template_problems.append(f"FileX template has treatments 1 to {count}. "
                                      f"Supply treatment=<k> with 1 <= k <= {count}.")
-    entry = data if isinstance(data, dict) and "crops" not in data else None
-    if isinstance(data, dict) and "crops" in data and valid_treatment:
-        entries, numbers = data["crops"], data.get("treatment_crops")
-        # Unrelated value errors must not hide the selected entry's date checks.
-        if (isinstance(entries, list) and isinstance(numbers, list)
-                and int(sim.treatment) <= len(numbers)):
-            number = numbers[int(sim.treatment) - 1]
-            if (type(number) is int and 1 <= number <= len(entries)
-                    and isinstance(entries[number - 1], dict)):
-                entry = _template_crop_entry(data, sim.treatment)
+    # Unrelated value errors must not hide the selected entry's date checks.
+    entry = (_template_crop_entry(data, sim.treatment) if isinstance(data, dict)
+             and ("crops" not in data or valid_treatment) else None)
     start = _controls_start_date(experiment_data, sim.treatment)
     if start is None and isinstance(entry, dict) and isinstance(entry.get("planting"), dict):
         planting_date = entry["planting"].get("date")

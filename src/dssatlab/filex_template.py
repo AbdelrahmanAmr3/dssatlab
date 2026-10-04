@@ -11,6 +11,9 @@ from .management_file import _load_yaml, _write_template
 from .weather import _show_value
 
 
+_CROP_ENTRY_BOUNDS = (1, 99)
+
+
 _TEMPLATE = """# DSSATLab FileX template: numbered fields, named treatments.
 # Use one crop, crop entries for mixed-crop treatments, or a rotation.
 # Station, latitude, longitude and elevation come from checked weather data.
@@ -137,12 +140,29 @@ def _template_treatment_fields(data):
     return data.get("treatment_fields", [1] * len(_template_treatment_names(data)))
 
 
+def _template_crop_entries(data):
+    """Return entries in FileX level order; malformed lists give no entries.
+
+    Rotation takes precedence on conflicts so genotype checks keep working.
+    """
+    entries = data.get("rotation", data.get("crops", [data]))
+    return entries if isinstance(entries, list) else []
+
+
 def _template_crop_entry(data, treatment):
-    """Return a checked treatment's crop entry; single-crop values are top-level."""
-    if "crops" in data:
-        number = data["treatment_crops"][int(treatment) - 1]
-        return data["crops"][number - 1]
-    return data
+    """Return a treatment's crop entry, or None for a malformed crop mapping."""
+    if "crops" not in data:
+        return data
+    entries, numbers = _template_crop_entries(data), data.get("treatment_crops")
+    if (isinstance(treatment, bool) or not isinstance(treatment, (int, str))
+            or not str(treatment).isascii() or not str(treatment).isdigit()
+            or not isinstance(numbers, list) or not 1 <= int(treatment) <= len(numbers)):
+        return None
+    number = numbers[int(treatment) - 1]
+    if type(number) is int and 1 <= number <= len(entries):
+        entry = entries[number - 1]
+        return entry if isinstance(entry, dict) else None
+    return None
 
 
 def _check_filex_template(data, data_dir) -> list[str]:
@@ -171,7 +191,7 @@ def _check_filex_template(data, data_dir) -> list[str]:
     problems.extend(_check_template_treatments(data))
     problems.extend(crop_problems)
     if "crops" not in data:
-        problems.extend(_check_template_crop(data, data_dir))
+        problems.extend(_check_template_crop(_template_crop_entry(data, 1), data_dir))
     return problems
 
 
@@ -205,16 +225,19 @@ def _check_template_treatments(data):
                 found = len(fields) if isinstance(fields, list) else _show_value(fields)
                 problems.append(f"{where}, treatment_fields: supply one field number per "
                                 f"treatment (found {found} for {count} treatments).")
-            if isinstance(fields, list):
-                bad = [i for i, value in enumerate(fields, 1)
-                       if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 99]
-                problems.extend(f"{where}, treatment_fields[{i}]: found {_show_value(fields[i - 1])}. "
-                                "Supply a whole number 1 to 99." for i in bad)
-                if fields and not bad:
-                    missing = sorted(set(range(1, max(fields) + 1)) - set(fields))
-                    if missing:
-                        problems.append(f"{where}, treatment_fields: number the fields 1 to {max(fields)} "
-                                        f"without gaps (missing {', '.join(map(str, missing))}).")
+        elif not isinstance(fields, list):
+            problems.append(f"{where}, treatment_fields: found {_show_value(fields)}. "
+                            "Supply a list with one field number per treatment.")
+        if isinstance(fields, list):
+            bad = [i for i, value in enumerate(fields, 1)
+                   if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 99]
+            problems.extend(f"{where}, treatment_fields[{i}]: found {_show_value(fields[i - 1])}. "
+                            "Supply a whole number 1 to 99." for i in bad)
+            if fields and not bad:
+                missing = sorted(set(range(1, max(fields) + 1)) - set(fields))
+                if missing:
+                    problems.append(f"{where}, treatment_fields: number the fields 1 to {max(fields)} "
+                                    f"without gaps (missing {', '.join(map(str, missing))}).")
     return problems
 
 
@@ -300,10 +323,7 @@ def _template_genotype_files(data, data_dir):
     paths = {}
     # Genotype checks need only each entry's crop, even if treatment mapping
     # or other values are malformed. Rotation takes precedence on conflicts.
-    entries = data.get("rotation", data.get("crops", [data]))
-    if not isinstance(entries, list):
-        return []
-    for component in entries:
+    for component in _template_crop_entries(data):
         crop = component.get("crop") if isinstance(component, dict) else None
         if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
             _, _, prefix, extensions, _ = _CROPS[crop]

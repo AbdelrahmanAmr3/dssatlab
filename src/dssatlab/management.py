@@ -291,14 +291,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
             treatment_cultivar_path = None
             crop_entry = None
             if number is not None and 1 <= number <= len(_template_treatment_names(filex_template)):
-                if "crops" not in filex_template:
-                    crop_entry = _template_crop_entry(filex_template, number)
-                else:
-                    entries = filex_template["crops"]
-                    numbers = filex_template.get("treatment_crops")
-                    if (isinstance(entries, list) and isinstance(numbers, list) and number <= len(numbers)
-                            and type(numbers[number - 1]) is int and 1 <= numbers[number - 1] <= len(entries)):
-                        crop_entry = _template_crop_entry(filex_template, number)
+                crop_entry = _template_crop_entry(filex_template, number)
             crop = crop_entry.get("crop") if isinstance(crop_entry, dict) else None
             if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
                 treatment_cultivar_path = data_dir / "Genotype" / f"{_CROPS[crop][2]}.CUL"

@@ -1,13 +1,14 @@
 """Check numbered crop entries and the treatments that use them."""
 
 from .experiment import _check_fields
-from .filex_template import _check_template_crop
+from .filex_template import _check_template_crop, _CROP_ENTRY_BOUNDS
 from .weather import _show_value
 
 
 def _check_crop_entries(data, data_dir):
     """Return crop-form, entry and treatment_crops problems without rendering."""
     where, problems = "FileX template", []
+    minimum, maximum = _CROP_ENTRY_BOUNDS
     forms = [key for key in ("crop", "rotation", "crops") if key in data]
     if len(forms) != 1:
         problems.append(f"{where}: supply exactly one of crop, rotation or crops "
@@ -32,9 +33,9 @@ def _check_crop_entries(data, data_dir):
                             "Checked the top-level crop entry numbers. "
                             "Supply treatment_crops with one crop entry number per treatment.")
         entries = data["crops"]
-        if not isinstance(entries, list) or not 1 <= len(entries) <= 99:
+        if not isinstance(entries, list) or not minimum <= len(entries) <= maximum:
             problems.append(f"{where}, crops: found {_show_value(entries)}. "
-                            "Supply a list of 1 to 99 crop entries.")
+                            f"Supply a list of {minimum} to {maximum} crop entries.")
         if isinstance(entries, list):
             for number, entry in enumerate(entries, 1):
                 location = f"{where}, crops[{number}]"
@@ -69,16 +70,16 @@ def _check_crop_entries(data, data_dir):
         problems.append(f"{where}, treatment_crops: found {_show_value(numbers)}. "
                         "Checked the crop entry numbers. Supply a list of whole numbers.")
     entries = data.get("crops")
-    valid_entries = isinstance(entries, list) and 1 <= len(entries) <= 99
+    valid_entries = isinstance(entries, list) and minimum <= len(entries) <= maximum
     # Malformed crops must not hide independent whole-number problems. Entry
     # numbers cannot exceed 99 even when the actual entry count is unavailable.
-    limit = len(entries) if valid_entries else 99
+    limit = len(entries) if valid_entries else maximum
     if isinstance(numbers, list):
         used = set()
         for number, value in enumerate(numbers, 1):
-            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= limit:
+            if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= limit:
                 problems.append(f"{where}, treatment_crops[{number}]: found {_show_value(value)}. "
-                                f"Supply a whole number 1 to {limit}.")
+                                f"Supply a whole number {minimum} to {limit}.")
             else:
                 used.add(value)
     if valid_entries and isinstance(numbers, list):
