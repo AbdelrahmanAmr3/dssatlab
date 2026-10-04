@@ -88,6 +88,35 @@ def test_mixed_stock_stations_still_fail(tmp_path, fake_dssat):
     sim.weather = [weather_file(tmp_path, "UFGA8201.WTH", ("82055",)),
                    weather_file(tmp_path, "XYZZ8201.WTH", ("82056", "82057"))]
     assert sim.check(False) == [
-        f"Weather data row {row}, column 'station': found 'XYZZ', but row 2 has 'UFGA'. "
-        "Use identical station values on every row." for row in (3, 4)
+        "Weather data row 3, column 'station': found 'XYZZ', but row 2 has 'UFGA'. "
+        "Use identical station values on every row."
+    ]
+
+
+def test_mixed_stock_stations_ignore_dates_in_both_list_orders(tmp_path, fake_dssat):
+    sim = period(tmp_path, "99365", "00366")
+    sim.executable = fake_dssat.executable
+    foreign = weather_file(tmp_path, "XYZZ0001.WTH", ("00001", "00366"))
+    matching = weather_file(tmp_path, "UFGA9901.WTH", ("99365",))
+    expected = [
+        "Weather data row 3, column 'station': found 'XYZZ', but row 2 has 'UFGA'. "
+        "Use identical station values on every row."
+    ]
+    for paths in ([foreign, matching], [matching, foreign]):
+        sim.weather = paths
+        assert sim.check(False) == expected
+
+
+def test_foreign_stock_station_with_structure_problem_reports_mismatch(tmp_path, fake_dssat):
+    sim = period(tmp_path, "82055", "82057")
+    sim.executable = fake_dssat.executable
+    path = weather_file(tmp_path, "XYZZ8201.WTH", ("xxxxx",))
+    path.write_text(path.read_text().replace("TMAX", "XXXX"))
+    sim.weather = path
+    assert sim.check(False) == [
+        f"Stock weather file {path}: missing required column TMAX. "
+        "Supply a stock weather file with column TMAX.",
+        "FileX WSTA 'UFGA' expects station 'UFGA', but stock weather file XYZZ8201.WTH "
+        "has station 'XYZZ'. Make the station codes exactly equal; "
+        "filenames are case-sensitive on Linux."
     ]

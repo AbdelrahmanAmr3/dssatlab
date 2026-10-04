@@ -1,5 +1,6 @@
 """Check and run one Simulation with a copied or generated FileX and user data."""
 
+from datetime import date
 from pathlib import Path
 import shutil
 
@@ -124,7 +125,7 @@ class Simulation:
                                   "characters, including the extension (DSSAT's 8.3 style).")
         paths = _stock_weather_paths(self.weather)
         stations = {row["station"] for row in rows if "station" in row}
-        if not rows and not weather_problems and paths:
+        if not rows and paths:
             stations = {path.name[:4].upper() for path in paths}
         if not edit_identity and "WSTA" in values and len(stations) == 1:
             station = stations.pop()
@@ -140,8 +141,12 @@ class Simulation:
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate))
         if days and start_date is None and _parse_sdate(sdate) is not None:
-            filex_problems.append(f"FileX {self.filex}: SDATE {sdate!r} is invalid. "
-                                 "Supply five digits: two-digit year followed by three-digit day of year.")
+            year = _filex_date(sdate[:2] + "001").year
+            last = date(year, 12, 31).timetuple().tm_yday
+            filex_problems.append(f"FileX {self.filex}: SDATE {sdate!r} is invalid: "
+                                 f"day {int(sdate[2:])} does not exist in {year} (DSSAT reads "
+                                 "years 00-35 as 2000-2035 and 36-99 as 1936-1999). "
+                                 f"Supply a day of year from 1 to {last}.")
         if values.get("START") == "P":
             try:
                 text = Path(self.filex).read_text(encoding="latin-1")

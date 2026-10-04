@@ -83,8 +83,12 @@ def _simulation_weather(sim, values, experiment_data, components):
                  _level_date(text, components[0], "MP", "PLANTING DETAILS", "P", "PDATE"))
     if (start is None and values.get("START") == "S"
             and re.fullmatch(r"[0-9]{5}", values.get("SDATE", ""))):
-        return [], [f"FileX {sim.filex}: SDATE {values['SDATE']!r} is invalid. "
-                    "Supply five digits: two-digit year followed by three-digit day of year."]
+        sdate = values["SDATE"]
+        year = _filex_date(sdate[:2] + "001").year
+        last = date(year, 12, 31).timetuple().tm_yday
+        return [], [f"FileX {sim.filex}: SDATE {sdate!r} is invalid: day {int(sdate[2:])} "
+                    f"does not exist in {year} (DSSAT reads years 00-35 as 2000-2035 "
+                    f"and 36-99 as 1936-1999). Supply a day of year from 1 to {last}."]
     if start is None:
         reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""
         return [], [f"Stock weather {sim.weather}: cannot check weather dates because "
@@ -122,11 +126,14 @@ def _simulation_weather(sim, values, experiment_data, components):
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
     # The preliminary read checks structure only; the walk decodes the dates.
     _, problems = _read_stock_weather(paths)
-    mixed = len({path.name[:4].upper() for path in paths}) > 1
+    stations = sorted({path.name[:4].upper() for path in paths})
+    mixed = len(stations) > 1
     if problems or (not same_station and not mixed):
         return [], problems
     if mixed:
-        rows, problems = _read_stock_weather(paths, start)  # Keep the row station check.
+        return [], [f"Weather data row {row}, column 'station': found {code!r}, "
+                    f"but row 2 has {stations[0]!r}. Use identical station values on every row."
+                    for row, code in enumerate(stations[1:], 3)]
     else:
         # Maturity is unknown until DSSAT runs. Without a known end, check only
         # the files reachable through DSSAT's selection walk.

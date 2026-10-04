@@ -48,18 +48,23 @@ def test_stock_weather_uses_effective_start_date(tmp_path, start, override):
 
 @pytest.mark.parametrize('start', ['E', 'P'])
 @pytest.mark.parametrize('override', [False, True])
-def test_stock_weather_unknown_start_is_one_problem(tmp_path, start, override):
+def test_stock_weather_unknown_start_keeps_station_mismatch(tmp_path, start, override):
     filex = tmp_path / 'UFGA8201.MZX'
     filex.write_text(SAMPLE.replace('     S 82056', f'     {start} 82056'), encoding='ascii')
     management = {'treatments': {2: {'fertilizer': []}}} if override else None
     sim = lab.Simulation(filex, 2, 'missing.WTH', management=management)
     problems = sim.check(False)
-    assert len(problems) == 1
+    assert len(problems) == (1 if override else 2)
     assert all(part in problems[0] for part in (
         'Stock weather missing.WTH', 'simulation start is unknown',
         'START and SDATE/PDATE', 'treatment 2', 'Use START S or P', 'weather as rows'))
     if start == 'E':
         assert 'emergence date' in problems[0]
+    if not override:
+        assert problems[1] == (
+            "FileX WSTA 'UFGA' expects station 'UFGA', but stock weather file missing.WTH "
+            "has station 'MISS'. Make the station codes exactly equal; "
+            "filenames are case-sensitive on Linux.")
     with pytest.raises(lab.DSSATCheckError) as error:
         sim.run()
     assert error.value.problems == problems

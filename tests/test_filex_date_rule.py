@@ -7,6 +7,7 @@ from test_filex_check import filex, SAMPLE
 from test_filex_dates import dated_simulation
 from test_season_coverage import weather
 from test_simulation_run import fake_dssat
+from test_stock_weather import weather_file
 
 
 def test_sdate_wrong_century_names_rule_and_remedies(filex, fake_dssat):
@@ -61,10 +62,29 @@ def test_invalid_sdate_keeps_message(filex, fake_dssat, capsys, sdate, reason):
                          date='2035-01-01', method='S', distribution='R',
                          population=8, row_spacing=75, depth=5)}}})
     problems = sim.check(True)
-    assert problems == [f"FileX {path}: SDATE {sdate!r} is invalid. Supply five digits: "
-                        "two-digit year followed by three-digit day of year."]
+    expected = ("is invalid: day 366 does not exist in 2035 (DSSAT reads years 00-35 as "
+                "2000-2035 and 36-99 as 1936-1999). Supply a day of year from 1 to 365."
+                if sdate == '35366' else
+                "is invalid. Supply five digits: two-digit year followed by three-digit day of year.")
+    assert problems == [f"FileX {path}: SDATE {sdate!r} {expected}"]
     assert f'check was skipped ({reason}).' in capsys.readouterr().out
     assert not any('not covered by weather data' in p for p in problems)
+
+
+@pytest.mark.parametrize('stock', [False, True])
+@pytest.mark.parametrize('sdate,year,day,last', [('00000', 2000, 0, 366),
+                                             ('36999', 1936, 999, 366)])
+def test_out_of_range_sdate_names_year_and_valid_days(filex, fake_dssat, stock,
+                                                    sdate, year, day, last):
+    path = filex(sdate=sdate)
+    source = (weather_file(path.parent, "UFGA0001.WTH", ("00001",)) if stock else
+              weather('2000-01-01', '2000-01-02'))
+    sim = Simulation(path, weather=source, executable=fake_dssat.executable)
+    assert sim.check(False) == [
+        f"FileX {path}: SDATE {sdate!r} is invalid: day {day} does not exist in {year} "
+        "(DSSAT reads years 00-35 as 2000-2035 and 36-99 as 1936-1999). "
+        f"Supply a day of year from 1 to {last}."
+    ]
 
 
 def test_inherited_irrigation_uses_filex_century(filex, fake_dssat):
