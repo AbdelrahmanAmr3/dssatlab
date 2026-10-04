@@ -70,6 +70,13 @@ def test_layers_require_nonempty_list_of_dicts(sim, value):
     assert any("soil_analysis" in p and expected in p for p in sim.check(False))
 
 
+def test_twenty_layers_pass_and_twenty_one_fail(sim):
+    analysis(sim)["layers"] = [dict(depth=i * 5, extractable_p=12) for i in range(1, 21)]
+    assert not any("soil_analysis" in p for p in sim.check(False))
+    analysis(sim)["layers"].append(dict(depth=105, extractable_p=12))
+    assert any("21 layers" in p and "at most 20" in p for p in sim.check(False))
+
+
 def test_layer_depth_is_required(sim):
     analysis(sim)["layers"][0] = {}
     assert any("layer 1" in p and "missing required field 'depth'" in p

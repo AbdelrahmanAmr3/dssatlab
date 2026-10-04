@@ -53,6 +53,9 @@ def _check_soil_analysis(data, where):
     if not isinstance(layers, list) or not layers:
         return problems + [f"{where}, layers: expected a non-empty list of layer dicts. "
                            "Supply layers with depth and optional soil analysis values."]
+    if len(layers) > 20:
+        return problems + [f"{where}, layers: found {len(layers)} layers; DSSAT reads at most 20. "
+                           "Supply 20 layers or fewer."]
     previous = None
     for number, layer in enumerate(layers, 1):
         location = f"{where}, layer {number}"
