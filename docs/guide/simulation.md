@@ -246,7 +246,8 @@ Five-digit weather dates use
 DSSAT's weather century rule, anchored to the simulation start, including a
 first-record adjustment back one century when the record falls after that start,
 and a 99-to-00 rollover. Checks follow the files DSSAT selects, rather than the
-order of the supplied paths. Daily dates must be ascending, unique and continuous
+order of the supplied paths. The preliminary read checks structure without
+decoding unselected dates. Daily dates must be ascending, unique and continuous
 across selected file boundaries. Coordinates and
 daily ranges use the [weather template checks](#prepare-the-weather-template).
 Start coverage, the last seasonal start and scheduled sequence ends use the same
@@ -488,8 +489,10 @@ The FileX checks locate the selected treatment and follow its `FL` and `SM`
 references to the field's `WSTA` and the simulation controls' `START` and `SDATE`.
 The weather station must match the first four characters of `WSTA`, including
 case. `WSTA` must have four or eight characters, and `SDATE` must contain five
-digits: two for the year and three for the day of year. The FileX filename must
-also fit the 12-character limit.
+digits: two for the year and three for the day of year (YYDDD). Every FileX date
+uses DSSAT's rule: years 00-35 are 2000-2035 and 36-99 are 1936-1999. Weather
+written by dssatlab never chooses its century. The FileX filename must also fit
+the 12-character limit.
 
 For every simulation controls level used by the selected treatment (or each rotation
 component in a sequence), `check()` also validates the simulation methods and outputs:
@@ -513,9 +516,10 @@ checks, including when no experiment data is supplied. Giving a name alone
 leaves the copied field IDs unchanged.
 
 Weather must cover the **simulation start date** under START S and START P.
-Under START S this is SDATE, resolved from the years the weather covers, or
-`controls.start_date` when supplied. A weather date must match the two-digit
-year and day of year in SDATE. Under START P the start is the effective
+Under START S this is SDATE, read with the FileX rule above, or
+`controls.start_date` when supplied. For example, SDATE `35001` needs weather
+for 2035-01-01; 1935 weather fails coverage. Supply weather for the resolved
+date, or set `controls.start_date`. Under START P the start is the effective
 planting date (an experiment-data override, else PDATE). `controls.start_date`
 replaces SDATE under START S only. Harvest bounds use the effective planting
 date under START P, including automatic planting; in a sequence, only the

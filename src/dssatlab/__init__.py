@@ -36,4 +36,4 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "run_sweep", "run_treatments", "combine_summaries", "summarize_seasons", "write_scenario_template",
            ]
 
-__version__ = "0.18.2"
+__version__ = "0.18.3"

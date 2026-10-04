@@ -103,7 +103,9 @@ DSSAT determines the start date of each season using a fixed calendar day-of-yea
 
 Season k (1-based) starts on **day of year D of year Y + k - 1**,
 where Y and D come from the simulation start date: `controls.start_date`, else
-SDATE under START S; the effective planting date under START P.
+SDATE under START S; the effective planting date under START P. FileX dates use
+DSSAT's rule: years 00-35 are 2000-2035 and 36-99 are 1936-1999. Weather written
+by dssatlab never chooses their century.
 See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
 
 - For example, if season 1 starts on `1978-03-01` (day of year 60 in 1978), season 3 (year 1980) starts
