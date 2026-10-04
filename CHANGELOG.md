@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.19.1] - Unreleased
+## [0.19.1] - 2026-10-04
 
 ### Fixed
 - `Simulation.check()` with stock `$WEATHER` weather checks FileX dates against DSSAT's anchor: the first date F of the first weather file DSSAT opens. Positive SDATE, the planting date under START P and the unshifted fixed harvest date under HARVS R are reported when before F or more than 99 years after it ([#253](https://github.com/AbdelrahmanAmr3/dssatlab/issues/253); [ADR 0029](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0029-stock-weather-anchor-checked-as-a-window.md)).
