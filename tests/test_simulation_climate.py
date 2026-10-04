@@ -10,7 +10,6 @@ from test_simulation_run import fake_dssat, inputs, soil_rows
 from test_simulation_template import data, installed, rows
 from test_simulation_stock_weather import stock_file
 from test_sequence import sequence, change_component
-from test_season_coverage import weather
 
 
 def set_method(filex, method):

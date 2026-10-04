@@ -171,7 +171,7 @@ _Avoid_: synthetic weather, simulated weather, gap filling
 A DSSAT `*.CLI` file of station monthly averages (for example from DSSAT's `Weather/Climate`
 folder), handed to a Simulation through `weather=`. DSSAT reads `<first four characters of WSTA>.CLI`
 beside the FileX; it is copied unchanged, under its upper-case name, into the simulation folder.
-The checks read only its header, station and the twelve monthly averages rows.
+The checks read only its header, station row and the table its WTHER method needs (monthly averages for S, WGEN parameters for W).
 
 **Replicate**:
 One repetition of a treatment's seasons with a different random weather series (DSSAT NREPS,

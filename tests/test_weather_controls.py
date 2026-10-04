@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from dssatlab import (DSSATCheckError, Simulation, run_treatments,
+from dssatlab import (DSSATCheckError, run_treatments,
                       write_experiment_template, write_management_template)
 from dssatlab.filex import _section_row
 from dssatlab.sequence import _rotation_components

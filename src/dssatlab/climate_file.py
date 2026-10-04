@@ -50,7 +50,7 @@ def _read_climate_file(path, method):
 
     Only the first line, station row and the method's required table are checked.
     The required WGEN column names come from stock UFGA.CLI and DTCM.CLI;
-    real-DSSAT table-requirement probes remain unverified (ADR 0032).
+    the table requirements were probed on real DSSAT on Windows (ADR 0032).
     """
     if method not in ("W", "S"):
         raise ValueError("Climate-file method must be W or S.")

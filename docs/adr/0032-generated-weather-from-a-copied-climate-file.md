@@ -34,7 +34,7 @@ above 1 need generated weather.
 
 ## Consequences
 
-- A Simulation can run seasonal and sequence analyses on generated weather with replicates.
+- A Simulation can run seasonal and sequence analyses on generated weather; replicates apply to sequences only.
 - The narrow read cannot prove the climate file is complete for WGEN; DSSAT's own errors still
   surface through the run.
 
