@@ -59,8 +59,10 @@ def test_case18_is_an_unexecuted_stock_weather_simulation(tmp_path, sim_inputs):
     cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
     start = next(i for i, cell in enumerate(cells)
                  if "".join(cell["source"]).startswith("## Case 18:"))
+    end = next(i for i, cell in enumerate(cells[start + 1:], start + 1)
+               if "".join(cell["source"]).startswith("## Case 19:"))
     calls = []
-    for cell in cells[start:]:
+    for cell in cells[start:end]:
         if cell["cell_type"] != "code":
             continue
         assert cell["execution_count"] is None and cell["outputs"] == []
@@ -77,6 +79,39 @@ def test_case18_is_an_unexecuted_stock_weather_simulation(tmp_path, sim_inputs):
     filex, _ = sim_inputs
     assert Simulation(filex=filex, treatment=kwargs["treatment"],
                       weather=stock_file(tmp_path)).check(False) == []
+
+
+def test_case19_environment_and_soil_analysis_pass_checks(sim_inputs):
+    cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
+    start = next(i for i, cell in enumerate(cells)
+                 if "".join(cell["source"]).startswith("## Case 19:"))
+    calls, values = [], {}
+    for cell in cells[start:]:
+        if cell["cell_type"] != "code":
+            continue
+        assert cell["execution_count"] is None and cell["outputs"] == []
+        tree = ast.parse("".join(cell["source"]))
+        for node in tree.body:
+            if (isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id == "experiment19"):
+                values["experiment19"] = ast.literal_eval(node.value)
+        calls.extend(node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                     and isinstance(node.func, ast.Attribute))
+    call, = [node for node in calls if node.func.attr == "Simulation"]
+    assert call.func.value.id == "dl" and call.args == []
+    kwargs = {kw.arg: kw.value for kw in call.keywords}
+    assert ast.literal_eval(kwargs["filex"]) == "case1_gainesville/UFGA8201.MZX"
+    assert ast.literal_eval(kwargs["treatment"]) == 1
+    assert kwargs["weather"].id == "weather12"
+    assert kwargs["management"].id == "experiment19"
+    assert any(node.func.attr == "check" and node.func.value.id == "sim19" for node in calls)
+    assert any(node.func.attr == "run" and node.func.value.id == "sim19" for node in calls)
+    entry = values["experiment19"]["treatments"][1]
+    assert entry["environment"][0]["srad"] == {"multiply": 0.5}
+    assert entry["soil_analysis"]["layers"][0]["extractable_p"] == 12
+    filex, weather = sim_inputs
+    assert Simulation(filex, weather=weather,
+                      management=values["experiment19"]).check(False) == []
 
 
 def test_case16_residue_passes_checks(sim_inputs):

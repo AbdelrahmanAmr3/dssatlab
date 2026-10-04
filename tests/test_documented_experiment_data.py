@@ -8,7 +8,7 @@ import re
 
 import pytest
 
-from dssatlab import Simulation
+from dssatlab import Simulation, write_management_template
 from test_experiment_template import sim_inputs, cultivar_table
 from test_management_file import sim_inputs as management_inputs
 from test_filex_template import data, rows
@@ -73,6 +73,24 @@ def _filex_templates():
 
 
 TEMPLATES = list(_filex_templates())
+
+
+def test_new_guide_sections_match_management_template_comments(tmp_path):
+    yaml = pytest.importorskip('yaml')
+    path = tmp_path / 'management.yaml'
+    write_management_template(path)
+    lines, active = [], False
+    for line in path.read_text(encoding='utf-8').splitlines():
+        if line.startswith(('    # soil_analysis:', '    # environment:')):
+            active = True
+        elif active and not line.startswith('    #   '):
+            active = False
+        lines.append(line.replace('    # ', '    ', 1) if active else line)
+    entry = yaml.safe_load('\n'.join(lines))['treatments'][1]
+    for section in ('soil_analysis', 'environment'):
+        examples = [data['treatments'][1][section] for label, data in EXAMPLES
+                    if label.startswith('experiment.md:') and section in data['treatments'][1]]
+        assert examples == [entry[section]]
 
 
 @pytest.mark.parametrize('label,template', TEMPLATES, ids=[label for label, _ in TEMPLATES])

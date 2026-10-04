@@ -70,14 +70,21 @@ def _newline(lines):
 
 
 def _insert_section(lines, section, body):
-    """Insert header/row strings before harvest or controls, preserving existing lines."""
+    """Insert before the next present section in DSSAT's order, preserving lines."""
     bounds = _section_bounds(lines, "SIMULATION CONTROLS")
     if bounds is None:
         raise ValueError("missing SIMULATION CONTROLS section. Supply that section "
                          "so management can be inserted before it.")
-    harvest = _section_bounds(lines, "HARVEST DETAILS")
-    if harvest is not None and harvest[0] < bounds[0]:
-        bounds = harvest
+    order = ("SOIL ANALYSIS", "INITIAL CONDITIONS", "PLANTING DETAILS",
+             "IRRIGATION AND WATER MANAGEMENT", "FERTILIZERS", "RESIDUES",
+             "CHEMICALS", "TILLAGE", "ENVIRONMENT MODIFICATIONS",
+             "HARVEST DETAILS", "SIMULATION CONTROLS")
+    position = next((n for n, name in enumerate(order)
+                     if section == name or section.startswith(name + " ")), -1)
+    for name in order[position + 1:]:
+        following = _section_bounds(lines, name)
+        if following is not None and following[0] < bounds[0]:
+            bounds = following
     newline = _newline(lines)
     block = [line + newline for line in ["*" + section, *body, ""]]
     return lines[:bounds[0]] + block + lines[bounds[0]:]
@@ -355,6 +362,12 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
             if "initial_conditions" in entry:
                 from .initial_conditions import _initial_conditions_text
                 text = _initial_conditions_text(text, int(treatment), entry["initial_conditions"])
+            if "soil_analysis" in entry:
+                from .soil_analysis import _soil_analysis_text
+                text = _soil_analysis_text(text, int(treatment), entry["soil_analysis"])
+            if "environment" in entry:
+                from .environment import _environment_text
+                text = _environment_text(text, int(treatment), entry["environment"])
             if "controls" in entry:
                 from .controls import _controls_text
                 text = _controls_text(text, int(treatment), entry["controls"])

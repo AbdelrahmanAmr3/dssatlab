@@ -284,10 +284,10 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
     expected = ([f"{prefix} {years}: the sequence runs from {start} through {last}, "
                  f"after the weather data ends ({end}). Supply weather through {last}, "
                  "or fewer years."] if short else [])
-    if override and start == '1980-02-29':
-        expected.append("Controls start_date '1980-02-29' is after the FileX's first irrigation "
-                        "date 1978-05-11; DSSAT stops with error IPIRR. Start on or before "
-                        "that date, or give irrigation in the management data.")
+    if start == '1980-02-29':
+        expected.append(f"{'Controls start_date' if override else 'Simulation start date'} "
+                        "'1980-02-29' is after the FileX's first irrigation date 1978-05-11; "
+                        "DSSAT stops with error IPIRR. Start on or before that date, or give irrigation in the management data.")
     before = set(sequence.filex.parent.iterdir())
     problems = sequence.check(True)
     inherited = [p for p in problems if 'outside weather range' in p

@@ -61,6 +61,35 @@ treatments:
         p: 20.0                   # Elemental phosphorus applied, kg/ha (must be >= 0)
         k: 10.0                   # Elemental potassium applied, kg/ha (must be >= 0)
 
+    # Soil analysis: omit to keep SA, or use the quoted "off" to set SA to 0.
+    # Required date and non-empty layers; depth in cm > 0, strictly ascending.
+    # Methods: two ASCII letters + three digits; omitted values write -99.
+    # Numbers must be finite and fit five characters without rounding.
+    # Bulk density: > 0 to 10 g/cm3; organic/stable carbon: 0-100%; total N: 0-10%.
+    # Both pH: > 0 to 14; extractable P: >= 0 mg/kg; exchangeable K: >= 0 cmol/kg.
+    # A value in a deeper layer also needs a value in layer 1; DSSAT uses P only under phosphorus "Y".
+    # Treatments only; rotation components do not take soil_analysis.
+    # soil_analysis:
+    #   date: "1982-02-25"
+    #   ph_buffer_method: "SA005"
+    #   p_method: "IB001"
+    #   k_method: "SA001"
+    #   layers:
+    #     - {depth: 15, bulk_density: 1.3, organic_carbon: 1, total_nitrogen: 0.1,
+    #        ph_water: 6.5, ph_buffer: 6, extractable_p: 12, exchangeable_k: 0.2, stable_carbon: 0}
+    #     - {depth: 30, extractable_p: 8}
+
+    # Environment modifications: omit to keep ME, or [] to set ME to 0.
+    # Required quoted ISO date, strictly ascending; each event changes at least one variable.
+    # Variables: day_length, srad, tmax, tmin, rain, co2, dew_point, wind.
+    # Each change has exactly one of add, subtract, multiply, replace and a finite number.
+    # Numbers must fit four characters; multiply: 0-9.99; co2: whole -89 to 9999;
+    # every other value: -9.9 to 99.9. Omitted variables write add 0.
+    # DSSAT may round a change to one decimal place. Event dates need no weather coverage.
+    # Treatments only; rotation components do not take environment.
+    # environment:
+    #   - {date: "1982-02-25", srad: {multiply: 0.5}, tmax: {add: 2}, co2: {replace: 550}}
+
     # For a sequence, replace the sections above with this rotation example.
     # R1 maize planted 1978-03-15; R2 fallow ends 1978-11-14;
     # R3 wheat planted 1978-11-15; R4 fallow ends 1979-03-14.

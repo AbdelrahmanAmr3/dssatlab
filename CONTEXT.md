@@ -269,6 +269,21 @@ FileX copy, so DSSAT uses its own initial soil water and nitrogen. Not the same 
 section, which keeps the FileX's own level.
 _Avoid_: no IC, disabled IC (in code and messages)
 
+**Soil analysis**:
+Measured soil properties for a treatment's field, given in experiment data `soil_analysis` (DSSAT
+SOIL ANALYSIS, level SA): a date, optional method codes and layers with values such as extractable
+phosphorus (SAPX) or organic carbon. DSSAT replaces the soil profile's values with them, and uses a
+column only when the first layer has a value. Soil phosphorus only matters with `phosphorus: "Y"`.
+`"off"` sets SA to 0 (ADR 0028).
+_Avoid_: soil test, soil sample
+
+**Environment modification**:
+A change to the daily weather from a date onwards, given in experiment data `environment` (DSSAT
+ENVIRONMENT MODIFICATIONS, level ME): add, subtract, multiply or replace one or more of day length,
+srad, tmax, tmin, rain, CO2, dew point and wind. Each event lasts until the next one. The weather
+file and the weather checks are unchanged (ADR 0028).
+_Avoid_: climate change scenario, weather modification (in code and messages)
+
 **FileX template**:
 The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one crop, one or
 more fields, and one treatment or a list of named treatments, each on one field. Every treatment starts from the template's
