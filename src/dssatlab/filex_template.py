@@ -258,12 +258,11 @@ def _check_template_cultivar(data, crop, data_dir):
 def _template_genotype_files(data, data_dir):
     """List each template crop's required genotype files once; fallow needs none."""
     paths = {}
-    entries = data.get("rotation", [data])
-    # Rotation checks also list genotype files for malformed templates. Keep
-    # their components when crops is present as a conflicting top-level key.
-    if "crops" in data and "rotation" not in data:
-        entries = [_template_crop_entry(data, number)
-                   for number in range(1, len(_template_treatment_names(data)) + 1)]
+    # Genotype checks need only each entry's crop, even if treatment mapping
+    # or other values are malformed. Rotation takes precedence on conflicts.
+    entries = data.get("rotation", data.get("crops", [data]))
+    if not isinstance(entries, list):
+        return []
     for component in entries:
         crop = component.get("crop") if isinstance(component, dict) else None
         if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
