@@ -120,8 +120,14 @@ def _simulation_weather(sim, values, experiment_data, components):
     # A station mismatch is reported by Simulation;
     # avoid a second name-lookup problem for the same mismatch.
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
-    rows, problems = _read_stock_weather(paths, start)
-    if same_station and not problems:
+    # The preliminary read checks structure only; the walk decodes the dates.
+    _, problems = _read_stock_weather(paths)
+    mixed = len({path.name[:4].upper() for path in paths}) > 1
+    if problems or (not same_station and not mixed):
+        return [], problems
+    if mixed:
+        rows, problems = _read_stock_weather(paths, start)  # Keep the row station check.
+    else:
         # Maturity is unknown until DSSAT runs. Without a known end, check only
         # the files reachable through DSSAT's selection walk.
         walk_end = end if harvest is not None or len(components) > 1 else None
