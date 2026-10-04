@@ -27,6 +27,25 @@ def simulation(inputs, cultivar, treatment=1):
                       management={"treatments": {treatment: {"cultivar": cultivar}}})
 
 
+def test_copied_i3_cultivar_levels_allocate_12():
+    from dssatlab.cultivar import _cultivar_text
+    from dssatlab.filex import _section_row
+
+    # UFGA7801.SBX uses I3 levels with CR immediately after the level.
+    treatments = ("*TREATMENTS\n"
+                  "@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM\n"
+                  "  11 1 0 [1]  10.00 [EM-FL]         1  1  0  1  1  1  0  1  0  0  0  0  1\n")
+    cultivars = "*CULTIVARS\n@C CR INGENO CNAME\n" + "".join(
+        f"{level:3d}SB IB{999 + level:04d} {8 + level * 2:6.2f} [EM-FL]\n"
+        for level in range(1, 12))
+
+    written = _cultivar_text(treatments + cultivars, 1, {"crop": "SB", "code": "IB1000"})
+
+    assert "12 SB IB1000   -99\n" in written
+    assert _section_row(written, "TREATMENTS", "N", 1, ("CU",))["CU"] == "12"
+    assert cultivars in written  # All eleven original levels survive unchanged.
+
+
 @pytest.mark.parametrize("newline", [b"\n", b"\r\n"])
 def test_cultivar_adds_level_and_changes_only_selected_cu(cultivar_inputs, fake_dssat, newline):
     filex, weather = cultivar_inputs

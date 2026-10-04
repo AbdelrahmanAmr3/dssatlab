@@ -219,9 +219,8 @@ def _new_level(lines, treatment, column, highest, section, *, rotation=None):
     level = next((n for n in range(1, 100) if n not in used), highest + 1)
     start, end = _section_bounds(lines, section.split()[0]) or (0, 0)
     for index in range(start + 1, end):
-        if lines[index].startswith("@"):
-            left, right = next(iter(_columns(lines[index]).values()))
-        elif lines[index][left:right].strip().lstrip("0") == str(level):
+        match = re.match(r"\s*([0-9]+)", lines[index])
+        if match is not None and int(match[1]) == level:
             # Empty strings remove rows from the text without shifting insertion points.
             lines[index] = ""
     return level
@@ -273,11 +272,11 @@ def _event_blocks(lines, section, headers, *, optional_columns=()):
             blocks[active] = (columns, index + 1, line.rstrip("\r\n"))
         elif active is not None:
             columns, _, header = blocks[active]
-            left, right = next(iter(columns.values()))
-            try:
-                level = int(line[left:right])
-            except ValueError:
+            # Copied FileX I3 levels can extend past the I2 header span.
+            match = re.match(r"\s*([0-9]+)", line)
+            if match is None:
                 continue
+            level = int(match[1])
             highest = max(highest, level)
             blocks[active] = (columns, index + 1, header)
     for number, columns in enumerate(expected):
