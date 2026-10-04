@@ -12,6 +12,7 @@ from .experiment import (_check_controls, _check_date, _check_fields,
 from .weather import _show_value
 from .initial_conditions import _check_initial_conditions, _initial_conditions_text
 from .soil_analysis import _check_soil_analysis, _soil_analysis_text
+from .environment import _check_environment, _environment_text
 from .controls import _check_planting_window, _controls_text
 
 
@@ -150,7 +151,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
     from .operations import _OPERATION_FIELDS, _check_operation
 
     sections = ("planting", "irrigation", "fertilizer", *_OPERATION_FIELDS,
-                "cultivar", "initial_conditions", "soil_analysis", "controls")
+                "cultivar", "initial_conditions", "soil_analysis", "environment", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
                               f"with optional {', '.join(sections)}, "
@@ -200,12 +201,14 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         report.extend(_report_lines("    cultivar", section_problems))
     else:
         report.append("    cultivar: OK (omitted; keeps the FileX Level)")
-    for section in ("initial_conditions", "soil_analysis", "controls"):
+    for section in ("initial_conditions", "soil_analysis", "environment", "controls"):
         if section in entry:
-            if section in ("initial_conditions", "soil_analysis"):
+            if section in ("initial_conditions", "soil_analysis", "environment"):
                 check, render = ((_check_initial_conditions, _initial_conditions_text)
                                  if section == "initial_conditions" else
-                                 (_check_soil_analysis, _soil_analysis_text))
+                                 (_check_soil_analysis, _soil_analysis_text)
+                                 if section == "soil_analysis" else
+                                 (_check_environment, _environment_text))
                 section_problems = check(entry[section], where)
                 if not section_problems and not entry_problems and text is not None:
                     try:

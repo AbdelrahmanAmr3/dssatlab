@@ -79,6 +79,17 @@ treatments:
     #        ph_water: 6.5, ph_buffer: 6, extractable_p: 12, exchangeable_k: 0.2, stable_carbon: 0}
     #     - {depth: 30, extractable_p: 8}
 
+    # Environment modifications: omit to keep ME, or [] to set ME to 0.
+    # Required quoted ISO date, strictly ascending; each event changes at least one variable.
+    # Variables: day_length, srad, tmax, tmin, rain, co2, dew_point, wind.
+    # Each change has exactly one of add, subtract, multiply, replace and a finite number.
+    # Numbers must fit four characters; multiply: 0-9.99; co2: whole -89 to 9999;
+    # every other value: -9.9 to 99.9. Omitted variables write add 0.
+    # DSSAT may round a change to one decimal place. Event dates need no weather coverage.
+    # Treatments only; rotation components do not take environment.
+    # environment:
+    #   - {date: "1982-02-25", srad: {multiply: 0.5}, tmax: {add: 2}, co2: {replace: 550}}
+
     # For a sequence, replace the sections above with this rotation example.
     # R1 maize planted 1978-03-15; R2 fallow ends 1978-11-14;
     # R3 wheat planted 1978-11-15; R4 fallow ends 1979-03-14.

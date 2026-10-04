@@ -365,6 +365,9 @@ def _write_management(filex, treatment, management, *, name=None, station=None, 
             if "soil_analysis" in entry:
                 from .soil_analysis import _soil_analysis_text
                 text = _soil_analysis_text(text, int(treatment), entry["soil_analysis"])
+            if "environment" in entry:
+                from .environment import _environment_text
+                text = _environment_text(text, int(treatment), entry["environment"])
             if "controls" in entry:
                 from .controls import _controls_text
                 text = _controls_text(text, int(treatment), entry["controls"])
