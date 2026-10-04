@@ -61,6 +61,17 @@ In addition, an optional top-level `harvest_date` may be specified as a quoted I
 
 **Potato requirements**: Potato requires all three fields: `planting_material_weight`, `sprout_length`, and `harvest_date`. Each missing field is reported as a separate problem. For other crops, these fields are optional.
 
+### New cultivars through experiment data
+
+Keep an installed cultivar in the FileX template, then supply a new cultivar
+in the treatment's experiment data using `management=`. Give an unused six-character
+`code`, an existing `ecotype`, optional `name` (up to 16 printable ASCII characters),
+and every coefficient after `ECO#` in the crop's first `.CUL` table. There are no
+defaults for omitted coefficients. The simulation folder's `.CUL` copy gains
+your entry and the FileX points at your code. These fields belong in experiment
+data, not the FileX template's `cultivar` mapping. See the
+[new cultivar tutorial](new-cultivars.md#run-from-a-filex-template).
+
 ### Crop rotations
 
 To simulate a multi-year crop rotation (such as maize followed by fallow, wheat, and fallow) from scratch, provide `rotation`—a list of 2 to 99 crop or fallow components—instead of the single-crop keys (`crop`, `cultivar`, `planting`, `harvest_date`). A leading fallow takes `start_date` before `end_date`. See [A rotation from the FileX template](sequence.md#a-rotation-from-the-filex-template) for details on template structure, date checks, and multi-cycle simulations.
@@ -539,8 +550,9 @@ including both boundaries; `check()` rejects dates outside this range.
 With stock `$WEATHER` weather and seven-digit daily dates, DSSAT anchors FileX
 years to the first date F of the first weather file it opens. `check()` reports
 positive SDATE under any START setting, the planting date under START P and the
-unshifted fixed harvest date under HARVS R when before F or more than 99 years
-after F. DSSAT compares year and day-of-year integers: the upper bound is
+unshifted fixed harvest dates under HARVS R, including every rotation component,
+when before F or more than 99 years after F. Both inherited FileX harvest dates
+and experiment data overrides are checked. DSSAT compares year and day-of-year integers: the upper bound is
 `YYYYDDD <= F_YYYYDDD + 99000`, rather than a calendar anniversary. The report
 names the date and weather file. Supply weather starting on or before an early
 date, or move the date into the window. The anchor does not widen the writable

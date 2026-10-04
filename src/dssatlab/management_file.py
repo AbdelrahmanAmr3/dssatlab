@@ -135,9 +135,15 @@ _EXPERIMENT_SECTIONS_TEXT = """
     cultivar:
       crop: "MZ"                 # Required CR: two uppercase ASCII letters (e.g., MZ=maize)
       code: "IB0035"             # Required INGENO: six printable ASCII characters, no spaces; case-sensitive
-      # Code must exist in the one crop-matching .CUL beside the FileX (e.g., MZCER048.CUL).
-      # coefficients: {P1: 300}  # Optional: exact .CUL header names to numbers.
-      # Writes a changed cultivar in the simulation folder's .CUL copy only.
+      # An existing code may change a subset of coefficients (e.g., {P1: 300}); omit ecotype/name.
+      # For a new cultivar, change code to an unused code such as NC0001 and uncomment below.
+      # New codes cannot start with !, @, * or $; DL0001-DL9999 are reserved for changed cultivars.
+      # ecotype: "IB0001"         # Required for a new cultivar: six printable ASCII characters, no spaces.
+      # name: "New maize"         # Optional for a new cultivar: <=16 printable ASCII characters; defaults to code.
+      # coefficients: {P1: 259, P2: 1.193, P5: 947.1, G2: 924.3, G3: 8.168, PHINT: 43}
+      # New cultivars require EVERY coefficient after ECO# in the first @VAR# table, with no defaults.
+      # Use the crop's one .CUL and its existing .ECO ecotype; rice has no .ECO (format check only).
+      # Only the simulation folder's .CUL copy changes; a new cultivar keeps your code.
 
     # Or replace the whole dict with initial_conditions: "off" (must be quoted).
     # "off" sets IC to 0 in the copy; DSSAT supplies initial soil water and nitrogen.
