@@ -2,6 +2,7 @@
 
 from .core import connect, detect, install
 from .dssat_observed import read_dssat_observed
+from .economics import net_returns
 from .errors import (DSSATCheckError, DSSATError, DSSATInstallError,
                      DSSATNotFoundError, DSSATOutputError, DSSATRunError)
 from .evaluate import evaluate
@@ -28,7 +29,7 @@ __all__ = ["DSSATError", "DSSATInstallError", "DSSATNotFoundError", "DSSATRunErr
            "Simulation", "write_weather_template", "write_soil_template", "import_nasa_power",
            "summarize_weather", "summarize_soil",
            "evaluate", "write_observed_template", "plot_evaluation", "plot_observed",
-           "read_dssat_observed",
+           "read_dssat_observed", "net_returns",
            "write_management_template", "write_experiment_template", "write_filex_template", "DSSATCheckError",
            "list_crops", "list_cultivars",
            "read_summary", "read_plant_growth", "to_dataframe", "plot_plant_growth", "DSSATOutputError",
