@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.18.3]
+## [0.18.3] - 2026-10-03
 
 ### Fixed
 - FileX YYDDD dates now use DSSAT's two-digit-year rule: years 00-35 are 2000-2035 and 36-99 are 1936-1999. Weather no longer chooses the century for SDATE, inherited irrigation or automatic planting dates. SDATE `35001` with 1935 weather now fails coverage; `36001` with 1936 weather and `40001` with 1940 weather pass. Weather spanning centuries no longer causes an ambiguous start year ([#248](https://github.com/AbdelrahmanAmr3/dssatlab/issues/248)).
