@@ -33,7 +33,8 @@ does not choose it.
 - A dict per item of `treatments` with its own crop, cultivar and planting. Rejected: changes the
   type of `treatments` and repeats the crop block for every treatment of the same crop.
 - One shared controls level with a blank SMODEL, as DTCM6401 does. Rejected: ADR 0009 writes the
-  model per crop, and legumes need N fixation on while cereals do not.
+  model per crop (the crop's CR and its SMODEL are separate choices), and the package
+  writes SYMBI Y for legumes as its fixed default; DSSAT allows Y or N for legumes and forces N for others.
 - A crop per treatment in experiment data. Rejected: experiment data varies a written FileX; it
   does not decide what the FileX holds (ADR 0010).
 
