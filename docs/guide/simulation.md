@@ -489,10 +489,8 @@ The FileX checks locate the selected treatment and follow its `FL` and `SM`
 references to the field's `WSTA` and the simulation controls' `START` and `SDATE`.
 The weather station must match the first four characters of `WSTA`, including
 case. `WSTA` must have four or eight characters, and `SDATE` must contain five
-digits: two for the year and three for the day of year (YYDDD). Every FileX date
-uses DSSAT's rule: years 00-35 are 2000-2035 and 36-99 are 1936-1999. Weather
-written by dssatlab never chooses its century. The FileX filename must also fit
-the 12-character limit.
+digits: two for the year and three for the day of year (YYDDD). The FileX
+filename must also fit the 12-character limit.
 
 For every simulation controls level used by the selected treatment (or each rotation
 component in a sequence), `check()` also validates the simulation methods and outputs:
@@ -516,7 +514,7 @@ checks, including when no experiment data is supplied. Giving a name alone
 leaves the copied field IDs unchanged.
 
 Weather must cover the **simulation start date** under START S and START P.
-Under START S this is SDATE, read with the FileX rule above, or
+Under START S this is SDATE, read with the [FileX date rule](#filex-dates), or
 `controls.start_date` when supplied. For example, SDATE `35001` needs weather
 for 2035-01-01; 1935 weather fails coverage. Supply weather for the resolved
 date, or set `controls.start_date`. Under START P the start is the effective
@@ -530,6 +528,27 @@ through the scheduled end of the component that crosses the stopping boundary
 ([sequence coverage](sequence.md#sequence-checks)). Maturity-driven endings are
 known only during the run. Supply weather for the full period DSSAT will simulate.
 The checks do not establish that the DSSAT executable can run.
+
+### FileX dates
+
+FileX dates have two-digit years: 00-35 means 2000-2035, and 36-99 means
+1936-1999. Weather written by dssatlab never chooses their century. Experiment
+data dates written as FileX dates must be from 1936-01-01 to 2035-12-31,
+including both boundaries; `check()` rejects dates outside this range.
+
+With stock `$WEATHER` weather and seven-digit daily dates, DSSAT anchors FileX
+years to the first date F of the first weather file it opens. `check()` reports
+positive SDATE under any START setting, the planting date under START P and the
+unshifted fixed harvest date under HARVS R when before F or more than 99 years
+after F. DSSAT compares year and day-of-year integers: the upper bound is
+`YYYYDDD <= F_YYYYDDD + 99000`, rather than a calendar anniversary. The report
+names the date and weather file. Supply weather starting on or before an early
+date, or move the date into the window. The anchor does not widen the writable
+1936-2035 range.
+
+Other FileX levels are not checked against this window. A date before F in one
+of those levels can still be read in the next century. See
+[ADR 0029](../adr/0029-stock-weather-anchor-checked-as-a-window.md).
 
 ## Run after the checks
 

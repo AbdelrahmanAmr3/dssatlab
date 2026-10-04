@@ -64,7 +64,9 @@ treatments:
       years: 1                   # number of seasons (NYERS); see Seasonal analysis
 ```
 
-Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO strings.
+Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO strings
+from 1936-01-01 to 2035-12-31, including both boundaries. Dates outside this range
+are rejected because FileX stores two-digit years; see [FileX dates](simulation.md#filex-dates).
 
 | Section | What `check()` rejects |
 |---|---|
