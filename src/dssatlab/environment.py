@@ -4,8 +4,8 @@ from datetime import date
 
 from .experiment import _check_date, _check_fields, _check_number, _unknown_keys
 from .filex import _section_row
-from .filex_write import (_append_rows, _cell, _event_blocks, _insert_section,
-                          _new_level, _repoint, _section_bounds)
+from .filex_write import (_append_rows, _cell, _inherited_level, _insert_section,
+                          _repoint)
 from .weather import _dssat_date, _show_value
 
 
@@ -94,22 +94,8 @@ def _environment_text(text, treatment, data):
     if not data:
         _repoint(lines, treatment, "ME", 0)
         return "".join(lines)
-    # Discover and reuse I3 inherited levels without changing their original bytes.
-    level_lines = list(lines)
-    bounds = _section_bounds(lines, name)
-    if bounds is not None:
-        for index in range(bounds[0] + 1, bounds[1]):
-            try:
-                inherited = int(lines[index][:3])
-            except ValueError:
-                continue
-            level_lines[index] = f"{inherited:2d} " + lines[index][3:]
-    blocks, highest = _event_blocks(level_lines, name, (_HEADER,), optional_columns=("ENVNAME",))
-    level = _new_level(level_lines, treatment, "ME", highest, name)
-    if bounds is not None:
-        for index in range(bounds[0] + 1, bounds[1]):
-            if not level_lines[index]:
-                lines[index] = ""  # Remove only rows of a reused, unreferenced level.
+    blocks, level = _inherited_level(lines, treatment, "ME", name, (_HEADER,),
+                                     optional_columns=("ENVNAME",))
     prefix = _cell(level, 2, name, "E", first_column=True) + " "
     rows = []
     for event in data:
