@@ -100,12 +100,13 @@ def test_guide_filex_templates(label, template, data, rows, installed):
     if 'rotation' in template:
         first, last = date(1977, 1, 1), date(1982, 1, 1)
     else:
-        # Short name-only examples use the preceding single-crop template's fields.
-        complete = deepcopy(data)
-        if 'treatments' in template:
-            complete.pop('treatment_name')
-        complete.update(template)
-        template = complete
+        if 'crops' not in template:
+            # Short name-only examples use the preceding single-crop template's fields.
+            complete = deepcopy(data)
+            if 'treatments' in template:
+                complete.pop('treatment_name')
+            complete.update(template)
+            template = complete
         first, last = date(2021, 1, 1), date(2022, 1, 1)
     weather = [dict(rows[0][0], date=(first + timedelta(days=i)).isoformat())
                for i in range((last - first).days)]

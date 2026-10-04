@@ -2,6 +2,17 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.20.1] - Unreleased
+
+### Added
+- Different crops in different FileX template treatments through `crops`, a list of 1 to 99 crop entries, and `treatment_crops`, one entry number per named treatment. Each entry has its own cultivar, planting and optional harvest date, fixed crop model and nitrogen fixation setting. Treatments can share an entry; entries can name the same crop with different cultivars. See [mixed-crop treatments](guide/simulation.md#mixed-crop-treatments) and [ADR 0031](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0031-crop-entries-for-mixed-crop-treatments.md).
+- `Simulation` and `run_treatments()` resolve experiment data checks, simulation starts and weather coverage against each treatment's crop entry, and copy every entry's required genotype files. Checks report malformed entries and mappings before writing.
+- `write_filex_template()` includes a commented maize, soybean and wheat example, tested by loading the uncommented YAML and checking every treatment.
+
+### Notes
+- Real-DSSAT proof on Windows 4.8.5.017: five treatments spanning maize, soybean, wheat and dry bean match their single-crop templates through both `Simulation` and `run_treatments()`; the retained DTCM6401 probe matches 96/96 corresponding reference rows. Evidence and rerun commands are recorded in ADR 0031. GAPS F10 is representable; full course L2 remains blocked by F11 and TMAX 99.9 weather rows.
+- Zero runtime dependencies are preserved.
+
 ## [0.20.0] - 2026-10-04
 
 ### Added

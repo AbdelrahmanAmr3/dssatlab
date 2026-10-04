@@ -11,7 +11,8 @@ from .management_file import _load_yaml, _write_template
 from .weather import _show_value
 
 
-_TEMPLATE = """# DSSATLab FileX template: numbered fields, named treatments, one crop.
+_TEMPLATE = """# DSSATLab FileX template: numbered fields, named treatments.
+# Use one crop, crop entries for mixed-crop treatments, or a rotation.
 # Station, latitude, longitude and elevation come from checked weather data.
 # The soil profile ID comes from checked soil data. Do not add them here.
 # The simulation starts on the planting date. Use experiment data to add
@@ -42,6 +43,45 @@ planting:
 # harvest_date: "2021-08-01"  # Optional; potato needs it. After planting,
 # within weather data; omit to harvest at maturity.
 # Values must fit DSSAT's fixed-width columns without rounding or truncation.
+
+# For different crops in different treatments, replace the top-level crop,
+# cultivar, planting, harvest_date and treatment_name with the example below.
+# crops takes 1-99 entries, each with its own crop, cultivar, planting and optional
+# harvest_date. treatment_crops needs treatments: one entry number per treatment,
+# 1..K with every entry used. Entries may share a crop. Do not combine with rotation.
+# treatment_fields still selects each treatment's field; omitted means all field 1.
+# Mixed-crops example:
+# treatments: ["Maize control", "Maize fertilized", "Soybean", "Wheat"]
+# treatment_crops: [1, 1, 2, 3]
+# crops:
+#   - crop: "maize"
+#     cultivar: {code: "IB0035"}
+#     planting:
+#       date: "2021-03-01"
+#       method: "S"
+#       distribution: "R"
+#       population: 7.2
+#       row_spacing: 75
+#       depth: 5
+#   - crop: "soybean"
+#     cultivar: {code: "IB0011"}
+#     planting:
+#       date: "2021-04-01"
+#       method: "S"
+#       distribution: "R"
+#       population: 30
+#       row_spacing: 50
+#       depth: 5
+#   - crop: "wheat"
+#     cultivar: {code: "IB0488"}
+#     planting:
+#       date: "2021-03-01"
+#       method: "S"
+#       distribution: "R"
+#       population: 150
+#       row_spacing: 20
+#       depth: 3
+#     harvest_date: "2021-08-01"
 
 # Only a leading fallow takes start_date, before end_date; the simulation starts there.
 # For example, prepend {crop: "fallow", start_date: "2021-02-01", end_date: "2021-02-28"}

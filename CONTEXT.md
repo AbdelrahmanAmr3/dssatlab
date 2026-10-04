@@ -299,8 +299,10 @@ cultivar, planting and harvest; experiment data keyed by treatment number varies
 from the experiment data plus the crop, station and soil profile. Instead of one crop it can hold a
 rotation: one sequence of 2 to 99 rotation components (crops or fallows), each crop with its own
 cultivar, planting and harvest, written as a sequence FileX. It starts on the first crop's planting
-date, or on the start date of a leading fallow. Instead of one crop it can also hold crop entries,
-one per crop, with each treatment pointing at one entry: different crops in different treatments.
+date, or on the start date of a leading fallow. Instead of one crop it can also hold numbered crop
+entries in `crops`, each with its own cultivar, planting and optional harvest date; `treatment_crops`
+points each named treatment at an entry. Several treatments can share an entry, and entries can
+name the same crop with different cultivars: different crops in different treatments.
 Not the same as the experiment template, which only edits a copy of an existing FileX.
 _Avoid_: FileX generator
 

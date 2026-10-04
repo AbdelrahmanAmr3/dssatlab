@@ -84,9 +84,9 @@ def test_written_template_explains_fields_and_passes(tmp_path, data_dir, uncomme
     text = path.read_text()
     assert '# treatment_fields: [1, 2]' in text
     if uncomment:
-        text = '\n'.join('# ' + line if line.startswith('treatment_name:') else
-                         line[2:] if line.startswith(('# treatments:', '# treatment_fields:'))
-                         else line for line in text.splitlines())
+        text = text.replace('\ntreatment_name:', '\n# treatment_name:', 1)
+        text = text.replace('\n# treatments:', '\ntreatments:', 1)
+        text = text.replace('\n# treatment_fields:', '\ntreatment_fields:', 1)
         path.write_text(text)
     loaded, problems = _load_filex_template(path)
     assert problems == []

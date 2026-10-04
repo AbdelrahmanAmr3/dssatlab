@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dssatlab import DSSATCheckError, Simulation, run_treatments
+from dssatlab import DSSATCheckError, Simulation, run_treatments, write_filex_template
 from dssatlab.filex import _section_row
 from test_crop_entries import mixed
 from test_filex_template import data, rows
@@ -29,6 +29,23 @@ def test_valid_mixed_template_check_is_read_only(inputs, installed, tmp_path):
     original, before = deepcopy(inputs), snapshot(tmp_path)
     assert Simulation(**inputs).check(verbose=False) == []
     assert inputs == original and snapshot(tmp_path) == before
+    assert installed.calls == []
+
+
+def test_commented_mixed_crops_example_loads_and_passes_check(tmp_path, installed, rows):
+    yaml = pytest.importorskip("yaml")
+    path = tmp_path / "template.yaml"
+    write_filex_template(path)
+    example = path.read_text().split("# Mixed-crops example:", 1)[1].split("\n\n", 1)[0]
+    path.write_text("\n".join(line[2:] for line in example.splitlines()[1:]
+                              if line.startswith("# ")))
+    template = yaml.safe_load(path.read_text())
+    assert [entry["crop"] for entry in template["crops"]] == ["maize", "soybean", "wheat"]
+    assert template["treatment_crops"] == [1, 1, 2, 3]
+    for treatment in range(1, 5):
+        sim = Simulation(filex_template=path, treatment=treatment,
+                         weather=weather("2021-03-01", "2021-08-01"), soil=rows[1])
+        assert sim.check(verbose=False) == []
     assert installed.calls == []
 
 
