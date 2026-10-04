@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.21.0] - Unreleased
+## [0.21.0] - 2026-10-04
 
 ### Added
 - Generated weather from a supplied `.CLI` path through `weather=`, alone or with stock `.WTH` paths for mixed measured/generated treatments of a copied FileX. The climate file is copied unchanged under its upper-case name; checks follow the first four characters of WSTA, require WGEN parameters for W and monthly averages for S, and report missing or unused inputs. See [generated weather](guide/generated-weather.md) and [ADR 0032](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0032-generated-weather-from-a-copied-climate-file.md).
