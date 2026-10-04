@@ -7,6 +7,7 @@ Guides for running the DSSAT crop model from Python using dssatlab:
 - [Run a Simulation](simulation.md): Run one treatment combining an existing FileX with your own daily weather data.
 - [Run with soil data](soil.md): Supply a custom soil profile for your simulation.
 - [Run with management data](management.md): Supply custom planting, irrigation, fertilizer, residue, tillage and harvest events.
+- [Define new cultivars](new-cultivars.md): Supply your own code, an existing ecotype and every required coefficient through experiment data.
 - [Run treatments and scenarios](scenarios.md): Run all or selected treatments across what-if scenarios, and combine summaries.
 - [Sweeps](sweeps.md): Run every combination of labelled experiment data sections, with the base first and factor columns in the Summary rows.
 - [Seasonal analysis](seasonal.md): Run experiments over multiple weather years using controls years and summarize seasonal yield and statistics.

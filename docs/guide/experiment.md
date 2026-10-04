@@ -70,7 +70,7 @@ are rejected because FileX stores two-digit years; see [FileX dates](simulation.
 
 | Section | What `check()` rejects |
 |---|---|
-| `cultivar` | A code that is not in the one `.CUL` file for that crop beside the FileX; the message lists the codes that do exist. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. |
+| `cultivar` | An unknown code without a complete new cultivar definition (`ecotype` and every coefficient); an existing code with `ecotype` or `name`; invalid coefficient names, values or widths. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. See [new cultivars](new-cultivars.md) for the code, ecotype and name checks. |
 | `initial_conditions` | Nonpositive or non-ascending layer depths, water outside 0 to 1, negative ammonium, nitrate or residue, and detail values outside the ranges below. Layers may go deeper than the soil profile. Values other than a dict or the quoted string `"off"` are rejected. |
 | `controls` | Simulation or management codes outside the tables below, automatic values outside their ranges, an invalid automatic planting window, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
 
