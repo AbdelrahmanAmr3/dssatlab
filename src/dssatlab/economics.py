@@ -178,6 +178,8 @@ def net_returns(rows: list[dict], price_file: str | Path) -> list[dict]:
         if prices is None:
             continue
         try:
+            if isinstance(key[0], bool) or isinstance(key[1], bool):
+                raise TypeError("bool is not a crop code or treatment number")
             section = prices.get(key)
         except TypeError:
             problems.append(f"Summary row {number}: invalid CR/TRNO values {key!r}. "

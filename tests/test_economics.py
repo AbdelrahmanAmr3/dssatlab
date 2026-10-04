@@ -273,3 +273,9 @@ def test_stock_price_files_parse(name):
         pytest.skip(f"Stock Price file absent: {path}")
     # Empty rows still validate every section and every price-file value.
     assert lab.net_returns([], path) == []
+
+
+def test_bool_trno_is_not_treatment_one(tmp_path):
+    path = write_price(tmp_path, price_section())
+    with pytest.raises(lab.DSSATCheckError, match="invalid CR/TRNO"):
+        lab.net_returns([{"CR": "MZ", "TRNO": True}], path)

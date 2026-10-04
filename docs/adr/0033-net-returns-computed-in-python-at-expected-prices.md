@@ -18,6 +18,8 @@ each Summary row, matched by crop (`CR`) and treatment (`TRNO`):
     GRAN*HWAH/1000 + BYPR*BWAH/1000 - BASE - NFER*NICM - NCOS*NI#M - IRRI*IRCM - IRCO*IR#M
     - SCOS*DWAP - RESM*RECM/1000 - PCOS*PICM - PFER*PI#M - KCOS*KICM - KFER*KI#M
 
+Units follow ECONOMIC.CDE: GRAN and BYPR are $/t (yields in kg/ha, hence /1000), RESM is $/t of
+residue, the other prices are $ per kg of nutrient or per unit of the matching Summary quantity.
 Every price and cost is replaced by its expected value: fixed PAR1, uniform and triangular means,
 normal mean; IDIS -1 leaves the component out. Season statistics come from `summarize_seasons()`.
 
@@ -26,8 +28,8 @@ normal mean; IDIS -1 leaves the component out. Season statistics come from `summ
 - Reproduce the tool's five-percentile price procedure. Rejected as scope: no course case needs more
   than the mean, and a deterministic expected-price result is the easiest to check.
 - Reject IDIS 1-3. Rejected: DTCM6401 uses a normal grain price, and net return is linear in each
-  price, so at expected prices the mean over seasons is the expected mean net return, conditional on
-  the simulated quantities (not a reproduction of the historical risk analysis).
+  price, so at expected prices, when prices are independent of yield, the mean over seasons is the expected
+  mean net return, conditional on the simulated quantities (not a reproduction of the historical risk analysis).
 - Stochastic dominance and risk plots. Rejected for now: no course case needs more than the mean.
 
 ## Consequences
