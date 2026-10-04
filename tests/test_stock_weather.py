@@ -153,7 +153,7 @@ def test_reader_decodes_names_before_selection(tmp_path, name):
 ])
 def test_wrong_name_reports_file_and_requested_name_once(tmp_path, name, station, expected):
     path = weather_file(tmp_path, name)
-    _, problems = _walk_weather_files([path], station, "76001", date(1976, 1, 1), date(1976, 1, 1))
+    _, problems, _ = _walk_weather_files([path], station, "76001", date(1976, 1, 1), date(1976, 1, 1))
     assert len(problems) == 1
     assert all(value in problems[0] for value in (name, expected, "Checked", "Supply"))
 
