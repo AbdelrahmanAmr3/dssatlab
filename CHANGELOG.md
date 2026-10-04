@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.20.0]
+## [0.20.0] - 2026-10-04
 
 ### Added
 - New cultivars in experiment data: an unused `cultivar.code`, existing `ecotype`, optional `name`, and every coefficient after `ECO#` in the first `.CUL` table. Checks report missing coefficients, unknown ecotypes, conflicts and fixed-width problems before writing. The simulation folder's `.CUL` copy gains the line under the user's code; source `.CUL`, `.ECO` and `.SPE` files stay unchanged ([ADR 0030](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0030-new-cultivars-under-the-users-own-code.md)).
