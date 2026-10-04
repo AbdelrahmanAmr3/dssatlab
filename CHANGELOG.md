@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.21.1] - Unreleased
+## [0.21.1] - 2026-10-04
 
 ### Added
 - `net_returns(rows, price_file)` computes net return in $/ha at expected prices from a DSSAT `.PRI` price file, matching Summary rows by crop and FileX treatment. It returns row copies with `net_return`, propagates missing used quantities as `None`, and collects file and row problems in `DSSATCheckError`. Results work with `summarize_seasons(..., variables=["net_return"])` and `to_dataframe()`. Price risk is not modelled. See [seasonal economics](guide/seasonal.md#compute-net-return-from-a-price-file).
