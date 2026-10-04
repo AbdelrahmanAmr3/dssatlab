@@ -64,6 +64,64 @@ def test_start_p_still_checks_positive_sdate(tmp_path):
     assert problems[0].startswith("FileX SDATE 88100 reads as 1988-04-09, before")
 
 
+@pytest.mark.parametrize("start", ["S", "P", "E"])
+def test_positive_sdate_is_checked_under_any_start_setting(tmp_path, start):
+    sim = anchored_sim(tmp_path, "88100")
+    sim.filex.write_text(sim.filex.read_text().replace("     S 88100", f"     {start} 88100"))
+    problems = sim.check(False)
+    anchors = [p for p in problems if "anchors FileX years" in p]
+    assert len(anchors) == 1
+    assert anchors[0].startswith(
+        "FileX SDATE 88100 reads as 1988-04-09, before 1988-05-29")
+    if start != "S":
+        reason = " (START E needs an emergence date)" if start == "E" else ""
+        assert problems == [
+            f"Stock weather {sim.weather}: cannot check weather dates because "
+            f"the simulation start is unknown{reason}. Checked START and "
+            "SDATE/PDATE for treatment 7. "
+            "Use START S or P with a valid date, or pass the weather as rows.",
+            anchors[0],
+        ]
+
+
+@pytest.mark.parametrize("source", ["experiment", "filex"])
+@pytest.mark.parametrize("second,expected_count", [("1988-05-30", 1), ("1988-04-10", 2)])
+def test_each_reported_harvest_date_is_checked(tmp_path, source, second, expected_count):
+    sim = anchored_sim(tmp_path, harvest="88100")
+    if source == "experiment":
+        sim.management = {"treatments": {7: {"harvest": [
+            {"date": "1988-04-09"}, {"date": second},
+        ]}}}
+    else:
+        code = "88151" if second == "1988-05-30" else "88101"
+        text = sim.filex.read_text().replace(
+            " 1 88100 GS000   -99   -99   100     0 -99",
+            " 1 88100 GS000   -99   -99   100     0 -99\n"
+            f" 1 {code} GS000   -99   -99   100     0 -99")
+        sim.filex.write_text(text)
+    problems = anchor_problems(sim)
+    assert len(problems) == expected_count
+    field = "treatments.7.harvest.0.date 1988-04-09" if source == "experiment" else "FileX HDATE 88100"
+    assert problems[0].startswith(f"{field} reads as 1988-04-09, before 1988-05-29")
+    if expected_count == 2:
+        field = "treatments.7.harvest.1.date 1988-04-10" if source == "experiment" else "FileX HDATE 88101"
+        assert problems[1].startswith(f"{field} reads as 1988-04-10, before 1988-05-29")
+
+
+@pytest.mark.parametrize("source", ["experiment", "filex"])
+def test_unknown_start_checks_sdate_and_reported_harvest(tmp_path, source):
+    sim = anchored_sim(tmp_path, "88100", "88101")
+    sim.filex.write_text(sim.filex.read_text().replace("     S 88100", "     E 88100"))
+    if source == "experiment":
+        sim.management = {"treatments": {7: {"harvest": [{"date": "1988-04-10"}]}}}
+    problems = sim.check(False)
+    assert len(problems) == 3
+    assert "simulation start is unknown (START E needs an emergence date)" in problems[0]
+    assert problems[1].startswith("FileX SDATE 88100 reads as 1988-04-09, before")
+    field = "treatments.7.harvest.0.date 1988-04-10" if source == "experiment" else "FileX HDATE 88101"
+    assert problems[2].startswith(f"{field} reads as 1988-04-10, before 1988-05-29")
+
+
 @pytest.mark.parametrize("planting", [None, "88150"])
 def test_controls_start_before_anchor_names_location(tmp_path, planting):
     sim = anchored_sim(tmp_path, planting=planting)

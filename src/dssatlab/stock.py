@@ -7,7 +7,7 @@ import shutil
 
 from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
-from .filex import _filex_date, _read_filex, _weather_filename
+from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
 from .irrigation import _effective_management
 from .operations import _harvest_end
 from .rotation_data import _calendar_date, _level_date
@@ -91,43 +91,62 @@ def _simulation_weather(sim, values, experiment_data, components):
         return [], [f"FileX {sim.filex}: SDATE {sdate!r} is invalid: day {int(sdate[2:])} "
                     f"does not exist in {year} (DSSAT reads years 00-35 as 2000-2035 "
                     f"and 36-99 as 1936-1999). Supply a day of year from 1 to {last}."]
-    if start is None:
-        reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""
-        return [], [f"Stock weather {sim.weather}: cannot check weather dates because "
-                    f"the simulation start is unknown{reason}. Checked START and "
-                    f"SDATE/PDATE for treatment {sim.treatment}. "
-                    "Use START S or P with a valid date, or pass the weather as rows."]
-    years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
-    try:
-        years = max(1, int(years))
-    except (TypeError, ValueError, OverflowError):
-        years = 1  # Ordinary controls checks report invalid years.
-    end = _sequence_stop(start, years) or date.max
-    harvest = None
-    fixed_harvest = None
-    if len(components) == 1:
-        code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
-        if code == "R":
-            harvest = _harvest_end(entry, _level_date(
-                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
-            fixed_harvest = harvest
-            if harvest is not None:
-                try:
-                    harvest = _sequence_shift(harvest, harvest.year + years - 1)
-                except (ValueError, OverflowError):
-                    harvest = None  # The season checks report years outside the calendar.
-                if harvest is not None:
-                    end = harvest
-    if len(components) > 1:
-        stop = _sequence_stop(start, years)
-        if stop is not None:
-            end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
     station = values["WSTA"]
     if _overrides_section(experiment_data, sim.treatment) and station[:4] != paths[0].name[:4].upper():
         station = paths[0].name[:4].upper()  # Match the copied field's new station.
     # A station mismatch is reported by Simulation;
     # avoid a second name-lookup problem for the same mismatch.
     same_station = all(path.name[:4].upper() == station[:4] for path in paths)
+    where = f"treatments.{int(sim.treatment)}"
+    sdate_field = (f"{where}.controls.start_date"
+                   if _controls_start_date(experiment_data, sim.treatment) is not None
+                   else "FileX SDATE")
+    dates = [(sdate_field, _filex_date(values.get("SDATE")))]
+    harvest = None
+    if len(components) == 1:
+        code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
+        if code == "R":
+            harvest = _harvest_end(entry, _level_date(
+                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
+            events = entry.get("harvest")
+            if isinstance(events, list):
+                dates.extend((f"{where}.harvest.{i}.date", _calendar_date(event.get("date")))
+                             for i, event in enumerate(events) if isinstance(event, dict))
+            elif harvest is not None:
+                dates.extend(("FileX HDATE", _filex_date(event["HDATE"])) for event in
+                             _section_rows(text, "HARVEST DETAILS", "H", int(components[0]["MH"]),
+                                           ("HDATE",)))
+    if start is None:
+        reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""
+        problems = [f"Stock weather {sim.weather}: cannot check weather dates because "
+                    f"the simulation start is unknown{reason}. Checked START and "
+                    f"SDATE/PDATE for treatment {sim.treatment}. "
+                    "Use START S or P with a valid date, or pass the weather as rows."]
+        sdate = dates[0][1]
+        if sdate is not None and same_station:
+            # SDATE still needs the initial anchor; no effective start is known.
+            _, _, anchor = _walk_weather_files(paths, station, values["SDATE"], sdate, sdate,
+                                               wed=_weather_directory(sim.executable),
+                                               mode="Q" if len(components) > 1 else "C")
+            problems.extend(_weather_anchor_problems(anchor, dates))
+        return [], problems
+    years = _selected_controls(experiment_data, sim.treatment).get("years", values.get("NYERS", 1))
+    try:
+        years = max(1, int(years))
+    except (TypeError, ValueError, OverflowError):
+        years = 1  # Ordinary controls checks report invalid years.
+    end = _sequence_stop(start, years) or date.max
+    if harvest is not None:
+        try:
+            harvest = _sequence_shift(harvest, harvest.year + years - 1)
+        except (ValueError, OverflowError):
+            harvest = None  # The season checks report years outside the calendar.
+        if harvest is not None:
+            end = harvest
+    if len(components) > 1:
+        stop = _sequence_stop(start, years)
+        if stop is not None:
+            end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
     # The preliminary read checks structure only; the walk decodes the dates.
     _, problems = _read_stock_weather(paths)
     stations = sorted({path.name[:4].upper() for path in paths})
@@ -146,24 +165,11 @@ def _simulation_weather(sim, values, experiment_data, components):
         rows, problems, anchor = _walk_weather_files(paths, station, initial, start, walk_end,
                                                      wed=_weather_directory(sim.executable),
                                                      mode="Q" if len(components) > 1 else "C")
-        where = f"treatments.{int(sim.treatment)}"
-        sdate_field = (f"{where}.controls.start_date"
-                       if _controls_start_date(experiment_data, sim.treatment) is not None
-                       else "FileX SDATE")
-        dates = [(sdate_field, _filex_date(values.get("SDATE")))]
         if values.get("START") == "P":
             if len(components) > 1:
                 where += f".rotation.{int(components[0]['R'])}"
             field = f"{where}.planting.date" if isinstance(planting, dict) else "FileX PDATE"
             dates.append((field, start))
-        if fixed_harvest is not None:
-            events = entry.get("harvest")
-            field = "FileX HDATE"
-            if isinstance(events, list):
-                index = next(i for i, event in enumerate(events) if isinstance(event, dict)
-                             and _calendar_date(event.get("date")) == fixed_harvest)
-                field = f"{where}.harvest.{index}.date"
-            dates.append((field, fixed_harvest))
         problems.extend(_weather_anchor_problems(anchor, dates))
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
