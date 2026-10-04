@@ -222,7 +222,7 @@ def test_column_positions_come_from_headers_and_latin1_is_accepted(filex, weathe
     lines[1] = lines[1][:33] + "...." + lines[1][33:]
     for i in (2, 3, 4):
         lines[i] = lines[i][:33] + "    " + lines[i][33:]
-    text = "\n".join(lines).replace("Field section", "Champ cultivé")
+    text = "\n".join(lines).replace("Field section", "Champ cultivÃ©")
     assert Simulation(filex(text=text), 1, weather()).check() == []
 
 
@@ -335,21 +335,27 @@ def test_checks_write_nothing_and_reread_inputs(filex, weather, tmp_path):
 
 @pytest.mark.parametrize("wther,fname,expected_problems", [
     ("W", "N", [
-        "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M."
+        "FileX WTHER 'W' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
+        "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder.",
+        "Supplied weather data is unused; DSSAT would ignore it. Checked all run treatments' weather sources. "
+        "Remove it from weather= or set WTHER to M."
     ]),
     ("M", "Y", []),
     ("W", "Y", [
-        "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M.",
+        "FileX WTHER 'W' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
+        "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder.",
+        "Supplied weather data is unused; DSSAT would ignore it. Checked all run treatments' weather sources. "
+        "Remove it from weather= or set WTHER to M."
     ]),
     ("S", "N", [
-        "FileX WTHER 'S' in controls level 1 (treatment 1): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M."
+        "FileX WTHER 'S' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
+        "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder.",
+        "Supplied weather data is unused; DSSAT would ignore it. Checked all run treatments' weather sources. "
+        "Remove it from weather= or set WTHER to M."
     ]),
     ("G", "N", [
-        "FileX WTHER 'G' in controls level 1 (treatment 1): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M."
+        "FileX WTHER 'G' in controls level 1 (treatment 1): unsupported weather source. "
+        "Checked the run treatment's SM level after experiment edits. Set WTHER to one of M, W, S."
     ]),
 ])
 def test_wther_checked_and_fname_y_allowed_for_one_row_treatment(filex, weather, wther, fname, expected_problems):
@@ -386,9 +392,9 @@ def test_two_row_treatment_level_two_w_reported_once(filex, weather):
 """
     path = filex(text=treatments + fields + controls)
     problems = Simulation(path, 1, weather()).check()
-    assert [p for p in problems if "WTHER" in p or "FNAME" in p] == [
-        "FileX WTHER 'W' in controls level 2 (treatment 1): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M."
+    assert [p for p in problems if p.startswith("FileX WTHER") or "FNAME" in p] == [
+        "FileX WTHER 'W' in controls level 2 (treatment 1): missing climate file UFGA.CLI. "
+        "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder."
     ]
 
 
@@ -409,9 +415,9 @@ def test_two_rows_both_using_level_one_with_w_reported_once(filex, weather):
 """
     path = filex(text=treatments + fields + controls)
     problems = Simulation(path, 1, weather()).check()
-    assert [p for p in problems if "WTHER" in p or "FNAME" in p] == [
-        "FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M."
+    assert [p for p in problems if p.startswith("FileX WTHER") or "FNAME" in p] == [
+        "FileX WTHER 'W' in controls level 1 (treatment 1): missing climate file UFGA.CLI. "
+        "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder."
     ]
 
 
@@ -489,10 +495,11 @@ def test_run_treatments_labels_controls_problem(filex, weather):
     with pytest.raises(DSSATCheckError) as exc_info:
         run_treatments(filex=path, weather=weather(), treatments=[1])
     problems = exc_info.value.problems
-    assert len(problems) == 1
-    assert problems[0] == (
+    assert len(problems) == 2
+    assert "Scenario 'base', treatment all:" in problems[0] and "unused" in problems[0]
+    assert problems[1] == (
         "Scenario 'base', treatment 1: FileX WTHER 'W' in controls level 1 (treatment 1): "
-        "DSSAT would generate weather and ignore the weather data supplied. Set WTHER to M."
+        "missing climate file UFGA.CLI. Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder."
     )
 
 
@@ -522,9 +529,9 @@ def test_treatment_selection_only_checks_its_own_controls_levels(filex, weather)
     path = filex(text=text + controls)
     assert Simulation(path, 1, weather()).check() == []
     problems = Simulation(path, 2, weather()).check()
-    assert problems == [
-        "FileX WTHER 'W' in controls level 2 (treatment 2): DSSAT would generate weather "
-        "and ignore the weather data supplied. Set WTHER to M."
+    assert [p for p in problems if p.startswith("FileX WTHER")] == [
+        "FileX WTHER 'W' in controls level 2 (treatment 2): missing climate file UFGA.CLI. "
+        "Checked WSTA 'UFGA'. Supply UFGA.CLI from DSSAT's Weather/Climate folder."
     ]
 
 

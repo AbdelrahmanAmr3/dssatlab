@@ -81,7 +81,7 @@ MESSAGES = {
     "filename": "A sequence runs in DSSAT's sequence mode, which needs a FileX filename of exactly 12 characters (8 plus the extension, like UFGA7804.SQX); 'SEQ1.SQX' has 8. Rename the FileX.",
     "R": "Treatment 1 has rotation components R 1, 1, 3, 4, 5, 6: give each row of a sequence its own R number.",
     "FL": "Treatment 1 is a sequence whose components use fields 1 and 2; dssatlab writes one weather file and one soil profile, so give every component the same field (FL).",
-    "NREPS": "FileX NREPS 5 for sequence treatment 1: with measured weather every replicate repeats the same rows. Set NREPS to 1.",
+    "NREPS": "FileX NREPS 5 for sequence treatment 1: with measured weather every replicate repeats the same rows. Checked the first component's GENERAL NREPS and sequence WTHER. Set NREPS to 1.",
 }
 
 
@@ -205,7 +205,8 @@ def test_sequence_rejects_component_experiment_data(sequence, fake_dssat, entry,
     sequence.management = {"treatments": {"01": entry}}
     original = deepcopy(sequence.management)
     expected = ("Treatment 1 is a sequence of 6 rotation components; experiment data for a "
-                "sequence takes only controls years, start_date and rotation. Edit the components "
+                "sequence takes only controls years, start_date, weather_source, replicates, random_seed "
+                "and rotation. Edit the components "
                 "in the FileX for other changes.")
     assert sequence.check(True) == [expected]
     assert "FileX: REJECTED" in capsys.readouterr().out

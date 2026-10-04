@@ -150,7 +150,8 @@ def test_controls_and_rotation(sim):
 
 def test_sequence_other_keys(sim):
     sim.management['treatments'][1]['planting'] = {}
-    assert any('controls years, start_date and rotation' in p for p in sim.check(False))
+    assert any('controls years, start_date, weather_source, replicates, random_seed and rotation'
+               in p for p in sim.check(False))
 
 
 def test_non_sequence(data, rows, installed):

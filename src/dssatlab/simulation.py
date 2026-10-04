@@ -6,7 +6,8 @@ import shutil
 
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
-from .filex import _check_filex_controls, _filex_date, _irrigation_dates, _read_filex
+from .climate import _check_weather_requirements, _coverage_weather_rows, _weather_requirements
+from .filex import _filex_date, _irrigation_dates, _read_filex
 from .filex_skeleton import _write_template_simulation
 from .template_checks import _check_template_simulation
 from .filex_write import _identity_text, _write_management
@@ -25,7 +26,7 @@ from .stock import (_simulation_soil, _simulation_weather, _stock_weather_paths,
 
 
 class Simulation:
-    """One FileX treatment with weather data and optional soil data.
+    """One FileX treatment with measured or generated weather and optional soil data.
 
     Construction only stores inputs. Positional order remains filex, treatment,
     weather, executable; defaults None, 1, None allow filex to be omitted for a
@@ -38,7 +39,7 @@ class Simulation:
             path or dict, as accepted by write_filex. Alternative to filex (#90).
         treatment (int | str): Treatment number (int or digit string) within the FileX.
         weather (str | Path | list | DataFrame): Weather-template CSV path, rows or
-            DataFrame, or a stock .WTH path/list of paths with a copied FileX.
+            DataFrame, or .WTH paths and/or one .CLI path with a copied FileX.
             Stock files are copied unchanged under upper-case names.
         executable (str | Path | None): Optional explicit path to the DSSAT executable or directory.
         soil (str | Path | list[dict] | DataFrame | None): Keyword-only. Soil data following the
@@ -50,7 +51,9 @@ class Simulation:
             path to a YAML file or a plain dict keyed by 'treatments', with optional
             planting, irrigation, fertilizer, cultivar, initial_conditions and controls
             per treatment. Construction only stores it; check() checks every entry
-            and prints a report.
+            and prints a report. Controls include weather_source M/W/S, replicates
+            1-99999 (above 1 needs a generated-weather sequence) and random_seed
+            0-99999 (a fixed seed repeats; 0 is passed as is).
         name (str | None): Scenario name written to the copied treatment, even
             without experiment overrides. None and "base" keep the FileX name.
             Sequences keep their component names. Other names must fit the column.
@@ -89,7 +92,8 @@ class Simulation:
     def _check_inputs(self, experiment_data=None, load_problems=None):
         """Collect input problems, using the loaded experiment data dict when supplied.
 
-        Checks weather columns, values and dates; FileX treatment, WSTA,
+        Checks measured weather columns, values and dates or the required climate table;
+        FileX treatment, WTHER, WSTA,
         START/SDATE and filename; START S/P coverage, soil and scenario name.
         Experiment overrides edit field identity; otherwise station and soil IDs must match.
         """
@@ -114,8 +118,7 @@ class Simulation:
             experiment_data, self.treatment, components)
         filex_problems.extend(sequence_problems + data_problems)
         filex_problems.extend(_check_harvest(experiment_data, self.filex, self.treatment))
-        filex_problems.extend(_check_filex_controls(self.filex, self.treatment,
-                                                    [row["SM"] for row in components]))
+        filex_problems.extend(_check_weather_requirements(self, experiment_data, components, rows))
         name = Path(self.filex).name if isinstance(self.filex, (str, Path)) else ""
         if Path(name).suffix.upper() == ".FCX":
             filex_problems.append(f"FileX {name} is a forecast FileX: a Simulation "
@@ -138,11 +141,15 @@ class Simulation:
                                      f"{expected!r}, but {source} has station "
                                      f"{station!r}. Make the station codes exactly equal; "
                                      "filenames are case-sensitive on Linux.")
-        days = [row["date"] for row in rows if "date" in row]
+        coverage_rows = _coverage_weather_rows(self, experiment_data, components, rows)
+        days = [row["date"] for row in coverage_rows if "date" in row]
+        # Generated weather has no daily rows, but calendar and irrigation checks still apply.
+        dated = bool(days) or any(method in ("W", "S") for _, method, _ in _weather_requirements(
+            self, experiment_data, components))
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate))
-        if days and start_date is None and _parse_sdate(sdate) is not None:
+        if dated and start_date is None and _parse_sdate(sdate) is not None:
             year = _filex_date(sdate[:2] + "001").year
             last = date(year, 12, 31).timetuple().tm_yday
             filex_problems.append(f"FileX {self.filex}: SDATE {sdate!r} is invalid: "
@@ -176,7 +183,7 @@ class Simulation:
             filex_problems.append(f"Simulation start date {start_date.isoformat()!r} is not "
                                  f"covered by weather data ({min(days)} to {max(days)}). "
                                  "Supply weather for the simulation's start date.")
-        if (override_start is not None or values.get("START") != "E") and start_date is not None and days and not _overrides_section(
+        if (override_start is not None or values.get("START") != "E") and start_date is not None and dated and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
             # DSSAT-CSM v4.8.6.0, InputModule/IPMAN.for, IPIRR: only IRRIG R
@@ -204,7 +211,7 @@ class Simulation:
                 report.extend(_report_lines("Management data", load_problems))
             else:
                 management_problems, management_report = _check_management(
-                    checked_data, self.filex, self.treatment, rows, start_date,
+                    checked_data, self.filex, self.treatment, coverage_rows, start_date,
                     start_date_note=skip_reason, check_harvest=False,
                 )
                 problems.extend(management_problems)
@@ -228,7 +235,7 @@ class Simulation:
         if any problems are found.
         Creates a dated simulation folder (dssat_sim_YYYY-MM-DD_HHMMSS) beside the
         FileX, copies the FileX and sibling model files (*.CUL, *.ECO, *.SPE),
-        and writes template weather or copies stock weather files unchanged.
+        and writes measured weather or copies stock .WTH/.CLI files unchanged.
         For a template, creates the folder beside its YAML (or in cwd for a dict),
         writes the FileX and SOIL.SOL, and copies the crop's genotype files from
         Genotype beside the DSSAT executable. Experiment edits then apply as usual.
@@ -236,7 +243,8 @@ class Simulation:
         irrigation, fertilizer, cultivar, initial conditions, controls) in the copy
         and repoints only the selected treatment; the original FileX is never changed.
         With experiment overrides, writes the weather station and supplied soil
-        ID into that field. Independently writes name into the copied treatment,
+        ID into that field; generated weather keeps the FileX station.
+        Independently writes name into the copied treatment,
         except for sequences, None and "base", which retain the FileX names.
         With soil=, writes SOIL.SOL or copies stock soil and copies no sibling .SOL
         files. With soil=None, copies all sibling .SOL files. Invokes the DSSAT executable for the
@@ -266,12 +274,12 @@ class Simulation:
             rows, weather_problems = _simulation_weather(self, values, experiment_data, components)
             if weather_problems:
                 raise DSSATCheckError(weather_problems)
-            station = rows[0]["station"] if _overrides_section(experiment_data, self.treatment) else None
+            station = rows[0]["station"] if rows and _overrides_section(experiment_data, self.treatment) else None
             if station is not None and _stock_weather_paths(self.weather) and values["WSTA"][:4] == station:
                 station = values["WSTA"]  # Keep an explicit stock filename in the copied field.
             if station is not None:
                 values["WSTA"] = station
-            soil_rows, _, template_id = _simulation_soil(self, values, station is not None)
+            soil_rows, _, template_id = _simulation_soil(self, values, _overrides_section(experiment_data, self.treatment))
             filex = Path(self.filex).resolve()
             sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
             shutil.copy2(filex, sim_folder / filex.name)
@@ -280,7 +288,7 @@ class Simulation:
                     continue
                 if sibling.is_file() and sibling.suffix.upper() in (".SOL", ".CUL", ".ECO", ".SPE"):
                     shutil.copy2(sibling, sim_folder / sibling.name)
-            soil_id = template_id if station is not None else None
+            soil_id = template_id if _overrides_section(experiment_data, self.treatment) else None
             _write_management(sim_folder / filex.name, self.treatment, experiment_data,
                               name=None if len(components) > 1 else self.name,
                               station=station, soil_id=soil_id)

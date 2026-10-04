@@ -10,6 +10,7 @@ from .management_file import _load_yaml
 from .outputs import read_summary
 from .runner import RunResult
 from .simulation import Simulation
+from .climate import _select_batch_weather
 
 
 _ALLOWED = ("weather", "soil", "management")
@@ -91,7 +92,9 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     scenarios in mapping order, with treatments in the selected order.
 
     Uses Simulation's input checks, including scenario name column fit. Each
-    copied treatment receives its scenario name, except "base", which keeps
+    scenario checks unused weather across its selected treatments; each Simulation
+    receives measured weather for WTHER M or a climate file for WTHER W/S.
+    Each copied treatment receives its scenario name, except "base", which keeps
     the FileX treatment name. With experiment overrides, the field receives
     the weather station and supplied soil ID. Otherwise the FileX station
     and soil ID must match the supplied data.
@@ -106,10 +109,14 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     simulations, problems = [], []
     for name, overrides, scenario_problems in _scenario_inputs(scenarios):
         inputs = {**base, **overrides}
+        selected = [Simulation(filex, treatment, filex_template=filex_template,
+                               executable=executable, name=name, **inputs)
+                    for treatment in treatments]
+        if filex_template is None:
+            problems.extend(f"Scenario {name!r}, treatment all: {problem}"
+                            for problem in _select_batch_weather(selected, inputs["weather"]))
         seen = set()
-        for treatment in treatments:
-            sim = Simulation(filex, treatment, filex_template=filex_template,
-                             executable=executable, name=name, **inputs)
+        for treatment, sim in zip(treatments, selected):
             found, _ = sim._check_inputs()
             # Simulation reports invalid treatment types/values; only normalize
             # here to detect aliases such as 1 and "01" before results overwrite.

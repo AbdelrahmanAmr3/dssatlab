@@ -6,6 +6,8 @@ import re
 import shutil
 
 from .controls import _controls_start_date, _selected_controls
+from .climate import (_copy_climate_file, _measured_weather_source, _split_weather_inputs,
+                      _template_climate_problems)
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
 from .irrigation import _effective_management
@@ -20,6 +22,7 @@ from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_d
 
 def _stock_weather_paths(source):
     """Return stock paths, or None for a weather-template source."""
+    source, _, _ = _split_weather_inputs(source)
     paths = source if isinstance(source, list) else [source]
     if paths and all(isinstance(path, (str, Path)) and Path(path).suffix.upper() == ".WTH"
                      for path in paths):
@@ -29,6 +32,9 @@ def _stock_weather_paths(source):
 
 def _weather_source_problems(source, *, template=False):
     """Reject mixed lists and stock sources for a FileX template before reading."""
+    problems = _template_climate_problems(source) if template else _split_weather_inputs(source)[2]
+    if problems:
+        return problems
     if isinstance(source, list):
         paths = [isinstance(item, (str, Path)) for item in source]
         if any(paths) and not all(paths):
@@ -47,13 +53,16 @@ def _parse_template_weather(source):
 
 
 def _simulation_weather(sim, values, experiment_data, components):
-    """Read either weather source, sharing checks and the sequence end rule."""
+    """Read daily weather only for M, sharing checks and the sequence end rule."""
     problems = _weather_source_problems(sim.weather)
     if problems:
         return [], problems
-    paths = _stock_weather_paths(sim.weather)
+    source = _measured_weather_source(sim, experiment_data, components)
+    if source is None:
+        return ([], []) if components or _split_weather_inputs(sim.weather)[1] else _parse_weather(source)
+    paths = _stock_weather_paths(source)
     if paths is None:
-        return _parse_weather(sim.weather)
+        return _parse_weather(source)
     if "WSTA" not in values:
         checked, checks = _read_filex(sim.filex, sim.treatment)
         if "WSTA" not in checked and checks:
@@ -196,12 +205,13 @@ def _simulation_weather(sim, values, experiment_data, components):
 
 
 def _write_simulation_weather(source, rows, folder, values):
-    """Copy stock bytes under uppercase names, or write template weather."""
+    """Copy WTH/CLI bytes under uppercase names, or write measured weather."""
+    _copy_climate_file(source, folder)
     paths = _stock_weather_paths(source)
     if paths is not None:
         for path in paths:
             shutil.copy2(path, folder / path.name.upper())
-    else:
+    elif rows:
         write_weather_file(rows, folder / _weather_filename(values["WSTA"], values["SDATE"]))
 
 

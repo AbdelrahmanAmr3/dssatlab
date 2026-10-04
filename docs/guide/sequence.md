@@ -79,11 +79,13 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    ```text
    Treatment 1 is a sequence whose components use fields 1 and 2; dssatlab writes one weather file and one soil profile, so give every component the same field (FL).
    ```
-4. **`NREPS` must be 1**: With measured daily weather, running multiple replicates repeats identical rows:
+4. **`NREPS` must be 1 with measured weather**: With measured daily weather, running multiple replicates repeats identical rows:
    ```text
    FileX NREPS 5 for sequence treatment 1: with measured weather every replicate repeats the same rows. Set NREPS to 1.
    ```
-5. **Weather coverage through the last component's known end**: Weather must continuously cover the simulation start through the end of the component that crosses DSSAT's stopping boundary. Under DSSAT's calendar rule (`CSM.for`), that boundary is:
+   With generated weather (W or S), larger NREPS values are accepted; see
+   [generated weather and replicates](generated-weather.md#replicate-a-sequence-and-read-every-row).
+5. **Measured weather coverage through the last component's known end**: Weather must continuously cover the simulation start through the end of the component that crosses DSSAT's stopping boundary. Under DSSAT's calendar rule (`CSM.for`), that boundary is:
    `(start year + years)` at the start date's day of year, minus one day.
    DSSAT tests the boundary after finishing a component, so that component can
    end later. Checks follow scheduled planting, fallow and harvest dates across
@@ -95,7 +97,7 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    FileX NYERS 10: the sequence runs from 1978-04-20 through 1988-04-18, after the weather data ends (1987-12-31). Supply weather through 1988-04-18, or fewer years.
    ```
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
-6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years` and/or `start_date`, and `rotation` for edits to individual crop or fallow components. Controls apply to a copy of the first component's controls level. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
+6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years`, `start_date`, `weather_source`, `replicates` and `random_seed`, and `rotation` for edits to individual crop or fallow components. Years and start date apply to a copy of the first component's controls level, which later components that share its original controls level also use; the three weather controls apply to every controls level the sequence uses. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
 This fixes [#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205): on real
 DSSAT, MSKB8921 with weather ending 1998-02-28 was refused because it needs
@@ -110,41 +112,18 @@ Weather written by dssatlab never chooses their century.
 
 ## Weather and replicate settings in DSSAT sample sequence files
 
-DSSAT ships sample sequence files (such as `UFGA7804.SQX`) that contain configuration settings that silently break automated runs with your own data:
+DSSAT sample sequences such as `UFGA7874.SQX` use WTHER W and NREPS above 1.
+Pass the matching climate file through `weather=` to keep their generated weather
+and replicates; see the [generated weather guide](generated-weather.md).
 
-- **`WTHER W` in `*SIMULATION CONTROLS -> METHODS`**: Sets weather generation mode to `W` (weather generator), causing DSSAT to generate artificial weather from climate files (`UFGA.CLI`) and silently ignore your supplied weather data.
-- **`NREPS 5` in `*SIMULATION CONTROLS -> GENERAL`**: Runs 5 replicates of identical simulated rows.
-
-`dssatlab` checks WTHER in every copied FileX and requires NREPS 1 for sequences.
-Problems raise a `DSSATCheckError`:
-
-```text
-FileX WTHER 'W' in controls level 1 (treatment 1): DSSAT would generate weather and ignore the weather data supplied. Set WTHER to M.
-```
+To use your measured daily weather instead, set `weather_source: "M"` and
+`replicates: 1` in the treatment's experiment data controls through `management=`.
+These overrides reach every controls level the sequence uses. No source FileX
+edit is needed. Supplying both daily weather and a climate file for this single
+sequence is a problem because one input would be unused.
 
 `FNAME Y` is accepted for sequences as well: readers find experiment-named files
 such as `UFGA7804.OSU`. See [output naming rules](reading-results.md#standard-and-experiment-named-output-files).
-
-### How to fix a copied FileX
-
-Before running a copied DSSAT sequence file, edit the text or modify a copy using simple string replacements:
-
-```python
-from pathlib import Path
-
-path = Path("UFGA7804.SQX")
-text = path.read_text(encoding="latin-1")
-
-# 1. Set measured weather in all METHODS rows: W -> M
-text = text.replace(" ME              W ", " ME              M ")
-
-# 2. Set NREPS to 1 in level 1's GENERAL row: 5 -> 1
-text = text.replace(" 1 GE             10     5 ", " 1 GE             10     1 ")
-
-path.write_text(text, encoding="latin-1")
-```
-
-These edits address WTHER and NREPS; `check()` still checks the other inputs.
 
 ## A rotation from the FileX template
 
@@ -348,8 +327,9 @@ original FileX stay unchanged. Omitted sections keep their levels. Edits apply i
 cycle, with DSSAT advancing the dates along with the component.
 
 `write_experiment_template()` includes a commented `rotation` example. For a sequence,
-replace the single-treatment sections with that example and keep only `years` and
-`start_date` in `controls`. Initial conditions and controls per component are not
+replace the single-treatment sections with that example. Controls accept `years`,
+`start_date`, `weather_source`, `replicates` and `random_seed`; FileX templates
+still require measured weather and one replicate. Initial conditions and controls per component are not
 supported. Fallow components take only `residues`, `tillage` and `harvest`; planting,
 cultivar, fertilizer and irrigation are rejected. A fallow's `harvest: []` is rejected
 because it needs its scheduled end; omit `harvest` to keep the FileX end. A cultivar
@@ -399,8 +379,9 @@ has no code check; the component's TILL `"Y"` applies tillage. Generated templat
 keep TILL `"N"`, so the tillage example above writes events but applying them
 requires a copied FileX with that component at TILL `"Y"`. The codes are
 never changed for you. For a single treatment, `controls.harvest_management`
-sets HARVS (`"A"`, `"M"`, `"R"`, `"D"`); a sequence accepts only `years` and
-`start_date` in treatment controls, so change component codes in the copied
+sets HARVS (`"A"`, `"M"`, `"R"`, `"D"`); a sequence accepts only `years`,
+`start_date`, `weather_source`, `replicates` and `random_seed` in treatment
+controls, so change component management codes in the copied
 FileX itself. See the [code rules and measured harvest behaviour](experiment.md#residues-tillage-and-harvest)
 and [ADR 0021](../adr/0021-field-operations-as-event-sections.md).
 

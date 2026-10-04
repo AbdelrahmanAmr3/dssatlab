@@ -1,6 +1,7 @@
 """Mixed-crop template rules report problems before FileX rendering."""
 
 from copy import deepcopy
+from datetime import date, timedelta
 
 import pytest
 
@@ -20,8 +21,33 @@ def mixed(data):
                 treatment_crops=[1, 2, 3, 1])
 
 
+@pytest.fixture
+def crop_rows(rows):
+    start, end = date(2021, 3, 1), date(2022, 2, 28)
+    weather = [dict(rows[0][0], date=start + timedelta(days=k))
+               for k in range((end - start).days + 1)]
+    return weather, rows[1]
+
+
 def problems(template, rows):
     return Simulation(filex_template=template, weather=rows[0], soil=rows[1]).check(verbose=False)
+
+
+@pytest.mark.parametrize("crop_entries", [False, True])
+def test_none_treatments_and_fields_return_problems(data, mixed, rows, installed, crop_entries):
+    template = mixed if crop_entries else data
+    template.pop("treatment_name", None)
+    template.update(treatments=None, treatment_fields=None)
+    found = problems(template, rows)
+    assert any("treatments: found None" in p for p in found)
+    assert any("treatment_fields:" in p for p in found)
+
+
+@pytest.mark.parametrize("fields", [None, [0], [1, 3]])
+def test_fields_checked_with_malformed_treatments(data, rows, installed, fields):
+    del data["treatment_name"]
+    data.update(treatments=None, treatment_fields=fields)
+    assert any("treatment_fields" in p for p in problems(data, rows))
 
 
 @pytest.mark.parametrize("form", ["crop", "rotation"])
@@ -178,58 +204,65 @@ def test_malformed_crops_does_not_hide_invalid_treatment_crop_numbers(mixed, row
         assert any(f"treatment_crops[{number}]: found" in p for p in found)
 
 
-def test_valid_three_entries_four_treatments_without_mutation(mixed, installed):
-    from dssatlab.crop_entries import _check_crop_entries
+def test_valid_three_entries_four_treatments_without_mutation(mixed, crop_rows, installed):
     before = deepcopy(mixed)
-    assert _check_crop_entries(mixed, installed.executable.parent) == []
+    assert problems(mixed, crop_rows) == []
     assert mixed == before
 
 
-def test_two_entries_can_name_the_same_crop(mixed, installed):
-    from dssatlab.crop_entries import _check_crop_entries
+def test_two_entries_can_name_the_same_crop(mixed, crop_rows, installed):
     mixed["crops"][1] = deepcopy(mixed["crops"][0])
     mixed["crops"][1]["cultivar"]["code"] = "ZZ0001"
-    assert _check_crop_entries(mixed, installed.executable.parent) == []
+    assert problems(mixed, crop_rows) == []
 
 
 @pytest.mark.parametrize("count", [1, 99])
-def test_crop_entry_count_boundaries(mixed, installed, count):
-    from dssatlab.crop_entries import _check_crop_entries
+def test_crop_entry_count_boundaries(mixed, rows, installed, count):
     mixed["crops"] = [deepcopy(mixed["crops"][0]) for _ in range(count)]
     mixed["treatments"] = ["Maize"] * count
     mixed["treatment_crops"] = list(range(1, count + 1))
-    assert _check_crop_entries(mixed, installed.executable.parent) == []
+    assert problems(mixed, rows) == []
 
 
-def test_treatment_crop_entry_selection(mixed):
-    from dssatlab.filex_template import _template_crop_entry
-    assert [_template_crop_entry(mixed, k)["crop"] for k in (1, 2, 3, 4)] == [
-        "maize", "soybean", "wheat", "maize"]
-    assert _template_crop_entry(mixed, "3")["cultivar"]["code"] == "IB0488"
+@pytest.mark.parametrize("treatment,crop,code", [
+    (1, "MZ", "IB0035"), (2, "SB", "IB0011"), (3, "WH", "IB0488"),
+    (4, "MZ", "IB0035"), ("3", "WH", "IB0488"),
+])
+def test_treatment_crop_entry_selection(mixed, crop_rows, installed, treatment, crop, code):
+    sim = Simulation(filex_template=mixed, weather=crop_rows[0], soil=crop_rows[1],
+                     treatment=treatment)
+    assert sim.check(verbose=False) == []
+    text = (sim.run().run_dir.parent / "TEST2101.MZX").read_text()
+    treatments = text.split("*TREATMENTS", 1)[1].split("\n\n", 1)[0].splitlines()[2:]
+    level = treatments[int(treatment) - 1].split()[-13]
+    cultivars = text.split("*CULTIVARS\n", 1)[1].split("\n\n", 1)[0].splitlines()[1:]
+    assert next(row.split()[1:3] for row in cultivars if row.split()[0] == level) == [crop, code]
 
 
-def test_single_crop_entry_selection(data):
-    from dssatlab.filex_template import _template_crop_entry
-    assert _template_crop_entry(data, 1) == data
+def test_single_crop_entry_selection(data, rows, installed):
+    folder = Simulation(filex_template=data, weather=rows[0], soil=rows[1]).run().run_dir.parent
+    text = (folder / "TEST2101.MZX").read_text()
+    assert "*CULTIVARS\n@C CR INGENO CNAME\n 1 MZ IB0035 -99\n" in text
 
 
-def test_single_crop_has_no_crop_entry_problems(data, installed):
-    from dssatlab.crop_entries import _check_crop_entries
-    assert _check_crop_entries(data, installed.executable.parent) == []
+def test_single_crop_has_no_crop_entry_problems(data, rows, installed):
+    assert problems(data, rows) == []
 
 
-def test_rotation_has_no_crop_entry_problems(data, installed):
-    from dssatlab.crop_entries import _check_crop_entries
-    rotation = dict(treatment_name="Sequence", rotation=[data, {"crop": "fallow", "end_date": "2022-02-28"}])
-    assert _check_crop_entries(rotation, installed.executable.parent) == []
+def test_rotation_has_no_crop_entry_problems(data, crop_rows, installed):
+    entry = {key: data[key] for key in ("crop", "cultivar", "planting")}
+    rotation = dict(treatment_name="Sequence", rotation=[entry, {"crop": "fallow", "end_date": "2022-02-28"}])
+    assert problems(rotation, crop_rows) == []
 
 
-def test_genotype_files_cover_each_entry_once(mixed, installed):
-    from dssatlab.filex_template import _template_genotype_files
+def test_genotype_files_cover_each_entry_once(mixed, crop_rows, installed):
     mixed["crops"].append(deepcopy(mixed["crops"][0]))
     mixed["treatment_crops"][-1] = 4
-    paths = _template_genotype_files(mixed, installed.executable.parent)
-    assert [path.name for path in paths] == [
+    folder = Simulation(filex_template=mixed, weather=crop_rows[0], soil=crop_rows[1]).run().run_dir.parent
+    paths = [path for path in folder.iterdir() if path.suffix in (".CUL", ".ECO", ".SPE")]
+    assert sorted(path.name for path in paths) == sorted([
         "MZCER048.CUL", "MZCER048.ECO", "MZCER048.SPE",
         "SBGRO048.CUL", "SBGRO048.ECO", "SBGRO048.SPE",
-        "WHCER048.CUL", "WHCER048.ECO", "WHCER048.SPE"]
+        "WHCER048.CUL", "WHCER048.ECO", "WHCER048.SPE"])
+    for path in paths:
+        assert path.read_bytes() == (installed.executable.parent / "Genotype" / path.name).read_bytes()

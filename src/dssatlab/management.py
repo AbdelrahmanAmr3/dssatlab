@@ -222,7 +222,11 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                     except ValueError as error:
                         section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
             else:
+                from .climate import _check_weather_controls
                 section_problems = _check_controls(entry[section], where)
+                if isinstance(entry[section], dict) and not entry_problems and text is not None:
+                    section_problems.extend(_check_weather_controls(
+                        text, number, entry[section], where, template=filex is None))
                 if not section_problems and not entry_problems and text is not None:
                     try:
                         _controls_text(text, number, entry[section])
@@ -291,14 +295,7 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
             treatment_cultivar_path = None
             crop_entry = None
             if number is not None and 1 <= number <= len(_template_treatment_names(filex_template)):
-                if "crops" not in filex_template:
-                    crop_entry = _template_crop_entry(filex_template, number)
-                else:
-                    entries = filex_template["crops"]
-                    numbers = filex_template.get("treatment_crops")
-                    if (isinstance(entries, list) and isinstance(numbers, list) and number <= len(numbers)
-                            and type(numbers[number - 1]) is int and 1 <= numbers[number - 1] <= len(entries)):
-                        crop_entry = _template_crop_entry(filex_template, number)
+                crop_entry = _template_crop_entry(filex_template, number)
             crop = crop_entry.get("crop") if isinstance(crop_entry, dict) else None
             if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
                 treatment_cultivar_path = data_dir / "Genotype" / f"{_CROPS[crop][2]}.CUL"

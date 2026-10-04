@@ -286,7 +286,7 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
 
 
 def _write_rotation_controls(filex, experiment_data, start, components):
-    """Edit the checked sequence's first controls level, keeping component levels."""
+    """Edit the first level's dates and every level's supplied weather controls."""
     # The normal controls writer adds a new level and repoints SM; sequences
     # need NYERS/SDATE in level 1, so edit that level in this generated FileX.
     controls = _selected_controls(experiment_data, 1)
@@ -296,4 +296,9 @@ def _write_rotation_controls(filex, experiment_data, start, components):
                                ("start_date", "SDATE", _dssat_date(start))):
         if key == 'years' or key in controls:
             _repoint(lines, 1, column, value, "SIMULATION CONTROLS", "N")
+    for level in range(1, len(components) + 1):
+        for key, column in (("weather_source", "WTHER"), ("replicates", "NREPS"),
+                            ("random_seed", "RSEED")):
+            if key in controls:
+                _repoint(lines, level, column, controls[key], "SIMULATION CONTROLS", "N")
     filex.write_bytes("".join(lines).encode("ascii"))
