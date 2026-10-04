@@ -1,4 +1,4 @@
-"""Numbered fields, named treatments and one crop: the FileX template and checks."""
+"""Numbered fields, named treatments and crop values: FileX template checks."""
 
 from pathlib import Path
 import re
@@ -97,6 +97,14 @@ def _template_treatment_fields(data):
     return data.get("treatment_fields", [1] * len(_template_treatment_names(data)))
 
 
+def _template_crop_entry(data, treatment):
+    """Return a checked treatment's crop entry; single-crop values are top-level."""
+    if "crops" in data:
+        number = data["treatment_crops"][int(treatment) - 1]
+        return data["crops"][number - 1]
+    return data
+
+
 def _check_filex_template(data, data_dir) -> list[str]:
     """Return every template problem; data_dir is the DSSAT data directory.
 
@@ -108,12 +116,28 @@ def _check_filex_template(data, data_dir) -> list[str]:
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply crop, cultivar, planting "
                 "and either treatment_name or treatments."]
-    if "rotation" in data:
+    # Import only at dispatch: crop entries use the shared crop value checks.
+    from .crop_entries import _check_crop_entries
+    crop_problems = _check_crop_entries(data, data_dir)
+    if "rotation" in data and "crops" not in data:
         # Import only at dispatch: rotation uses the shared template checks.
         from .rotation import _check_rotation_template
-        return _check_rotation_template(data, data_dir)
-    problems = _check_fields(data, ("crop", "cultivar", "planting"),
-                             ("treatment_name", "treatments", "treatment_fields", "harvest_date"), where, "FileX")
+        return crop_problems + _check_rotation_template(data, data_dir)
+    required = () if "crops" in data else ("crop", "cultivar", "planting")
+    optional = ("treatment_name", "treatments", "treatment_fields", "harvest_date", "treatment_crops")
+    if "crops" in data:
+        optional += ("crop", "cultivar", "planting", "crops", "rotation")
+    problems = _check_fields(data, required, optional, where, "FileX")
+    problems.extend(_check_template_treatments(data))
+    problems.extend(crop_problems)
+    if "crops" not in data:
+        problems.extend(_check_template_crop(data, data_dir))
+    return problems
+
+
+def _check_template_treatments(data):
+    """Check treatment names and numbered fields shared by crop forms."""
+    where, problems = "FileX template", []
     names = []
     if ("treatment_name" in data) == ("treatments" in data):
         problems.append(f"{where}: supply exactly one of treatment_name or treatments.")
@@ -151,7 +175,7 @@ def _check_filex_template(data, data_dir) -> list[str]:
                     if missing:
                         problems.append(f"{where}, treatment_fields: number the fields 1 to {max(fields)} "
                                         f"without gaps (missing {', '.join(map(str, missing))}).")
-    return problems + _check_template_crop(data, data_dir)
+    return problems
 
 
 def _check_template_crop(data, data_dir):
@@ -234,7 +258,13 @@ def _check_template_cultivar(data, crop, data_dir):
 def _template_genotype_files(data, data_dir):
     """List each template crop's required genotype files once; fallow needs none."""
     paths = {}
-    for component in data.get("rotation", [data]):
+    entries = data.get("rotation", [data])
+    # Rotation checks also list genotype files for malformed templates. Keep
+    # their components when crops is present as a conflicting top-level key.
+    if "crops" in data and "rotation" not in data:
+        entries = [_template_crop_entry(data, number)
+                   for number in range(1, len(_template_treatment_names(data)) + 1)]
+    for component in entries:
         crop = component.get("crop") if isinstance(component, dict) else None
         if isinstance(crop, str) and crop in _CROPS and data_dir is not None:
             _, _, prefix, extensions, _ = _CROPS[crop]
