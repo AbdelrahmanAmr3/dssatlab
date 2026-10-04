@@ -178,4 +178,5 @@ These equalities use the stock controls and seed. The seed override above
 demonstrates reproducibility and is not the course-reference setup. A locally
 altered `DTCM.CLI` changed yields, confirming DSSAT used the supplied copy.
 A stock Linux managed install was unavailable, so no Linux real-DSSAT proof
-was run. Economics from `.PRI` files remains outside this release.
+was run. To compute net returns from `.PRI` price files after a run, see
+[seasonal economics](seasonal.md#compute-net-return-from-a-price-file).

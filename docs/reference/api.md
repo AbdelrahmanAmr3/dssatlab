@@ -123,6 +123,51 @@ See [Summarise your weather and soil before a run](../guide/simulation.md#summar
 
 ::: dssatlab.write_scenario_template
 
+## Economics
+
+### net_returns(rows, price_file)
+
+```python
+net_returns(rows: list[dict], price_file: str | Path) -> list[dict]
+```
+
+::: dssatlab.net_returns
+
+Arguments:
+
+- `rows: list[dict]`: Summary rows from `read_summary()`, `result.summary()` or
+  `combine_summaries()`. Each row needs `CR` and `TRNO`, plus the quantity columns
+  used by its price section. Matching uses `(CR, TRNO)`, not the scenario's
+  `treatment` label; fallow rows also need a matching section.
+- `price_file: str | pathlib.Path`: an existing, readable UTF-8 DSSAT `.PRI`
+  price file. No default price file is selected. Crop headings cover subsequent
+  treatment sections until the next crop heading; both `TREATMENT10` and
+  `TREATMENT 10` are accepted.
+
+Returns `list[dict]`: copies of the input rows, in input order, retaining every
+column and adding `net_return` as a float in $/ha or `None` when a used quantity
+is `None`. Input rows are unchanged. `IDIS=-1` ignores a component, `0` uses
+fixed `PAR1`, `1` uses the uniform mean, `2` the triangular mean, and `3` the
+normal mean (`PAR1`). Price risk is not modelled. An empty row list returns `[]`
+after validating the price file.
+
+Raises one `DSSATCheckError` collecting file and row problems in
+`error.problems`: unreadable files; missing, duplicate or malformed sections;
+missing, extra or duplicate price columns; missing, duplicate or unknown
+parameter rows; non-finite or non-numeric price values; unknown IDIS or
+inconsistent distribution parameters; rows that are not a list of dicts;
+missing or invalid `CR`/`TRNO`, or no matching section; absent used quantity
+columns; and used quantities that are bools, strings or non-finite numbers.
+Required price columns are `GRAN BYPR BASE NFER NCOS IRRI IRCO SCOS RESM PCOS
+PFER KCOS KFER`, with `IDIS`, `PAR1`, `PAR2` and `PAR3` rows in each section.
+Uniform parameters require `PAR1 <= PAR2`, triangular parameters require
+`PAR1 <= PAR2 <= PAR3`, and normal parameters require `PAR2 >= 0`.
+
+Pass the result to `summarize_seasons(rows, variables=["net_return"])` or
+`to_dataframe(rows)` (optional pandas). See
+[seasonal economics](../guide/seasonal.md#compute-net-return-from-a-price-file)
+for the required quantities and missing-value limits.
+
 ## Reading outputs and plotting
 
 ::: dssatlab.read_summary

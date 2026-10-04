@@ -19,9 +19,11 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
-Version 0.21.0 adds generated weather from a supplied climate file, sequence
-replicates and a fixed random seed through experiment data controls. See the
-[generated weather guide](docs/guide/generated-weather.md).
+Version 0.21.1 adds `net_returns()` to compute net return at expected prices
+from a DSSAT `.PRI` price file and summarize it across seasons. See
+[seasonal economics](docs/guide/seasonal.md#compute-net-return-from-a-price-file).
+Generated weather from a supplied climate file, sequence replicates and a fixed
+random seed are covered in the [generated weather guide](docs/guide/generated-weather.md).
 
 Version 0.20.0 adds new cultivars under your own code through experiment data
 `cultivar.ecotype`, optional `name`, and every required coefficient. It also checks
