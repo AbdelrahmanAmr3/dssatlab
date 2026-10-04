@@ -7,8 +7,8 @@ Status: accepted (2026-10-04). Follows 0007.
 Seasonal course cases such as DTCM6401 come with a DSSAT price file (`*.PRI`) for an economic
 analysis. DSSAT-CSM never reads that file: the analysis lived in DSSAT's Seasonal Analysis tool,
 which combines each Summary row with prices and costs (Thornton et al. 1994, Agron. J. 86:860,
-Table 4) and samples price distributions (IDIS 1-3) at a few percentiles before a mean-variance or
-stochastic-dominance comparison.
+Table 4) and evaluates five percentiles of each price distribution (IDIS 1-3) against every yield,
+then sorts and interpolates them for a mean-variance or stochastic-dominance comparison (Table 5).
 
 ## Decision
 
@@ -23,14 +23,18 @@ normal mean; IDIS -1 leaves the component out. Season statistics come from `summ
 
 ## Alternatives considered
 
-- Sample the distributions as the Seasonal Analysis tool did. Rejected: needs a seed and a
-  percentile rule the tool never documented, and gives results that are no easier to check.
+- Reproduce the tool's five-percentile price procedure. Rejected as scope: no course case needs more
+  than the mean, and a deterministic expected-price result is the easiest to check.
 - Reject IDIS 1-3. Rejected: DTCM6401 uses a normal grain price, and net return is linear in each
-  price, so the expected value gives the exact mean net return over seasons.
+  price, so at expected prices the mean over seasons is the expected mean net return, conditional on
+  the simulated quantities (not a reproduction of the historical risk analysis).
 - Stochastic dominance and risk plots. Rejected for now: no course case needs more than the mean.
 
 ## Consequences
 
-- No DSSAT output to compare against; the proof recomputes every DTCM6401 row independently.
+- No DSSAT output to compare against; the proof recomputes every row of DTCM6401 and of UFGA8201
+  (nonzero N and irrigation) independently.
+- Summary alone cannot give complete economics for DTCM6401: missing N quantities and maize DWAP make
+  most of its rows None.
 - Price spread (risk) is not modelled: two price files with the same means give the same results.
 - Every Summary row needs a section for its crop and treatment, fallow rows included.
