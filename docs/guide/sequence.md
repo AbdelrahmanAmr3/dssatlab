@@ -104,6 +104,10 @@ or automatic management and cannot be known before the run, the checks retain
 the boundary requirement. Missing weather beyond it is caught by the post-run
 `WARNING.OUT` scan; passing the checks does not predict maturity.
 
+FileX dates use DSSAT's two-digit-year rule: years 00-35 are 2000-2035 and
+36-99 are 1936-1999, including the sequence start and inherited component dates.
+Weather written by dssatlab never chooses their century.
+
 ## Weather and replicate settings in DSSAT sample sequence files
 
 DSSAT ships sample sequence files (such as `UFGA7804.SQX`) that contain configuration settings that silently break automated runs with your own data:
