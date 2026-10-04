@@ -51,7 +51,7 @@ def test_valid_planting_reports_ok_for_every_treatment(simulation, planting, cap
     assert f"treatment {int(key)}: ok" in report
     assert "planting: ok" in report
     assert report.index("weather") < report.index("filex") < report.index("management")
-    assert "soil" not in report
+    assert "soil data" not in report
     assert "crop-specific fields are checked by dssat at run time" in report
 
 

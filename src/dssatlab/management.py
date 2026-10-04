@@ -11,6 +11,7 @@ from .experiment import (_check_controls, _check_date, _check_fields,
                          _check_number, _check_treatment_key, _unknown_keys)
 from .weather import _show_value
 from .initial_conditions import _check_initial_conditions, _initial_conditions_text
+from .soil_analysis import _check_soil_analysis, _soil_analysis_text
 from .controls import _check_planting_window, _controls_text
 
 
@@ -149,7 +150,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
     from .operations import _OPERATION_FIELDS, _check_operation
 
     sections = ("planting", "irrigation", "fertilizer", *_OPERATION_FIELDS,
-                "cultivar", "initial_conditions", "controls")
+                "cultivar", "initial_conditions", "soil_analysis", "controls")
     if not isinstance(entry, dict):
         entry_problems.append(f"{where}: entry must be a dict. Supply a dict "
                               f"with optional {', '.join(sections)}, "
@@ -199,13 +200,16 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         report.extend(_report_lines("    cultivar", section_problems))
     else:
         report.append("    cultivar: OK (omitted; keeps the FileX Level)")
-    for section in ("initial_conditions", "controls"):
+    for section in ("initial_conditions", "soil_analysis", "controls"):
         if section in entry:
-            if section == "initial_conditions":
-                section_problems = _check_initial_conditions(entry[section], where)
+            if section in ("initial_conditions", "soil_analysis"):
+                check, render = ((_check_initial_conditions, _initial_conditions_text)
+                                 if section == "initial_conditions" else
+                                 (_check_soil_analysis, _soil_analysis_text))
+                section_problems = check(entry[section], where)
                 if not section_problems and not entry_problems and text is not None:
                     try:
-                        _initial_conditions_text(text, number, entry[section])
+                        render(text, number, entry[section])
                     except ValueError as error:
                         section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
             else:
