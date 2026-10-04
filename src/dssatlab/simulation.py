@@ -175,7 +175,7 @@ class Simulation:
             filex_problems.append(f"Simulation start date {start_date.isoformat()!r} is not "
                                  f"covered by weather data ({min(days)} to {max(days)}). "
                                  "Supply weather for the simulation's start date.")
-        if (override_start is not None or values.get("START") == "P") and start_date is not None and days and not _overrides_section(
+        if (override_start is not None or values.get("START") != "E") and start_date is not None and days and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
             # DSSAT-CSM v4.8.6.0, InputModule/IPMAN.for, IPIRR: only IRRIG R

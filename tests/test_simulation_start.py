@@ -8,6 +8,7 @@ from dssatlab import Simulation
 from test_filex_check import SAMPLE, filex
 from test_season_coverage import weather
 from test_sequence import sequence
+from test_simulation_run import fake_dssat
 from test_stock_weather import weather_file
 
 
@@ -100,6 +101,47 @@ def test_start_p_irrigation_ignores_controls_start_date(filex):
         "Simulation start date '1982-02-26' is after the FileX's first irrigation date "
         "1982-02-25; DSSAT stops with error IPIRR. Start on or before that date, "
         "or give irrigation in the management data."]
+
+
+@pytest.mark.parametrize("start,day", [("S", "1982-03-05"), ("P", "1982-03-11")])
+@pytest.mark.parametrize("override", [False, True])
+def test_inherited_irrigation_before_effective_start(filex, fake_dssat, start, day, override):
+    text = (SAMPLE + AUTOMATIC.split("@N PLANTING")[0].replace("A     R", "R     R") +
+            PLANTING.replace("82057", "82070") +
+            IRRIGATION.replace("40057", "82063"))
+    sim = Simulation(filex(start=start, sdate="82064", text=text), 1,
+                     weather("1982-03-01", "1982-03-20"), fake_dssat.executable,
+                     management=experiment(controls={"start_date": "1982-03-05"}) if override else None)
+    label = "Controls start_date" if override and start == "S" else "Simulation start date"
+    assert sim.check(False) == [
+        f"{label} {day!r} is after the FileX's first irrigation date "
+        "1982-03-04; DSSAT stops with error IPIRR. Start on or before that date, "
+        "or give irrigation in the management data."]
+
+
+@pytest.mark.parametrize("code,idate", [("R", "82064"), ("R", "82065"),
+                                       ("A", "82063"), ("F", "82063"), ("N", "82063"),
+                                       ("D", "00001"), ("P", "82063"), ("W", "82063")])
+def test_inherited_start_s_irrigation_boundaries_and_codes(filex, fake_dssat, code, idate):
+    text = (SAMPLE + AUTOMATIC.split("@N PLANTING")[0].replace("A     R", f"R     {code}") +
+            PLANTING.replace("82057", "82070") +
+            IRRIGATION.replace("40057", idate))
+    sim = Simulation(filex(sdate="82064", text=text), 1,
+                     weather("1982-03-01", "1982-03-20"), fake_dssat.executable)
+    assert sim.check(False) == []
+
+
+@pytest.mark.parametrize("irrigation", [[], [{"date": "1982-03-06", "amount": 10, "method": "IR001"}]])
+def test_inherited_start_s_irrigation_replacement_skips_filex_dates(filex, fake_dssat, irrigation):
+    text = (SAMPLE + AUTOMATIC.split("@N PLANTING")[0].replace("A     R", "R     R") +
+            PLANTING.replace("82057", "82070") +
+            IRRIGATION.replace("40057", "82063").replace("@I IDATE",
+                "@I  EFIR  IDEP  ITHR  IEPT  IOFF  IAME  IAMT IRNAME\n"
+                " 1     1    30    50   100 GS000 IR001    10 -99\n@I IDATE"))
+    sim = Simulation(filex(sdate="82064", text=text), 1,
+                     weather("1982-03-01", "1982-03-20"), fake_dssat.executable,
+                     management=experiment(irrigation=irrigation))
+    assert sim.check(False) == []
 
 
 def test_automatic_planting_ignores_sdate_override_under_p(filex):
