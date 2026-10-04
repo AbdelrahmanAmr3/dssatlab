@@ -99,6 +99,19 @@ def test_inherited_irrigation_uses_filex_century(filex, fake_dssat):
         "or give irrigation in the management data."]
 
 
+@pytest.mark.parametrize('code,idate', [('D', '00010'), ('N', '40001')])
+def test_inherited_irrigation_start_bound_only_for_irrig_r(filex, fake_dssat, code, idate):
+    # DSSAT IPIRR bounds only IRRIG R calendar dates by the start date.
+    text = (SAMPLE + '@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n'
+            f' 1 MA              R     {code}     R     N     M\n'
+            f'\n*IRRIGATION AND WATER MANAGEMENT\n@I IDATE  IROP IRVAL\n 1 {idate} IR001    10\n')
+    sim = Simulation(filex(sdate='40001', text=text),
+                     weather=weather('1940-01-01', '2040-01-02'),
+                     executable=fake_dssat.executable,
+                     management={'treatments': {1: {'controls': {'start_date': '2040-01-01'}}}})
+    assert sim.check(False) == []
+
+
 def test_inherited_planting_window_uses_rule_and_only_edited_coverage(filex, fake_dssat):
     text = SAMPLE + '''
 @N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS

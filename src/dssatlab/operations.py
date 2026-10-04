@@ -101,7 +101,7 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
     # components start the day after the previous one ends, ignoring SDATE.
     # DSSAT-CSM v4.8.6.0, InputModule/ipexp.for (655-663): START E sets
     # start and planting to EDATE whatever PLANT is; emergence bounds harvest only here.
-    start, start_label = None, 'simulation start date'
+    start, start_label, emergence = None, 'simulation start date', False
     planting_edit = override.get('planting')
     planting = (date.fromisoformat(planting_edit['date']) if isinstance(planting_edit, dict)
                 and not _check_date(planting_edit.get('date'), '') else None)
@@ -115,7 +115,7 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
             elif reference == 'SM' and first and details.get('START') == 'P':
                 start = _simulation_start(text, treatment, source)
             elif reference == 'SM' and first and details.get('START') == 'E':
-                start_label = 'simulation start date (START E emergence date)'
+                start_label, emergence = 'simulation start date (START E emergence date)', True
                 if 'planting' in override:
                     if (isinstance(planting_edit, dict)
                             and not _check_date(planting_edit.get('emergence_date'), '')):
@@ -132,7 +132,8 @@ def _harvest_bounds(source, text, treatment, row, override, *, first=True):
         code = _component_management(text, row, 'PLANT')
     # DSSAT-CSM v4.8.6.0, Management/AUTPLT.for, AUTPLT (98-99):
     # PLANT A/F discard the reported PDATE; keep only a known simulation start.
-    if code in ('A', 'F'):
+    # START E also sets the planting date to EDATE, so PDATE is no bound.
+    if code in ('A', 'F') or emergence:
         planting = None
     return [(start_label, start), ('planting date', planting)]
 

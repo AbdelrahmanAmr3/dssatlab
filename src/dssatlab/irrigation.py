@@ -1,6 +1,7 @@
 """Check irrigation timing against the treatment's effective management codes."""
 
 from datetime import date
+from pathlib import Path
 
 from .experiment import _check_date, _check_fields, _check_number
 from .filex import _section_row
@@ -21,6 +22,21 @@ def _effective_management(entry, text, treatment, field, column):
         except (ValueError, TypeError):
             pass  # Existing FileX and controls checks report unavailable layouts.
     return None
+
+
+def _start_irrigation_code(source, filex, treatment, components):
+    """Read the first component's effective IRRIG, as DSSAT does before its start check."""
+    from .controls import _selected_controls
+    from .operations import _component_management
+
+    try:
+        text = Path(filex).read_text(encoding='latin-1')
+    except (OSError, TypeError, ValueError):
+        return None
+    if len(components) > 1:
+        return _component_management(text, components[0], 'IRRIG')
+    return _effective_management({'controls': _selected_controls(source, treatment)}, text,
+                                 treatment, 'irrigation_management', 'IRRIG')
 
 
 def _management_problem(kind, code, where, *, date_only=False):

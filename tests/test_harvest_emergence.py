@@ -138,3 +138,11 @@ def test_start_e_sequence_first_harvest_keeps_emergence_bound(tmp_path, fake_dss
 def test_start_e_sequence_later_harvest_not_bounded_by_emergence(tmp_path, fake_dssat):
     sim = emergence_simulation(tmp_path, fake_dssat, harvest='82080', sequence=True)
     assert sim.check(False) == []
+
+
+def test_start_e_ignores_pdate_as_harvest_bound(tmp_path, fake_dssat):
+    # DSSAT IPEXP sets the planting date to EDATE under START E.
+    sim = emergence_simulation(tmp_path, fake_dssat, harvest='82090')
+    text = sim.filex.read_text(encoding='latin-1').replace(' 1 82069 82079', ' 1 82100 82079')
+    sim.filex.write_text(text, encoding='latin-1')
+    assert sim.check(False) == []

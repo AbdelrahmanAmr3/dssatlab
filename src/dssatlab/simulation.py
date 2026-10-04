@@ -9,6 +9,7 @@ from .controls import _controls_start_date, _season_coverage
 from .filex import _check_filex_controls, _filex_date, _irrigation_dates, _read_filex
 from .filex_skeleton import _check_template_simulation, _write_template_simulation
 from .filex_write import _identity_text, _write_management
+from .irrigation import _start_irrigation_code
 from .management import _check_management, _report_lines
 from .experiment import _overrides_section
 from .operations import _check_harvest
@@ -177,8 +178,11 @@ class Simulation:
         if (override_start is not None or values.get("START") == "P") and start_date is not None and days and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
-            irrigation = [_filex_date(text)
-                          for text in _irrigation_dates(self.filex, self.treatment)]
+            # DSSAT-CSM v4.8.6.0, InputModule/IPMAN.for, IPIRR: only IRRIG R
+            # events are calendar dates that must not precede the start.
+            code = _start_irrigation_code(experiment_data, self.filex, self.treatment, components)
+            irrigation = [_filex_date(text) for text in _irrigation_dates(self.filex, self.treatment)
+                          if code in ("R", None)]
             irrigation = [day for day in irrigation if day is not None]
             if irrigation and min(irrigation) < start_date:
                 label = "Controls start_date" if override_start is not None else "Simulation start date"
