@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.19.0] - Unreleased
+## [0.19.0] - 2026-10-04
 
 ### Added
 - Experiment data `soil_analysis`: a required date, optional method codes and measured layer values, written as a new SOIL ANALYSIS level (SA). Checks require positive ascending depths, allowed value ranges and a first-layer value for any column supplied deeper down. Omitted values write -99; the quoted `"off"` sets SA to 0 ([ADR 0028](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0028-soil-analysis-and-environment-as-new-levels.md)).
