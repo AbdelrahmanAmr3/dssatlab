@@ -127,6 +127,8 @@ def test_guide_experiment_examples(label, experiment, sim_inputs, cultivar_table
     source = cultivar.read_bytes()
     line = next(line for line in source.splitlines() if line.startswith(b'IB0035'))
     cultivar.write_bytes(source + b'999991' + line[6:] + b'\n')
+    if label.startswith('new-cultivars.md:'):
+        cultivar.with_suffix('.ECO').write_text('@ECO# ECONAME\nIB0001 Example\n', encoding='ascii')
     first = date(1978, 1, 1)
     weather = [dict(weather[0], date=(first + timedelta(days=i)).isoformat())
                for i in range((date(1996, 1, 1) - first).days)]

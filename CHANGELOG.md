@@ -2,6 +2,20 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.20.0] - 2026-10-04
+
+### Added
+- New cultivars in experiment data: an unused `cultivar.code`, existing `ecotype`, optional `name`, and every coefficient after `ECO#` in the first `.CUL` table. Checks report missing coefficients, unknown ecotypes, conflicts and fixed-width problems before writing. The simulation folder's `.CUL` copy gains the line under the user's code; source `.CUL`, `.ECO` and `.SPE` files stay unchanged ([ADR 0030](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0030-new-cultivars-under-the-users-own-code.md)).
+- Experiment template comments and a [new cultivar tutorial](guide/new-cultivars.md) cover `ecotype`, `name`, required coefficients, copied FileX and FileX template Simulations. Rotation components reject new cultivars; scenarios keep separate definitions in their own simulation folders.
+
+### Fixed
+- Stock `$WEATHER` anchor checks now cover the effective HARVS R harvest dates of every rotation component, inherited from the FileX or overridden in experiment data ([#275](https://github.com/AbdelrahmanAmr3/dssatlab/issues/275)).
+- FileX edits read multi-digit I3 levels beyond the header span, avoiding cultivar-level collisions in UFGA7801 and removing old rows correctly when reusing a free level past 99.
+
+### Notes
+- All four real-DSSAT proofs pass on Windows 4.8.5.017: maize equality, changed maize P1, copied soybean IB1000 after the level fix, and rice without an `.ECO`. Results and local rerun evidence are recorded in ADR 0030. Stock-value course definitions remain approximations.
+- Zero runtime dependencies are preserved.
+
 ## [0.19.1] - 2026-10-04
 
 ### Fixed

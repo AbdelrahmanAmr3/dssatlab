@@ -94,6 +94,13 @@ def test_component_coefficients_rejected(sim):
         sim.run()
     assert message in error.value.problems
 
+
+@pytest.mark.parametrize('field,value', [('ecotype', 'IB0001'), ('name', 'New name')])
+def test_component_new_cultivar_fields_rejected(sim, field, value):
+    edits(sim, {3: {'cultivar': {'crop': 'WH', 'code': 'ZZ0001', field: value}}})
+    assert any(field in p and 'not per rotation component' in p and 'Remove' in p
+               for p in sim.check(False))
+
 @pytest.mark.parametrize('value', ['-99', 'XXXXX', '78367'])
 def test_unreadable_bound_note(sim, value, capsys):
     if sim.filex is None:

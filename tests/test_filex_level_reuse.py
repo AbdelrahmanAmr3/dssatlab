@@ -62,6 +62,18 @@ def level_rows(text, section, level):
     return [line for line in body.splitlines() if line[:2].strip() == str(level)]
 
 
+def test_reused_cultivar_level_drops_copied_i3_row():
+    original = "*TREATMENTS\n@N R CU\n  31  3\n*CULTIVARS\n@C CR INGENO CNAME\n"
+    rows = [f"{level:3d}SB IB{999 + level:04d} OLD\n" for level in range(1, 100)]
+
+    written = _cultivar_text(original + "".join(rows), 3, {"crop": "SB", "code": "IB1000"})
+
+    assert " 1 SB IB1000   -99\n" in written
+    assert rows[0] not in written  # Level 1 is the lowest free level.
+    assert "".join(rows[1:]) in written
+    assert "  31  1\n" in written
+
+
 @pytest.mark.parametrize("key,column,section,data,blocks,expected", CASES)
 @pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
 def test_reuses_only_level_freed_by_this_edit(

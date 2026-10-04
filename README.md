@@ -19,8 +19,10 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
-Version 0.19.1 checks FileX dates against the stock weather anchor and the
-1936-2035 range. See [FileX dates](docs/guide/simulation.md#filex-dates).
+Version 0.20.0 adds new cultivars under your own code through experiment data
+`cultivar.ecotype`, optional `name`, and every required coefficient. It also checks
+each rotation component's fixed harvest dates against the stock weather anchor
+and fixes edits to multi-digit FileX levels. See [new cultivars](docs/guide/new-cultivars.md).
 
 Version 0.18.1 adds `import_nasa_power()` for a downloaded daily CSV. Simulation
 checks use the effective planting date under START P for coverage and harvest
@@ -243,6 +245,10 @@ FileA beside the FileX); a `Simulation` leaves them `None`. No FileA/FileT is wr
 ## Which crops and cultivars can I use?
 
 Experiment data accepts optional `cultivar.coefficients` for coefficient sweeps with `run_sweep()`; each simulation gets its own changed `.CUL` copy and the source stays unchanged. See the [sweep guide](docs/guide/sweeps.md#cultivar-coefficient-sweep).
+
+To define a code absent from the crop's `.CUL`, supply `ecotype`, optional `name`,
+and every coefficient of its first table. The simulation copy keeps your code.
+See the [new cultivar tutorial](docs/guide/new-cultivars.md).
 
 Inspect which template crops and cultivars are installed before writing a FileX:
 

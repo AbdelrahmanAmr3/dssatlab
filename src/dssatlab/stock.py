@@ -9,7 +9,7 @@ from .controls import _controls_start_date, _selected_controls
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
 from .irrigation import _effective_management
-from .operations import _harvest_end
+from .operations import _component_management, _harvest_end
 from .rotation_data import _calendar_date, _level_date
 from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
@@ -103,18 +103,31 @@ def _simulation_weather(sim, values, experiment_data, components):
                    else "FileX SDATE")
     dates = [(sdate_field, _filex_date(values.get("SDATE")))]
     harvest = None
-    if len(components) == 1:
-        code = _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS")
+    sequence = len(components) > 1
+    edits = entry.get("rotation", {})
+    edits = {int(key): value for key, value in edits.items()
+             if str(key).isascii() and str(key).isdigit() and isinstance(value, dict)
+             } if isinstance(edits, dict) else {}
+    for row in components:
+        if sequence and not row["R"].isdigit():
+            continue  # Ordinary sequence checks report unreadable component numbers.
+        override = edits.get(int(row["R"]), {}) if sequence else entry
+        location = f"{where}.rotation.{int(row['R'])}" if sequence else where
+        code = (_component_management(text, row, "HARVS") if sequence else
+                _effective_management(entry, text, int(sim.treatment), "harvest_management", "HARVS"))
         if code == "R":
-            harvest = _harvest_end(entry, _level_date(
-                text, components[0], "MH", "HARVEST DETAILS", "H", "HDATE"), code)
-            events = entry.get("harvest")
+            end = _harvest_end(override, _level_date(
+                text, row, "MH", "HARVEST DETAILS", "H", "HDATE"), code)
+            if not sequence:
+                harvest = end
+            events = override.get("harvest")
             if isinstance(events, list):
-                dates.extend((f"{where}.harvest.{i}.date", _calendar_date(event.get("date")))
+                dates.extend((f"{location}.harvest.{i}.date", _calendar_date(event.get("date")))
                              for i, event in enumerate(events) if isinstance(event, dict))
-            elif harvest is not None:
-                dates.extend(("FileX HDATE", _filex_date(event["HDATE"])) for event in
-                             _section_rows(text, "HARVEST DETAILS", "H", int(components[0]["MH"]),
+            elif end is not None:
+                field = f"FileX HDATE (rotation component {int(row['R'])})" if sequence else "FileX HDATE"
+                dates.extend((field, _filex_date(event["HDATE"])) for event in
+                             _section_rows(text, "HARVEST DETAILS", "H", int(row["MH"]),
                                            ("HDATE",)))
     if start is None:
         reason = " (START E needs an emergence date)" if values.get("START") == "E" else ""

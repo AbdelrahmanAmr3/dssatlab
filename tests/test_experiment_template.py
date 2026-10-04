@@ -96,6 +96,38 @@ def test_filex_prefills_only_treatment_numbers(tmp_path, sim_inputs, writer_name
     assert filex.read_bytes() == before
 
 
+@pytest.mark.parametrize("prefill", [False, True])
+def test_new_cultivar_template_loads_checks_and_writes(tmp_path, sim_inputs, fake_dssat, prefill):
+    yaml = pytest.importorskip("yaml")
+    filex, weather = sim_inputs
+    source = filex.parent / "MZCER048.CUL"
+    original = source.read_bytes()
+    source.with_suffix(".ECO").write_text("@ECO# ECONAME\nIB0001 Example\n", encoding="ascii")
+    dest = tmp_path / "experiment.yaml"
+    dssatlab.write_experiment_template(dest, filex=filex if prefill else None)
+    text = dest.read_text(encoding="utf-8").replace('code: "IB0035"', 'code: "NC0001"')
+    for field in ("ecotype", "name", "coefficients"):
+        text = text.replace(f"      # {field}:", f"      {field}:")
+    dest.write_text(text, encoding="utf-8")
+    entry = yaml.safe_load(text)["treatments"][1]["cultivar"]
+    assert entry["ecotype"] == "IB0001"
+    assert entry["name"] == "New maize"
+    assert entry["coefficients"] == {
+        "P1": 259, "P2": 1.193, "P5": 947.1, "G2": 924.3, "G3": 8.168, "PHINT": 43,
+    }
+    sim = Simulation(filex, 1, weather, management=dest, executable=fake_dssat.executable)
+    assert sim.check(False) == []
+    folder = sim.run().run_dir.parent
+    line = next(line for line in (folder / source.name).read_bytes().splitlines()
+                if line.startswith(b"NC0001"))
+    assert line[7:23] == b"New maize       "
+    assert line[30:36] == b"IB0001"
+    written = (folder / filex.name).read_text(encoding="latin-1")
+    level = int(_section_row(written, "TREATMENTS", "N", 1, ("CU",))["CU"])
+    assert _section_row(written, "CULTIVARS", "C", level, ("INGENO",))["INGENO"] == "NC0001"
+    assert source.read_bytes() == original
+
+
 @pytest.mark.parametrize("writer_name", WRITERS)
 @pytest.mark.parametrize("directory", [False, True])
 def test_existing_destination_is_preserved(tmp_path, writer_name, directory):

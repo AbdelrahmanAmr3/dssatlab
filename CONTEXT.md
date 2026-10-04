@@ -120,6 +120,12 @@ copy of the cultivar's line with those values and a new VAR# (DL0001, DL0002 ...
 simulation folder's .CUL copy and points the treatment at it. The source .CUL never changes.
 _Avoid_: parameter, genetic coefficient file edit, calibration (GLUE is not planned)
 
+**New cultivar**:
+A cultivar the user defines in experiment data under their own code, absent from the crop's .CUL:
+an existing ecotype and every cultivar coefficient of that .CUL. dssatlab adds it as one line to
+the simulation folder's .CUL copy, keeping the user's code (unlike a changed cultivar's DLnnnn).
+_Avoid_: custom cultivar, cultivar file
+
 **Weather data**:
 A user's own daily weather, as they hold it (a table), before it is converted into a
 DSSAT weather file.
