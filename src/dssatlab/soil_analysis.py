@@ -12,6 +12,8 @@ from .weather import _dssat_date, _show_value
 
 # DSSAT-CSM v4.8.6.0 InputModule/IPSLIN.for, IPSLAN formats 55 and 60:
 # (I3,I5,3(1X,A5)) and (I3,F5.0,8(1X,F5.0)); SASC also reads (51X,F6.0).
+# optempy2k.for writes SAPX and SAKE as F6.2 and SASC as F6.3 for SOILDYN,
+# so their upper limits are the largest values those formats can show.
 _HEADERS = (
     "@A SADAT  SMHB  SMPX  SMKE  SANAME",
     "@A  SABL  SADM  SAOC  SANI SAPHW SAPHB  SAPX  SAKE  SASC",
@@ -23,9 +25,9 @@ _FIELDS = {
     "total_nitrogen": ("SANI", 0, 10, False, "%"),
     "ph_water": ("SAPHW", 0, 14, True, ""),
     "ph_buffer": ("SAPHB", 0, 14, True, ""),
-    "extractable_p": ("SAPX", 0, None, False, "mg/kg"),
-    "exchangeable_k": ("SAKE", 0, None, False, "cmol/kg"),
-    "stable_carbon": ("SASC", 0, 100, False, "%"),
+    "extractable_p": ("SAPX", 0, 999.99, False, "mg/kg"),
+    "exchangeable_k": ("SAKE", 0, 999.99, False, "cmol/kg"),
+    "stable_carbon": ("SASC", 0, 99.999, False, "%"),
 }
 
 

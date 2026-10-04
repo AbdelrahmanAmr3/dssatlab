@@ -45,6 +45,16 @@ def assert_problem(sim, event, variable, correction):
                and correction in p for p in sim.check(False))
 
 
+def test_environment_allows_100_events_and_rejects_101(sim):
+    first = date(1982, 3, 1)
+    sim.management["treatments"][2]["environment"] = [
+        dict(date=(first + timedelta(days=n)).isoformat(), srad={"multiply": 0.5})
+        for n in range(100)]
+    assert sim.check(False) == []
+    events(sim).append(dict(date=(first + timedelta(days=100)).isoformat(), srad={"multiply": 1}))
+    assert any("found 101 events" in p and "100 or fewer" in p for p in sim.check(False))
+
+
 @pytest.mark.parametrize("value", [None, {}, "off", True])
 def test_environment_requires_a_list(sim, value):
     sim.management["treatments"][2]["environment"] = value

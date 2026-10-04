@@ -15,6 +15,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Fixed
 - Experiment data `harvest` dates under effective HARVS R are checked against the known simulation start and planting dates, including START E emergence and sequence component bounds, as inherited harvest dates are ([#254](https://github.com/AbdelrahmanAmr3/dssatlab/issues/254)).
 - Inherited dated irrigation under IRRIG R is checked against an unchanged FileX SDATE under START S, as it already is when `controls.start_date` is supplied ([#256](https://github.com/AbdelrahmanAmr3/dssatlab/issues/256)).
+- Experiment data `environment` rejects more than 100 events, the number DSSAT reads. `soil_analysis` limits `extractable_p` and `exchangeable_k` to 999.99 and `stable_carbon` to 99.999, the widths DSSAT writes for them.
 
 ### Notes
 - FileX dates checked against `$WEATHER` stock weather ([#253](https://github.com/AbdelrahmanAmr3/dssatlab/issues/253)) are planned for 0.19.1.

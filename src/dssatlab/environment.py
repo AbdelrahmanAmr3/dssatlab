@@ -24,6 +24,9 @@ def _check_environment(data, where):
         return [f"{where}: expected a list of event dicts. Supply dated environment "
                 "modifications, [] to set ME to 0, or omit the section to keep the FileX level."]
     problems, previous = [], None
+    if len(data) > 100:
+        problems.append(f"{where}: found {len(data)} events. DSSAT reads at most 100 "
+                        "(WTHMOD NMODS); supply 100 or fewer events.")
     for number, event in enumerate(data, 1):
         location = f"{where}, event {number}"
         if not isinstance(event, dict):

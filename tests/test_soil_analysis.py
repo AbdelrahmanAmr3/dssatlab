@@ -93,8 +93,9 @@ def test_method_codes_require_two_ascii_letters_and_three_digits(sim, field, val
     ("total_nitrogen", -1, "0 to 10"), ("total_nitrogen", 10.1, "0 to 10"),
     ("ph_water", 0, "above 0 and at most 14"), ("ph_water", 14.1, "above 0 and at most 14"),
     ("ph_buffer", 0, "above 0 and at most 14"), ("ph_buffer", 14.1, "above 0 and at most 14"),
-    ("extractable_p", -1, "0 or greater"), ("exchangeable_k", -1, "0 or greater"),
-    ("stable_carbon", -1, "0 to 100"), ("stable_carbon", 101, "0 to 100"),
+    ("extractable_p", -1, "0 to 999.99"), ("extractable_p", 1000, "0 to 999.99"),
+    ("exchangeable_k", -1, "0 to 999.99"), ("exchangeable_k", 1000, "0 to 999.99"),
+    ("stable_carbon", -1, "0 to 99.999"), ("stable_carbon", 100, "0 to 99.999"),
 ])
 def test_layer_ranges_report_layer_field_and_correction(sim, field, value, expected):
     analysis(sim)["layers"][0][field] = value
@@ -150,7 +151,7 @@ def test_too_wide_values_are_reported_before_writing(sim, fake_dssat, field):
 def test_range_endpoints_and_first_layer_zero_are_accepted(sim, fake_dssat):
     analysis(sim)["layers"] = [dict(depth=15, bulk_density=10, organic_carbon=100,
         total_nitrogen=10, ph_water=14, ph_buffer=14, extractable_p=0,
-        exchangeable_k=0, stable_carbon=100), dict(depth=30, organic_carbon=0,
+        exchangeable_k=0, stable_carbon=99.99), dict(depth=30, organic_carbon=0,
         total_nitrogen=0, extractable_p=1, exchangeable_k=1, stable_carbon=0)]
     assert sim.check(False) == []
     sim.run()
@@ -190,7 +191,7 @@ def test_full_width_cells_and_level_columns(sim, fake_dssat, highest, prefix):
     analysis(sim).update(ph_buffer_method="SA005", p_method="IB001", k_method="SA001")
     analysis(sim)["layers"] = [dict(depth=99999, bulk_density=1.234, organic_carbon=12.34,
         total_nitrogen=0.123, ph_water=12.34, ph_buffer=12.35,
-        extractable_p=99999, exchangeable_k=88888, stable_carbon=99.99)]
+        extractable_p=999.9, exchangeable_k=888.8, stable_carbon=99.99)]
     assert sim.check(False) == []
     sim.run()
     block = section(copied(sim, fake_dssat).decode("latin-1")).rsplit(HEADER, 1)[1].splitlines()
@@ -202,7 +203,7 @@ def test_full_width_cells_and_level_columns(sim, fake_dssat, highest, prefix):
     row = block[3]
     assert row[3:8] == "99999"
     for left, right, expected in [(9, 14, "1.234"), (15, 20, "12.34"), (21, 26, "0.123"),
-        (27, 32, "12.34"), (33, 38, "12.35"), (39, 44, "99999"), (45, 50, "88888"), (51, 56, "99.99")]:
+        (27, 32, "12.34"), (33, 38, "12.35"), (39, 44, "999.9"), (45, 50, "888.8"), (51, 56, "99.99")]:
         assert row[left:right] == expected and row[left - 1] == " "
 
 

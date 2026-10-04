@@ -120,9 +120,9 @@ Each layer has these fields. Ranges include their endpoints unless stated otherw
 | `total_nitrogen` | SANI | No | %, 0 to 10 |
 | `ph_water` | SAPHW | No | pH, above 0 and at most 14 |
 | `ph_buffer` | SAPHB | No | pH, above 0 and at most 14 |
-| `extractable_p` | SAPX | No | mg/kg, 0 or greater (no upper range limit) |
-| `exchangeable_k` | SAKE | No | cmol/kg, 0 or greater (no upper range limit) |
-| `stable_carbon` | SASC | No | %, 0 to 100 |
+| `extractable_p` | SAPX | No | mg/kg, 0 to 999.99 |
+| `exchangeable_k` | SAKE | No | cmol/kg, 0 to 999.99 |
+| `stable_carbon` | SASC | No | %, 0 to 99.999 |
 
 Numbers must be finite Python integers or floats, not strings or booleans, and
 fit five characters without rounding or truncation. This width still limits
@@ -205,6 +205,8 @@ writes `INT(CO2ADJ)`. Every other variable uses -9.9 to 99.9 even for a
 temperature replacement, because another variable's multiply can select the
 F4.1 branch. **DSSAT may round an environment change to one decimal place**
 (for example, 0.25 to 0.3); dssatlab writes the value you supplied.
+
+A level holds at most 100 events, the number DSSAT reads (WTHMOD); more are rejected.
 
 Omit `environment` to keep the FileX's ME level. `environment: []` sets ME to 0;
 `"off"`, `null` and a dict are rejected. Rotation components reject this section.
