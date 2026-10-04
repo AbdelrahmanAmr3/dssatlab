@@ -27,9 +27,10 @@ and DSSAT stops when the result is beyond F plus 99 years. Second, an experiment
 - Pass the anchor into `_filex_date` and every caller on the stock path. Rejected: a second reading
   rule threaded through about ten callers, for no difference inside the window.
 - Check every FileX date of the treatment against the window. Rejected: needs full FileX parsing.
-  Other levels dated before F make DSSAT stop with an error, which fails the run loudly.
+  A date in another level before F can still be read silently in the next century when it stays
+  inside the window (F=1988150: 87100 reads as 2087100); this residual risk is accepted.
 
 ## Consequences
 
-- Proven on real DSSAT in `.work/e2e28`.
+- Real-DSSAT proof pending in `.work/e2e28` (v0.19.1 ticket T4).
 - Dates in other levels (fertilizer, initial conditions, soil analysis, ...) are not window-checked.
