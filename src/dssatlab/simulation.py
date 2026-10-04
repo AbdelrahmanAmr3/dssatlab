@@ -6,7 +6,7 @@ import shutil
 
 from .errors import DSSATCheckError
 from .controls import _controls_start_date, _season_coverage
-from .climate import _check_weather_requirements, _coverage_weather_rows
+from .climate import _check_weather_requirements, _coverage_weather_rows, _weather_requirements
 from .filex import _filex_date, _irrigation_dates, _read_filex
 from .filex_skeleton import _write_template_simulation
 from .template_checks import _check_template_simulation
@@ -143,10 +143,13 @@ class Simulation:
                                      "filenames are case-sensitive on Linux.")
         coverage_rows = _coverage_weather_rows(self, experiment_data, components, rows)
         days = [row["date"] for row in coverage_rows if "date" in row]
+        # Generated weather has no daily rows, but calendar and irrigation checks still apply.
+        dated = bool(days) or any(method in ("W", "S") for _, method, _ in _weather_requirements(
+            self, experiment_data, components))
         sdate = values.get("SDATE") if values.get("START") == "S" else None
         start_date, skip_reason = ((override_start, None) if override_start is not None
                                    else _simulation_start_date(sdate))
-        if days and start_date is None and _parse_sdate(sdate) is not None:
+        if dated and start_date is None and _parse_sdate(sdate) is not None:
             year = _filex_date(sdate[:2] + "001").year
             last = date(year, 12, 31).timetuple().tm_yday
             filex_problems.append(f"FileX {self.filex}: SDATE {sdate!r} is invalid: "
@@ -180,7 +183,7 @@ class Simulation:
             filex_problems.append(f"Simulation start date {start_date.isoformat()!r} is not "
                                  f"covered by weather data ({min(days)} to {max(days)}). "
                                  "Supply weather for the simulation's start date.")
-        if (override_start is not None or values.get("START") != "E") and start_date is not None and days and not _overrides_section(
+        if (override_start is not None or values.get("START") != "E") and start_date is not None and dated and not _overrides_section(
                 experiment_data, self.treatment, "irrigation",
                 rotation=components[0]['R'] if len(components) > 1 else None):
             # DSSAT-CSM v4.8.6.0, InputModule/IPMAN.for, IPIRR: only IRRIG R

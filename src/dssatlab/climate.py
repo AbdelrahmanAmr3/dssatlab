@@ -87,7 +87,7 @@ def _check_weather_requirements(sim, experiment_data, components, rows=()):
     if split_problems:
         return []  # The weather-source checks already report malformed input lists.
     requirements = _weather_requirements(sim, experiment_data, components)
-    if rows and _overrides_section(experiment_data, sim.treatment):
+    if rows and "station" in rows[0] and _overrides_section(experiment_data, sim.treatment):
         changed_requirements = set()
         for component in components:
             if component["FL"] == components[0]["FL"]:

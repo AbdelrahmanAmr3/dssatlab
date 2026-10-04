@@ -163,3 +163,23 @@ def test_mixed_sequence_reports_malformed_experiment_data(sequence, tmp_path, en
     assert sequence.check(False)
     with pytest.raises(DSSATCheckError):
         sequence.run()
+
+
+@pytest.mark.parametrize("method", ["W", "S"])
+@pytest.mark.parametrize("sdate", ["82366", "82000"])
+def test_generated_weather_still_checks_calendar_start_date(inputs, tmp_path, method, sdate):
+    set_method(inputs.filex, method)
+    inputs.filex.write_text(inputs.filex.read_text().replace("S 82056", f"S {sdate}"))
+    path = tmp_path / "UFGA.CLI"
+    path.write_text(UFGA)
+    assert any("SDATE" in p for p in Simulation(inputs.filex, 2, path).check(False))
+
+
+@pytest.mark.parametrize("station", ["BAD", None])
+def test_bad_weather_station_with_management_override_reports_problems(inputs, station):
+    data = {"treatments": {2: {"controls": {"years": 1}}}}
+    rows = [dict(row) for row in inputs.rows]
+    for row in rows:
+        row.pop("station", None) if station is None else row.update(station=station)
+    problems = Simulation(inputs.filex, 2, rows, management=data).check(False)
+    assert problems
