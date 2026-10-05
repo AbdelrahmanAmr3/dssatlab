@@ -3,6 +3,7 @@
 import pytest
 
 from dssatlab import DSSATCheckError, Simulation
+from dssatlab.weather import _parse_weather, write_weather_file
 from test_filex_check import SAMPLE, filex
 from test_season_coverage import weather
 from test_sequence import sequence
@@ -89,6 +90,18 @@ def test_forecast_equal_to_start_needs_no_current_season_weather(forecast, overr
     else:
         edit(forecast, "1982057", "1982056")
     forecast.weather = weather("1981-02-25", "1982-02-24")
+    assert forecast.check(False) == []
+
+
+@pytest.mark.parametrize("override", [False, True])
+def test_stock_wth_forecast_equal_to_start_matches_rows(forecast, tmp_path, override):
+    if override:
+        forecast.management = experiment(controls={"forecast_date": "1982-02-25"})
+    else:
+        edit(forecast, "1982057", "1982056")
+    path = tmp_path / "UFGA8201.WTH"
+    write_weather_file(_parse_weather(weather("1981-02-25", "1982-02-24"))[0], path)
+    forecast.weather = path
     assert forecast.check(False) == []
 
 

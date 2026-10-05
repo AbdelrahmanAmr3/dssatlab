@@ -1,11 +1,11 @@
 """Narrow reads of stock DSSAT files, without rewriting or repairing them."""
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 import re
 import shutil
 
-from .controls import _controls_start_date, _selected_controls
+from .controls import _controls_start_date, _filex_forecast_date, _selected_controls
 from .climate import (_copy_climate_file, _measured_weather_source, _split_weather_inputs,
                       _parse_template_weather, _template_climate_problems)
 from .experiment import _overrides_section
@@ -153,6 +153,7 @@ def _simulation_weather(sim, values, experiment_data, components):
     except (TypeError, ValueError, OverflowError):
         years = 1  # Ordinary controls checks report invalid years.
     end = _sequence_stop(start, years) or date.max
+    forecast_end = False
     if harvest is not None:
         try:
             harvest = _sequence_shift(harvest, harvest.year + years - 1)
@@ -160,6 +161,13 @@ def _simulation_weather(sim, values, experiment_data, components):
             harvest = None  # The season checks report years outside the calendar.
         if harvest is not None:
             end = harvest
+    if Path(sim.filex).suffix.upper() == ".FCX":
+        # A forecast reads history only through the day before forecast_date (ADR 0035).
+        controls = _selected_controls(experiment_data, sim.treatment)
+        value = controls.get("forecast_date", _filex_forecast_date(text, sim.treatment))
+        forecast = value if isinstance(value, date) else _calendar_date(value)
+        if forecast is not None:
+            end, forecast_end = forecast - timedelta(days=1), True
     if len(components) > 1:
         stop = _sequence_stop(start, years)
         if stop is not None:
@@ -177,7 +185,7 @@ def _simulation_weather(sim, values, experiment_data, components):
     else:
         # Maturity is unknown until DSSAT runs. Without a known end, check only
         # the files reachable through DSSAT's selection walk.
-        walk_end = end if harvest is not None or len(components) > 1 else None
+        walk_end = end if harvest is not None or len(components) > 1 or forecast_end else None
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
         rows, problems, anchor = _walk_weather_files(paths, station, initial, start, walk_end,
                                                      wed=_weather_directory(sim.executable),
