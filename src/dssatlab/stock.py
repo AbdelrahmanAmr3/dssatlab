@@ -160,6 +160,9 @@ def _simulation_weather(sim, values, experiment_data, components):
             harvest = None  # The season checks report years outside the calendar.
         if harvest is not None:
             end = harvest
+    # A forecast reads history up to forecast_date and plans its own season, so the end
+    # of the stock weather is not checked for it (the run scans WARNING.OUT).
+    is_forecast = Path(sim.filex).suffix.upper() == ".FCX"
     if len(components) > 1:
         stop = _sequence_stop(start, years)
         if stop is not None:
@@ -177,7 +180,7 @@ def _simulation_weather(sim, values, experiment_data, components):
     else:
         # Maturity is unknown until DSSAT runs. Without a known end, check only
         # the files reachable through DSSAT's selection walk.
-        walk_end = end if harvest is not None or len(components) > 1 else None
+        walk_end = None if is_forecast else (end if harvest is not None or len(components) > 1 else None)
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
         rows, problems, anchor = _walk_weather_files(paths, station, initial, start, walk_end,
                                                      wed=_weather_directory(sim.executable),
@@ -191,7 +194,7 @@ def _simulation_weather(sim, values, experiment_data, components):
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)
-    if harvest is not None and rows and harvest > max(row["date"] for row in rows if "date" in row):
+    if harvest is not None and not is_forecast and rows and harvest > max(row["date"] for row in rows if "date" in row):
         label = "Controls years" if "years" in _selected_controls(experiment_data, sim.treatment) else "FileX NYERS"
         problems.append(f"{label} {years}: the fixed harvest is on {harvest}, "
                         f"after the weather data ends ({max(row['date'] for row in rows)}). "

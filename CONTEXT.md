@@ -383,10 +383,16 @@ picks it from the FileX: Y for a forecast FileX, Q when a treatment run is a seq
 _Avoid_: batch mode (a batch file is how Q and Y receive their treatments), irrigation mode
 
 **Forecast run**:
-A run in DSSAT's forecast mode (Y) of a forecast FileX (`.FCX`): observed weather up to the
-forecast date (FODAT), then one result per historical weather year. `run()` does it; a Simulation
-does not.
+A run in DSSAT's forecast mode (Y) of a forecast FileX (`.FCX`): observed weather from the start
+date to the day before the forecast date, then one result per historical weather year, from
+(start year - NYERS) to (start year - 1). `run()` does it, and so does a Simulation whose FileX
+is a copied `.FCX` (measured weather only, one treatment).
 _Avoid_: prediction, seasonal analysis (that is NYERS seasons of one weather record)
+
+**Forecast date**:
+The first day a forecast run takes from the historical weather years instead of observed weather
+(FileX SIMDATES FODAT, experiment data `controls.forecast_date`). A Simulation needs one, and it
+must not be before the start date.
 
 **Run directory**:
 A new, dated folder created beside the FileX for one run. DSSAT runs in the FileX's own

@@ -2,6 +2,7 @@
 
 from datetime import date
 import math
+from pathlib import Path
 import re
 
 from .filex import _section_row
@@ -57,8 +58,8 @@ def _unknown_keys(data, allowed, where, template="Management"):
             for key in data if key not in allowed]
 
 
-def _check_date(value, location, *, iso_advice=None):
-    """Check quoted calendar dates that will be written as FileX YYDDD dates."""
+def _check_date(value, location, *, iso_advice=None, filex_year=True):
+    """Check quoted calendar dates, limiting years only for FileX YYDDD dates."""
     try:
         if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
             raise ValueError
@@ -69,7 +70,7 @@ def _check_date(value, location, *, iso_advice=None):
         return [f"{location}: found {_show_value(value)}. Supply a "
                 'valid ISO calendar date as a quoted YYYY-MM-DD string '
                 '(for example "2024-05-10"); quote the date, even in a dict.']
-    if not 1936 <= day.year <= 2035:
+    if filex_year and not 1936 <= day.year <= 2035:
         return [f"{location}: {value} cannot be written in a FileX: DSSAT stores two-digit years "
                 "and reads 00-35 as 2000-2035 and 36-99 as 1936-1999. "
                 "Use a date from 1936-01-01 to 2035-12-31."]
@@ -94,23 +95,26 @@ def _check_fields(data, required, optional, where, template="Management"):
     return problems
 
 
-def _check_controls(data, where):
+def _check_controls(data, where, filex=None):
     """Check the controls section's keys and value types, without FileX edits.
 
-    Cultivar and initial conditions have their own checks. The start date
-    follows the existing strict ISO contract. Replicates and random_seed are
-    whole numbers; random_seed 0 is passed to DSSAT unchanged.
+    Both dates follow the strict ISO contract; forecast_date has four-digit years.
+    Replicates and random_seed are whole numbers; seed 0 is passed unchanged.
     """
     where = f"{where}, controls"
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply fields from the Experiment "
                 "template or omit the section to keep the FileX level."]
-    problems = _check_fields(data, (), ("start_date", *_CONTROL_OPTIONS, "output_interval", "years"),
-                             where, "Experiment")
+    problems = _check_fields(data, (), ("start_date", "forecast_date", *_CONTROL_OPTIONS,
+                                       "output_interval", "years"), where, "Experiment")
+    if "forecast_date" in data and (not isinstance(filex, (str, Path))
+                                    or Path(filex).suffix.upper() != ".FCX"):
+        problems.append(f"Controls forecast_date needs a forecast FileX (.FCX); FileX {filex} "
+                        "is not one. Remove forecast_date or use a .FCX.")
     for field, value in data.items():
         location = f"{where}, field {field!r}"
-        if field == "start_date":
-            problems.extend(_check_date(value, location))
+        if field in ("start_date", "forecast_date"):
+            problems.extend(_check_date(value, location, filex_year=field == "start_date"))
         elif field == "years":
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 problems.append(f"{location}: found {_show_value(value)}. "

@@ -314,6 +314,86 @@ current directory for a dict. It writes the FileX (holding all treatments), weat
 copies all template crops' required genotype files from `Genotype`. Your original files are unchanged.
 `run_treatments()` also accepts `filex_template=` to run all or selected template treatments (see [Run treatments and scenarios](scenarios.md)).
 
+## Forecast with your weather data
+
+Give `Simulation` an existing forecast FileX (`.FCX`, case-insensitive) and
+daily weather in the [weather template](#prepare-the-weather-template) columns.
+For the UFAC2301 peanut course case, prepare `forecast_weather.csv` from the
+daily rows of `UFAC9925.WTH`, keeping its station values and daily values.
+Include the historical record and observations up to the day before the forecast
+date. Keep the FileX and any supporting soil and genotype files together.
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation(
+    filex="UFAC2301.FCX", treatment=1, weather="forecast_weather.csv",
+    executable=r"C:\DSSAT48\DSCSM048.EXE",
+    management={"treatments": {1: {"controls": {
+        "forecast_date": "2023-05-17",
+        "years": 23,
+    }}}},
+)
+problems = sim.check()
+if problems:
+    raise dl.DSSATCheckError(problems)
+result = sim.run()
+rows = dl.read_summary(result.run_dir)
+for historical_year, row in zip(range(2000, 2023), rows):
+    print(historical_year, row["HWAM"], row["MDAT"])
+```
+
+Use `treatment=2` with that treatment's own controls to forecast the second
+course treatment. Each Simulation runs one treatment. The usual `RunResult`
+and `read_summary()` apply: **each Summary row is one historical weather year**,
+in order `(start year - NYERS)` through `(start year - 1)`. For treatment 1's
+2023 start and 23 years, these are 2000 through 2022; treatment 2's 2022 start
+uses 1999 through 2021. `controls.years` is DSSAT's NYERS: in a forecast it
+counts historical years, rather than future seasons. Compute ensemble means,
+percentiles or probabilities yourself from these rows.
+
+`controls.forecast_date` is a quoted ISO date (`"YYYY-MM-DD"`) and the first
+day DSSAT takes from historical weather. It replaces SIMDATES FODAT in columns
+29-36 of the copied `.FCX`, as YYYYDDD. Unlike two-digit FileX dates, this key
+has no 1936-2035 limit. Omit it to keep a valid FODAT already in the FileX.
+A missing, truncated, malformed or `-99` FODAT needs an override. Setting
+`forecast_date` on another FileX is a check problem; it never switches run mode.
+Only the copy is edited, and `run()` uses mode Y through `$BATCH(FORECAST)`.
+The copied FileX retains `.FCX` and must have an exactly 12-character filename.
+
+The effective start is `controls.start_date` or SDATE under START S, or the
+effective planting date under START P. START E and an unavailable start are
+check problems. The forecast date must be on or after the effective start;
+equality gives a pure historical-weather ensemble. `controls.start_date`
+replaces SDATE under START S only. A controls-only start after an inherited
+reported planting date is rejected; automatic planting A/F keeps its window rules.
+
+Forecast coverage replaces the normal season coverage and start-in-weather
+checks for weather rows; stock `.WTH` files are not coverage-checked for a forecast. Supply every day from the start day of year in `start year - NYERS`
+through `forecast date - 1`, including the intervening years. For treatment 1,
+that is 2000-04-30 (day 121 of 2000) through 2023-05-16; for treatment 2,
+1999-05-01 through 2022-06-30. No current-year weather on or after the forecast
+date is required, and planned management dates after it need not be in your
+observed weather. The generated weather remains one multi-year `.WTH`.
+
+This is a **conservative input check**: it does not prove every historical
+ensemble season end is covered. The existing `WARNING.OUT` scan still raises
+`DSSATRunError` if DSSAT runs out of measured weather after the checks pass.
+The missing forecast date message, for example, is:
+
+```text
+FileX X treatment N has no forecast date (SIMDATES FODAT).
+Set controls forecast_date, e.g. 2023-05-17.
+```
+
+Forecast limits: measured weather only (WTHER M), one treatment with one
+rotation component, and a copied `.FCX`. Climate `.CLI` inputs and generated
+weather WTHER S/W/G are rejected. Forecast FileX from scratch, short-term
+forecast files, FSTRYR/FENDYR ranges, forecast-specific result classes and
+ensemble statistics are outside this feature. Forecasts through
+`run_treatments()` or named scenarios are not promised or tested.
+See [ADR 0035](../adr/0035-a-simulation-runs-a-forecast-from-a-copied-fcx.md).
+
 ## Use stock weather files
 
 With a copied FileX (`filex=`), pass a string or `Path` ending in `.WTH`
@@ -638,8 +718,9 @@ The checks do not establish that the DSSAT executable can run.
 
 FileX dates have two-digit years: 00-35 means 2000-2035, and 36-99 means
 1936-1999. Weather written by dssatlab never chooses their century. Experiment
-data dates written as FileX dates must be from 1936-01-01 to 2035-12-31,
+data dates written as two-digit FileX dates must be from 1936-01-01 to 2035-12-31,
 including both boundaries; `check()` rejects dates outside this range.
+`controls.forecast_date` uses YYYYDDD and has no such limit.
 
 With stock `$WEATHER` weather and seven-digit daily dates, DSSAT anchors FileX
 years to the first date F of the first weather file it opens. `check()` reports

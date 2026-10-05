@@ -19,6 +19,11 @@ Requires Python 3.10 or newer. To upgrade later: `pip install --upgrade dssatlab
 
 ## Current stage
 
+Version 0.22.0 adds a yield forecast from a copied `.FCX` through `Simulation`,
+using your measured weather and `controls.forecast_date`. Each Summary row is
+one historical weather year; `controls.years` counts those years. See the
+[forecast tutorial](docs/guide/simulation.md#forecast-with-your-weather-data).
+
 Version 0.21.1 adds `net_returns()` to compute net return at expected prices
 from a DSSAT `.PRI` price file and summarize it across seasons. See
 [seasonal economics](docs/guide/seasonal.md#compute-net-return-from-a-price-file).
@@ -76,7 +81,7 @@ print(result.run_dir, result.outputs)
 
 How a run works:
 
-- `run()` selects Y for `.FCX` (case-insensitive), otherwise Q when a selected treatment has several TREATMENTS rows, otherwise A for all treatments or C for one treatment. Q/Y write `DSSBatch.v48` in the FileX folder and move it into the run directory on success or failure; a failed launch deletes it. An existing batch file is refused and never overwritten. Q with several treatment numbers requires `treatment=n`. See the [run guide](docs/guide/run-filex.md#guards-before-dssat-starts) for the exact guard messages. Forecasts through `Simulation` are for a later release.
+- `run()` selects Y for `.FCX` (case-insensitive), otherwise Q when a selected treatment has several TREATMENTS rows, otherwise A for all treatments or C for one treatment. Q/Y write `DSSBatch.v48` in the FileX folder and move it into the run directory on success or failure; a failed launch deletes it. An existing batch file is refused and never overwritten. Q with several treatment numbers requires `treatment=n`. See the [run guide](docs/guide/run-filex.md#guards-before-dssat-starts) for the exact guard messages. A `Simulation` also forecasts from a copied `.FCX` with measured weather; see the [forecast tutorial](docs/guide/simulation.md#forecast-with-your-weather-data).
 - DSSAT runs in the FileX's own folder, so weather and soil files beside the FileX are found. Newly created or updated files move into a new `dssat_run_<date>` folder beside the FileX; unchanged files stay beside it.
 - The FileX filename can be at most 12 characters, including the extension, and must be exactly 12 for Q/Y, for example `MSKB8902.SQX`.
 - A failed run raises `DSSATRunError` with the command, the end of DSSAT's console output and the start of `ERROR.OUT`. The run folder is kept so you can look inside.

@@ -84,12 +84,9 @@ A forecast FileX runs in Y mode, using observed weather up to its forecast date
 result = dl.run("UFAC2301.FCX")
 ```
 
-Forecast runs through `Simulation` and `run_treatments()` are for a later release.
-`Simulation.check()` reports:
-
-```text
-FileX UFAC2301.FCX is a forecast FileX: a Simulation does not run forecast mode (Y). Call run() on the FileX instead.
-```
+A `Simulation` also runs a copied `.FCX` with your weather data and an optional
+`controls.forecast_date`; see [forecast with your weather data](simulation.md#forecast-with-your-weather-data).
+Forecasts through `run_treatments()` and named scenarios are not promised or tested.
 
 For Q and Y, `run()` writes `DSSBatch.v48` in the FileX folder and invokes
 `<executable> Q DSSBatch.v48` or `<executable> Y DSSBatch.v48`. Q has one batch
@@ -107,7 +104,7 @@ Cannot run FileX MSKB8902.SQX in sequence mode (Q): <folder> already holds DSSBa
 ```
 
 For Y, the message says `forecast mode (Y)` in place of `sequence mode (Q)`.
-Use `run()` for forecasts; a Simulation does not run them. A/C ignore an existing
+A Simulation stages its forecast in a fresh simulation folder. A/C ignore an existing
 batch file. An 11-character name is refused for Q/Y:
 
 ```text

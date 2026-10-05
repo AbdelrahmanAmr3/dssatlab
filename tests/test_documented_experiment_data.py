@@ -16,6 +16,8 @@ from test_simulation_template import installed
 from test_simulation_run import fake_dssat
 from test_climate import UFGA
 from test_sequence import sequence
+from test_filex_check import SAMPLE
+from test_forecast_check import METHODS, SIMDATES
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -135,7 +137,18 @@ def test_guide_experiment_examples(label, experiment, sim_inputs, cultivar_table
     first = date(1978, 1, 1)
     weather = [dict(weather[0], date=(first + timedelta(days=i)).isoformat())
                for i in range((date(1996, 1, 1) - first).days)]
-    if label.startswith('generated-weather.md:'):
+    if any('forecast_date' in entry.get('controls', {})
+           for entry in experiment['treatments'].values()):
+        # The forecast example needs a copied .FCX and historical weather,
+        # rather than the single-crop template used by this page's other examples.
+        filex = tmp_path / 'UFAC2301.FCX'
+        filex.write_text(SAMPLE.replace('82056', '23121') + METHODS + SIMDATES,
+                         encoding='latin-1')
+        first, last = date(2000, 4, 30), date(2023, 5, 17)
+        weather = [dict(weather[0], date=(first + timedelta(days=i)).isoformat())
+                   for i in range((last - first).days)]
+        kwargs = dict(filex=filex)
+    elif label.startswith('generated-weather.md:'):
         # Check the documented controls on a copied seasonal or sequence FileX.
         is_sequence = any(entry.get('controls', {}).get('replicates', 1) > 1
                           for entry in experiment['treatments'].values())

@@ -1,6 +1,7 @@
 # 0022: run() picks DSSAT's run mode from the FileX
 
 Status: accepted (2026-10-02). Amends 0012 ("`run()` mode A, no batch file").
+The Simulation forecast restriction below is superseded by [ADR 0035](0035-a-simulation-runs-a-forecast-from-a-copied-fcx.md).
 
 ## Context
 

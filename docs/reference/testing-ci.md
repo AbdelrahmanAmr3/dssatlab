@@ -73,3 +73,28 @@ DSSATLAB_MANUAL_FILEX=/path/to/UFGA8201.MZX \
 DSSATLAB_MANUAL_WEATHER=/path/to/weather.csv \
 python -m pytest tests/test_manual_integration.py
 ```
+
+## Release checks and forecast proof
+
+Before a release, run the tests, build the docs strictly, then build and check
+both distribution artifacts:
+
+```bash
+python -m pytest -q -p no:cacheprovider --basetemp=tmp/pt
+python -m mkdocs build --strict
+python -m build
+python -m twine check dist/*
+```
+
+Create the parent `tmp` directory first when using the explicit pytest temp path.
+The docs workflow already enforces the strict build; the publish workflow builds
+and checks the distributions. Ordinary CI does not run a real forecast.
+
+The v0.22 manual Windows forecast proof uses DSSAT 4.8.5.017 and UFAC2301.FCX
+with both course treatments. It compares weather-data Simulations with the
+course reference and a stock-weather `run()`, tests a changed FODAT against
+an independent hand edit, checks shorter NYERS and historical-year order, and
+trims observations to forecast date minus one day. Every comparison passes;
+see [ADR 0035](../adr/0035-a-simulation-runs-a-forecast-from-a-copied-fcx.md#real-dssat-proof)
+for the values and local evidence location. Use copies of all course inputs
+when repeating this manual check.

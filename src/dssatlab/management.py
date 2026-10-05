@@ -13,7 +13,7 @@ from .weather import _show_value
 from .initial_conditions import _check_initial_conditions, _initial_conditions_text
 from .soil_analysis import _check_soil_analysis, _soil_analysis_text
 from .environment import _check_environment, _environment_text
-from .controls import _check_planting_window, _controls_text
+from .controls import _check_inherited_planting, _check_planting_window, _controls_text
 
 
 _REQUIRED = ("date", "method", "distribution", "population", "row_spacing", "depth")
@@ -162,7 +162,10 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
     for section in ("planting", "irrigation", "fertilizer", *_OPERATION_FIELDS):
         label = f"    {section}"
         if section not in entry and section != "irrigation":
-            report.append(f"{label}: OK (omitted; keeps the FileX Level)")
+            found = _check_inherited_planting(text, number, entry, filex) if section == "planting" else []
+            problems.extend(found)
+            report.extend(_report_lines(label, found) if found else
+                          [f"{label}: OK (omitted; keeps the FileX Level)"])
             continue
         if section == "irrigation":
             section_problems, lines = _check_irrigation(entry, number, where, text, weather_range)
@@ -223,7 +226,7 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
                         section_problems.append(f"{where}, {section}: FileX {filex}: {error}")
             else:
                 from .climate import _check_weather_controls
-                section_problems = _check_controls(entry[section], where)
+                section_problems = _check_controls(entry[section], where, filex)
                 if isinstance(entry[section], dict) and not entry_problems and text is not None:
                     section_problems.extend(_check_weather_controls(
                         text, number, entry[section], where, template=filex is None))

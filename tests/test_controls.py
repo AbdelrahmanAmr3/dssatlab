@@ -80,6 +80,8 @@ def test_omitted_empty_or_other_treatment_controls_keep_exact_copy(sim, fake_dss
 ])
 def test_each_field_keeps_all_omitted_fields(sim, seasonal_weather, fake_dssat, field, value, old, new):
     sim.filex.write_bytes(sim.filex.read_bytes().replace(b"GE              1", b"GE              4"))
+    # Keep inherited planting on or after the overridden simulation start.
+    sim.filex.write_bytes(sim.filex.read_bytes().replace(b" 1 82057   -99", b" 1 82060   -99"))
     sim.management["treatments"][3]["controls"] = {field: value}
     base = sim.filex.read_bytes().split(b"*SIMULATION CONTROLS")[1].splitlines()
     expected = [b" 2" + line[2:].replace(old, new) for line in base if line.startswith(b" 1 ")]
@@ -190,6 +192,7 @@ def test_template_loads_checks_and_writes_controls(sim, tmp_path, fake_dssat):
 
 def test_start_override_names_weather_file_for_new_year(sim, fake_dssat):
     sim.weather = [dict(sim.weather[0], date="1983-01-01")]
+    sim.filex.write_bytes(sim.filex.read_bytes().replace(b" 1 82057   -99", b" 1 83001   -99"))
     sim.management["treatments"][3]["controls"] = {"start_date": "1983-01-01"}
     assert b"S 83001" in copied(sim, fake_dssat)
     folder = Path(fake_dssat.calls[0][1])
@@ -261,6 +264,7 @@ IRRIGATION = ("\n*IRRIGATION AND WATER MANAGEMENT\n"
 @pytest.mark.parametrize("start, valid", [("1982-03-04", True), ("1982-03-05", False)])
 def test_start_after_the_filex_first_irrigation_is_a_check_problem(sim, start, valid):
     sim.filex.write_bytes(sim.filex.read_bytes() + IRRIGATION.encode("latin-1"))
+    sim.filex.write_bytes(sim.filex.read_bytes().replace(b" 1 82057   -99", b" 1 82064   -99"))
     sim.management = {"treatments": {3: {"controls": {"start_date": start}}}}
     problems = sim.check(verbose=False)
     assert (problems == []) is valid
