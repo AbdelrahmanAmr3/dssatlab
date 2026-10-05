@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 from .cultivar import _CROPS, _read_cultivar_codes, _unknown_cultivar
+from .climate import _split_weather_inputs
 from .experiment import _check_date, _check_fields, _check_number
 from .filex_write import _cell, _columns, _PLANTING_HEADER
 from .management import _check_planting, _REQUIRED
@@ -333,17 +334,26 @@ def _template_genotype_files(data, data_dir):
     return list(paths)
 
 
-def _shared_field_problems(rows, kind):
-    """Reject different checked rows claiming the same station or soil ID."""
+def _shared_field_problems(rows, kind, source=None):
+    """Require one resolved CLI or equal rows for each shared station or soil ID."""
     column, label, own = (("station", "station", "station code") if kind == "weather"
                           else ("soil_id", "soil ID", "soil ID"))
+    sources = source if isinstance(source, dict) else {1: source}
+    sources = {int(key): value for key, value in sources.items()}
     seen, problems = {}, []
     for field, data in rows.items():
         identity = data[0][column]
-        if identity in seen and data != rows[seen[identity]]:
-            problems.append(f"Fields {seen[identity]} and {field} both use {label} {identity!r} "
-                            f"but their {kind} data differs. Give each field's {kind} its own "
-                            f"{own}, or the same data.")
+        climate = _split_weather_inputs(sources.get(field))[1] if kind == "weather" else []
+        checked_source = climate[0].resolve() if climate else data
+        if identity in seen and checked_source != seen[identity][1]:
+            first = seen[identity][0]
+            if kind == "weather":
+                problems.append(f"Fields {first} and {field} share station {identity} but "
+                                "different weather sources. Supply the same source for both.")
+            else:
+                problems.append(f"Fields {first} and {field} both use {label} {identity!r} "
+                                f"but their {kind} data differs. Give each field's {kind} its own "
+                                f"{own}, or the same data.")
         else:
-            seen.setdefault(identity, field)
+            seen.setdefault(identity, (field, checked_source))
     return problems

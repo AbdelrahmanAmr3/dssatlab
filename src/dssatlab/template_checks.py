@@ -94,7 +94,8 @@ def _check_template_simulation(sim, experiment_data, load_problems):
     for rows, found, kind in ((weather_fields, weather_problems, "weather"),
                               (soil_fields, soil_problems, "soil")):
         if not found:
-            template_problems.extend(_shared_field_problems(rows, kind))
+            template_problems.extend(_shared_field_problems(
+                rows, kind, sim.weather if kind == "weather" else None))
     weather, soil = weather_fields.get(selected_field, []), soil_fields.get(selected_field, [])
     count = len(_template_treatment_names(data))
     valid_treatment = (not isinstance(sim.treatment, bool) and isinstance(sim.treatment, (int, str))
@@ -122,8 +123,11 @@ def _check_template_simulation(sim, experiment_data, load_problems):
             if not path.is_file():
                 template_problems.append(f"FileX template: missing genotype file {path}. "
                                          "Supply this file in the data directory's Genotype folder.")
-    days = [row["date"] for row in weather if "date" in row]
-    template_problems.extend(_season_coverage(experiment_data, sim.treatment, start, days))
+    # Climate station values serve identity/FIELDS only, never daily-date checks.
+    coverage_weather = [row for row in weather if "date" in row]
+    days = [row["date"] for row in coverage_weather]
+    if days:
+        template_problems.extend(_season_coverage(experiment_data, sim.treatment, start, days))
     if start is not None and days and start not in days:
         template_problems.append(f"Simulation start date {start} is not covered by weather "
                                  f"data ({min(days)} to {max(days)}). Supply weather for that date.")
@@ -146,7 +150,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
             report.extend(_report_lines("Management data", load_problems))
         else:
             found, lines = _check_management(
-                experiment_data, None, sim.treatment, weather, start,
+                experiment_data, None, sim.treatment, coverage_weather, start,
                 text=text, filex_template=data, data_dir=data_dir)
             problems.extend(found)
             report.extend(lines)
