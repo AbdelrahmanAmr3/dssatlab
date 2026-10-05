@@ -57,6 +57,20 @@ def test_forecast_date_accepts_four_digit_years(forecast, value):
     assert problems == []
 
 
+def test_forecast_check_accepts_a_year_beyond_2035_without_a_date_problem(forecast):
+    assert not any("has no forecast date" in text for text in forecast.check(verbose=False))
+
+
+def test_forecast_check_needs_weather_and_a_12_character_name(forecast, tmp_path):
+    forecast.weather = None
+    short = tmp_path / "A.FCX"
+    shutil.copy2(forecast.filex, short)
+    forecast.filex = short
+    problems = forecast.check(verbose=False)
+    assert any("forecast needs measured weather" in text for text in problems)
+    assert any("exactly 12" in text for text in problems)
+
+
 @pytest.mark.parametrize("row", [ROW, b" 1 SD", b" 1 SD    -99     -99     -99",
                                  b" 1 SD    -99     -99     -99     -99 tail\r\n"])
 def test_copy_writes_fodat_and_preserves_other_bytes(forecast, tmp_path, row):

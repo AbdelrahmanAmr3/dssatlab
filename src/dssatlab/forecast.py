@@ -24,7 +24,14 @@ def _check_forecast(sim, source, components, values, start, days):
     forecast = _filex_forecast_date(text, sim.treatment)
     if "forecast_date" in controls:
         value = controls["forecast_date"]
-        forecast = None if _check_date(value, "forecast_date") else date.fromisoformat(value)
+        forecast = None if _check_date(value, "forecast_date", filex_year=False) else date.fromisoformat(value)
+    name = Path(sim.filex).name if isinstance(sim.filex, (str, Path)) else ""
+    if len(name) != 12:
+        problems.append(f"FileX filename {name!r} has {len(name)} characters; forecast mode Y needs "
+                        "exactly 12. Rename the FileX to 12 characters including the extension, e.g. UFGA2301.FCX.")
+    if _split_weather_inputs(sim.weather)[0] is None and not _split_weather_inputs(sim.weather)[1]:
+        problems.append(f"{where}: a forecast needs measured weather from the historical seasons. "
+                        "Supply weather data or .WTH paths.")
     if forecast is None:
         problems.append(f"{where} has no forecast date (SIMDATES FODAT). "
                         "Set controls forecast_date, e.g. 2023-05-17.")
