@@ -102,8 +102,11 @@ def test_shared_identity_requires_equal_parsed_rows(
     fields[kind][2][0][column] = str(source[0][column] + (0.1 if different else 0))
     sim = Simulation(**fields)
     if different:
-        assert sim.check() == [f"Fields 1 and 2 both use {label} {source[0][identity]!r} "
-            f"but their {kind} data differs. Give each field's {kind} its own {own}, or the same data."]
+        expected = (f"Fields 1 and 2 share station {source[0][identity]} but different weather "
+                    "sources. Supply the same source for both." if kind == "weather" else
+                    f"Fields 1 and 2 both use {label} {source[0][identity]!r} "
+                    f"but their {kind} data differs. Give each field's {kind} its own {own}, or the same data.")
+        assert sim.check() == [expected]
     else:
         assert sim.check() == []
         folder = sim.run().run_dir.parent

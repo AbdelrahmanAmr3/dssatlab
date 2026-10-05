@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from .controls import _controls_start_date, _season_coverage
+from .controls import _controls_start_date, _season_coverage, _selected_controls
 from .cultivar import _template_data_dir
 from .errors import DSSATCheckError
 from .experiment import _check_date
@@ -16,7 +16,7 @@ from .soil import _parse_soil
 from .stock import _parse_template_weather, _soil_source_problems, _weather_source_problems
 
 
-def _parse_field_data(source, count, kind):
+def _parse_field_data(source, count, kind, *, selected_field=1, treatment=1, weather_method=None):
     """Check field keys against fields 1..count (any keys if count is None) and parse each source."""
     label = f"{kind.capitalize()} data"
     parser = _parse_template_weather if kind == "weather" else _parse_soil
@@ -44,10 +44,13 @@ def _parse_field_data(source, count, kind):
         return {}, problems, _report_lines(label, problems)
     rows, problems, report = {}, [], []
     for number, value in sorted(normalized.items()):
-        rows[number], found = parser(value)
+        rows[number], found = (parser(value, field=number, treatment=treatment,
+                                     method=weather_method if number == selected_field else None)
+                               if kind == "weather" else parser(value))
         field_label = f"{label}, field {number}" if isinstance(source, dict) else label
         if isinstance(source, dict):
-            found = [p.replace(label, field_label, 1) if p.startswith(label)
+            found = [p if p.startswith(("Field ", "Treatment ")) else
+                     p.replace(label, field_label, 1) if p.startswith(label)
                      else f"{field_label}: {p}" for p in found]
         problems.extend(found)
         report.extend(_report_lines(field_label, found))
@@ -80,15 +83,19 @@ def _check_template_simulation(sim, experiment_data, load_problems):
         count = None
     else:
         count = max(fields) if not any("treatment_fields" in p for p in template_problems) else None
-    weather_fields, weather_problems, weather_report = _parse_field_data(sim.weather, count, "weather")
+    selected_field = fields[int(sim.treatment) - 1] if (
+        str(sim.treatment).isascii() and str(sim.treatment).isdigit()
+        and 1 <= int(sim.treatment) <= len(fields)) else 1
+    method = _selected_controls(experiment_data, sim.treatment).get("weather_source", "M")
+    weather_fields, weather_problems, weather_report = _parse_field_data(
+        sim.weather, count, "weather", selected_field=selected_field,
+        treatment=sim.treatment, weather_method=method)
     soil_fields, soil_problems, soil_report = _parse_field_data(sim.soil, count, "soil")
     for rows, found, kind in ((weather_fields, weather_problems, "weather"),
                               (soil_fields, soil_problems, "soil")):
         if not found:
-            template_problems.extend(_shared_field_problems(rows, kind))
-    selected_field = fields[int(sim.treatment) - 1] if (
-        str(sim.treatment).isascii() and str(sim.treatment).isdigit()
-        and 1 <= int(sim.treatment) <= len(fields)) else 1
+            template_problems.extend(_shared_field_problems(
+                rows, kind, sim.weather if kind == "weather" else None))
     weather, soil = weather_fields.get(selected_field, []), soil_fields.get(selected_field, [])
     count = len(_template_treatment_names(data))
     valid_treatment = (not isinstance(sim.treatment, bool) and isinstance(sim.treatment, (int, str))
@@ -116,8 +123,11 @@ def _check_template_simulation(sim, experiment_data, load_problems):
             if not path.is_file():
                 template_problems.append(f"FileX template: missing genotype file {path}. "
                                          "Supply this file in the data directory's Genotype folder.")
-    days = [row["date"] for row in weather if "date" in row]
-    template_problems.extend(_season_coverage(experiment_data, sim.treatment, start, days))
+    # Climate station values serve identity/FIELDS only, never daily-date checks.
+    coverage_weather = [row for row in weather if "date" in row]
+    days = [row["date"] for row in coverage_weather]
+    if days:
+        template_problems.extend(_season_coverage(experiment_data, sim.treatment, start, days))
     if start is not None and days and start not in days:
         template_problems.append(f"Simulation start date {start} is not covered by weather "
                                  f"data ({min(days)} to {max(days)}). Supply weather for that date.")
@@ -140,7 +150,7 @@ def _check_template_simulation(sim, experiment_data, load_problems):
             report.extend(_report_lines("Management data", load_problems))
         else:
             found, lines = _check_management(
-                experiment_data, None, sim.treatment, weather, start,
+                experiment_data, None, sim.treatment, coverage_weather, start,
                 text=text, filex_template=data, data_dir=data_dir)
             problems.extend(found)
             report.extend(lines)

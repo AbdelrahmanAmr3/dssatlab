@@ -43,13 +43,9 @@ def test_template_weather_controls_reach_every_sequence_level(sim, installed):
         assert _section_row(text, "SIMULATION CONTROLS", "N", level, ("WTHER",))["WTHER"] == "M"
 
 
-@pytest.mark.parametrize("controls,detail", [
-    ({"weather_source": "S"}, "Use a copied FileX for generated weather"),
-    ({"replicates": 3}, "every replicate repeats the same rows"),
-])
-def test_template_weather_controls_reject_unsupported_runs(sim, installed, controls, detail):
-    sim.management = {"treatments": {1: {"controls": controls}}}
-    assert any(detail in p for p in sim.check(False))
+def test_template_weather_controls_reject_unsupported_runs(sim, installed):
+    sim.management = {"treatments": {1: {"controls": {"replicates": 3}}}}
+    assert any("every replicate repeats the same rows" in p for p in sim.check(False))
     with pytest.raises(DSSATCheckError):
         sim.run()
     assert installed.calls == []

@@ -45,22 +45,16 @@ def _climate_number_problems(row, fields, where, *, missing=False):
     return problems
 
 
-def _read_climate_file(path, method):
-    """Return problems for W (WGEN) or S (SIMMETEO), without changing the file.
-
-    Only the first line, station row and the method's required table are checked.
-    The required WGEN column names come from stock UFGA.CLI and DTCM.CLI;
-    the table requirements were probed on real DSSAT on Windows (ADR 0032).
-    """
-    if method not in ("W", "S"):
-        raise ValueError("Climate-file method must be W or S.")
+def _read_climate_header(path):
+    """Return (lines, station row, problems), checking no monthly tables."""
     path = Path(path)
     try:
         lines = path.read_text(encoding="latin-1").splitlines()
     except (OSError, ValueError) as error:
-        return [f"Cannot read climate file {path}: {error}. Checked the supplied path. "
-                "Supply a readable climate file path."]
+        return None, {}, [f"Cannot read climate file {path}: {error}. Checked the supplied path. "
+                         "Supply a readable climate file path."]
     problems = []
+    row = {}
     where = f"Climate file {path}"
     if not lines or not lines[0].startswith("*CLIMATE"):
         problems.append(f"{where}: missing *CLIMATE header. Checked the first line. "
@@ -87,6 +81,29 @@ def _read_climate_file(path, method):
                                 "(case-insensitive). Correct INSI or supply the matching climate file.")
             problems.extend(_climate_number_problems(
                 row, ("LAT", "LONG", "ELEV", "TAV", "AMP"), f"{where}, line {number}"))
+    return lines, row, problems
+
+
+def _climate_station(path):
+    """Return weather-row station values from an already checked climate file."""
+    _, row, _ = _read_climate_header(path)
+    return dict(station=row["INSI"].upper(), latitude=float(row["LAT"]),
+                longitude=float(row["LONG"]), elevation=float(row["ELEV"]))
+
+
+def _read_climate_file(path, method):
+    """Check the header and required WGEN (W) or monthly averages (S) table.
+
+    Column names come from stock UFGA.CLI and DTCM.CLI; the required tables
+    were probed on real DSSAT on Windows (ADR 0032). Never change the file.
+    """
+    if method not in ("W", "S"):
+        raise ValueError("Climate-file method must be W or S.")
+    lines, _, problems = _read_climate_header(path)
+    if lines is None:
+        return problems
+    where = f"Climate file {path}"
+    numbered = list(enumerate(lines, 1))
 
     section = "MONTHLY AVERAGES" if method == "S" else "WGEN PARAMETERS"
     fields = (("SAMN", "XAMN", "NAMN", "RTOT", "RNUM") if method == "S" else

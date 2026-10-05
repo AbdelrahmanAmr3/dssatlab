@@ -7,7 +7,7 @@ import shutil
 
 from .controls import _controls_start_date, _selected_controls
 from .climate import (_copy_climate_file, _measured_weather_source, _split_weather_inputs,
-                      _template_climate_problems)
+                      _parse_template_weather, _template_climate_problems)
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
 from .irrigation import _effective_management
@@ -45,11 +45,6 @@ def _weather_source_problems(source, *, template=False):
         return ["A stock weather file needs a copied FileX. "
                 "Supply weather data rows for a FileX template."]
     return []
-
-
-def _parse_template_weather(source):
-    problems = _weather_source_problems(source, template=True)
-    return ([], problems) if problems else _parse_weather(source)
 
 
 def _simulation_weather(sim, values, experiment_data, components):

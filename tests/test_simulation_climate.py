@@ -83,13 +83,11 @@ def test_two_climate_files_are_a_problem(inputs, tmp_path):
     assert any("one climate file" in p for p in Simulation(inputs.filex, 2, paths).check(False))
 
 
-@pytest.mark.parametrize("form", ["path", "list", "field"])
-def test_template_rejects_climate_weather(data, rows, installed, tmp_path, form):
+def test_template_rejects_climate_mixed_with_rows(data, rows, installed, tmp_path):
     path = tmp_path / "UFGA.CLI"
     path.write_text(UFGA)
-    weather = {"path": path, "list": [path], "field": {1: path}}[form]
-    sim = Simulation(filex_template=data, weather=weather, soil=rows[1])
-    assert any("climate file" in p and "FileX template" in p for p in sim.check(False))
+    sim = Simulation(filex_template=data, weather=[path, tmp_path / "UFGA7801.WTH"], soil=rows[1])
+    assert any("mixes a climate file with other weather" in p for p in sim.check(False))
     with pytest.raises(DSSATCheckError):
         sim.run()
     assert installed.calls == []
