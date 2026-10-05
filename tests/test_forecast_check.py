@@ -237,3 +237,21 @@ def test_sequence_rejected_and_forecast_problems_collected_together(sequence):
 def test_long_history_does_not_overflow_calendar(forecast):
     forecast.management = experiment(controls={"years": 99999})
     assert "day 56 of -98017" in forecast.check(False)[0]
+
+
+def test_stock_wth_forecast_ignores_a_planned_harvest_after_forecast_date(forecast, tmp_path):
+    forecast.management = experiment(
+        harvest=[{"date": "1982-05-30", "stage": "GS000"}],
+        controls={"forecast_date": "1982-02-26", "harvest_management": "R"})
+    path = tmp_path / "UFGA8201.WTH"
+    write_weather_file(_parse_weather(weather("1981-02-25", "1982-02-25"))[0], path)
+    forecast.weather = path
+    assert not any("fixed harvest" in text for text in forecast.check(False))
+
+
+def test_stock_wth_forecast_date_at_the_calendar_minimum_does_not_crash(forecast, tmp_path):
+    edit(forecast, "1982057", "0001001")
+    path = tmp_path / "UFGA8201.WTH"
+    write_weather_file(_parse_weather(weather("1981-02-25", "1982-02-25"))[0], path)
+    forecast.weather = path
+    assert isinstance(forecast.check(False), list)

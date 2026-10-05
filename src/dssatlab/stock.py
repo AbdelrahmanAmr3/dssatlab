@@ -166,7 +166,7 @@ def _simulation_weather(sim, values, experiment_data, components):
         controls = _selected_controls(experiment_data, sim.treatment)
         value = controls.get("forecast_date", _filex_forecast_date(text, sim.treatment))
         forecast = value if isinstance(value, date) else _calendar_date(value)
-        if forecast is not None:
+        if forecast is not None and forecast > date.min + timedelta(days=1):
             end, forecast_end = forecast - timedelta(days=1), True
     if len(components) > 1:
         stop = _sequence_stop(start, years)
@@ -199,7 +199,7 @@ def _simulation_weather(sim, values, experiment_data, components):
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     rows, checks = _parse_weather(rows)
-    if harvest is not None and rows and harvest > max(row["date"] for row in rows if "date" in row):
+    if harvest is not None and not forecast_end and rows and harvest > max(row["date"] for row in rows if "date" in row):
         label = "Controls years" if "years" in _selected_controls(experiment_data, sim.treatment) else "FileX NYERS"
         problems.append(f"{label} {years}: the fixed harvest is on {harvest}, "
                         f"after the weather data ends ({max(row['date'] for row in rows)}). "
