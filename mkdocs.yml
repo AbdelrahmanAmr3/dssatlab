@@ -81,7 +81,7 @@ nav:
           - adr/0032-generated-weather-from-a-copied-climate-file.md
           - adr/0033-net-returns-computed-in-python-at-expected-prices.md
           - adr/0034-climate-file-as-a-template-fields-weather.md
-          - adr/0035-a-simulation-runs-a-forecast-from-a-fcx-template.md
+          - adr/0035-a-simulation-runs-a-forecast-from-a-copied-fcx.md
       - Testing and CI: reference/testing-ci.md
       - Releasing: reference/releasing.md
       - Roadmap: reference/roadmap.md
