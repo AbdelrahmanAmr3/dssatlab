@@ -3,10 +3,11 @@
 from pathlib import Path
 import shutil
 
-from .climate_file import _read_climate_file
+from .climate_file import _climate_station, _read_climate_file, _read_climate_header
 from .controls import _selected_controls
 from .filex import _section_row
 from .experiment import _overrides_section
+from .weather import _parse_weather
 
 
 def _split_weather_inputs(source):
@@ -30,12 +31,46 @@ def _split_weather_inputs(source):
 
 
 def _template_climate_problems(source):
-    """Reject CLI inputs, including per-field sources, for a FileX template."""
-    sources = source.values() if isinstance(source, dict) else [source]
-    if any(_split_weather_inputs(value)[1] for value in sources):
-        return ["A climate file cannot supply weather for a FileX template. "
-                "Checked the template's weather inputs. Supply weather data rows for every field."]
-    return []
+    """Require exactly one CLI and no other weather within each climate field."""
+    sources = source if isinstance(source, dict) else {1: source}
+    problems = []
+    for number, value in sources.items():
+        paths = value if isinstance(value, list) else [value]
+        if _split_weather_inputs(value)[1] and len(paths) != 1:
+            problems.append(f"Field {number} weather mixes a climate file with other weather. "
+                            "Supply one .CLI path or only data rows.")
+    return problems
+
+
+def _parse_template_weather(source, *, field=1, treatment=1, method=None):
+    """Parse a field after stock-source checks; read the selected W/S table only."""
+    problems = _template_climate_problems({field: source})
+    if problems:
+        return [], problems
+    climate = _split_weather_inputs(source)[1]
+    if not climate:
+        rows, problems = _parse_weather(source)
+        if method in ("W", "S"):
+            problems.append(f"Treatment {treatment} uses generated weather (WTHER {method}), "
+                            f"but field {field} weather is data rows. Checked the field's weather "
+                            "source. Supply the station's .CLI file for this field.")
+        return rows, problems
+    path = climate[0]
+    _, station, problems = _read_climate_header(path)
+    if station.get("INSI"):
+        expected = station["INSI"].upper() + ".CLI"
+        if path.name.upper() != expected:
+            problems.append(f"Climate file {path}: filename does not match {expected}. "
+                            "Checked @ INSI and the filename DSSAT reads. "
+                            f"Rename the file to {expected} or supply the matching climate file.")
+    if method == "M":
+        problems.append(f"Field {field} weather is a climate file, but treatment {treatment} "
+                        "uses WTHER M. Checked the treatment's weather source. Set controls "
+                        "weather_source W or S, or supply weather data rows.")
+    elif method in ("W", "S"):
+        # The full reader includes the same header checks.
+        problems.extend(p for p in _read_climate_file(path, method) if p not in problems)
+    return ([], problems) if problems else ([_climate_station(path)], [])
 
 
 def _weather_requirements(sim, experiment_data, components):
@@ -159,14 +194,11 @@ def _coverage_weather_rows(sim, experiment_data, components, rows):
 
 
 def _check_weather_controls(text, treatment, controls, where, *, template=False):
-    """Check replicate edits in their run context; templates retain measured weather."""
+    """Check replicate edits in their run context."""
     from .sequence import _rotation_components
 
     problems = []
     components = _rotation_components(None, treatment, text=text) if text else []
-    if template and controls.get("weather_source") in ("W", "S"):
-        problems.append(f"{where}, controls, field 'weather_source': generated weather needs a copied "
-                        "FileX. Checked the FileX template controls. Use a copied FileX for generated weather.")
     reps = controls.get("replicates")
     if type(reps) is not int or not 1 < reps <= 99999:
         return problems
