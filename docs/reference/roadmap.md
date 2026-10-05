@@ -37,7 +37,11 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.18.3 | FileX and weather date rules: YYDDD dates use DSSAT's two-digit-year rule (00-35 is 2000-2035) instead of the weather for the century (#221), START E rejects an inherited harvest before emergence (#226), and stock weather spanning 1999/2000 passes in either order (#238). |
 | 0.19.0 | Experiment data `soil_analysis` (phosphorus and other measured layer values, SA level) and `environment` (dated day length, srad, tmax, tmin, rain, CO2, dew point and wind modifications, ME level), written into a copied FileX. |
 | 0.19.1 | FileX start, planting and fixed harvest dates checked against the stock `$WEATHER` anchor (#253); experiment data FileX dates limited to 1936-2035 (#266); shared inherited-level view code for environment and soil analysis writers (#265). See [FileX dates](../guide/simulation.md#filex-dates). |
-| 0.20.0 (current) | New cultivars under the user's own code with `ecotype`, optional `name` and every required coefficient (ADR 0030); rotation harvest dates checked against the stock `$WEATHER` anchor (#275); multi-digit FileX level edits fixed. See [new cultivars](../guide/new-cultivars.md). |
+| 0.20.0 | New cultivars under the user's own code with `ecotype`, optional `name` and every required coefficient (ADR 0030); rotation harvest dates checked against the stock `$WEATHER` anchor (#275); multi-digit FileX level edits fixed. See [new cultivars](../guide/new-cultivars.md). |
+| 0.21.0 | Generated weather from a supplied `.CLI` climate file through `weather=`, and experiment data controls `weather_source`, `replicates` and `random_seed` (ADR 0032). See [generated weather](../guide/generated-weather.md). |
+| 0.21.1 | `net_returns()` from a DSSAT `.PRI` price file, in `summarize_seasons` and `to_dataframe()` (ADR 0033). See [seasonal economics](../guide/seasonal.md). |
+| 0.21.2 | A climate file as a FileX template field's weather source, including rotation templates (ADR 0034). See [generated weather](../guide/generated-weather.md#use-a-climate-file-in-a-filex-template). |
+| 0.22.0 (current) | Yield forecast: a `Simulation` runs one treatment of a copied `.FCX` in DSSAT mode Y with your measured weather, with `controls.forecast_date` and `controls.years` (ADR 0035). See the [simulation guide](../guide/simulation.md). |
 
 ## Deliberately not built yet
 
