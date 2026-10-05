@@ -6,7 +6,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Added
 - A `Simulation` runs one treatment of a copied forecast FileX (`.FCX`) in DSSAT mode Y with your measured weather data. `controls.forecast_date` sets SIMDATES FODAT in the copy, or an existing valid FODAT is retained. `controls.years` counts historical weather years; each Summary row is one year, from start year - NYERS through start year - 1. See [forecast with your weather data](guide/simulation.md#forecast-with-your-weather-data).
-- Forecast checks collect missing or invalid dates, a forecast before the start, insufficient contiguous history and observations, non-measured weather and multiple rotation components. Coverage ends the day before the forecast date and is a conservative input check; the missing-weather warning scan remains the backstop.
+- Forecast checks collect missing or invalid dates, a forecast before the start, insufficient contiguous history and observations, non-measured weather and multiple rotation components. Coverage of measured weather rows ends the day before the forecast date and is a conservative input check; stock `.WTH` weather is not coverage-checked for a forecast, so the missing-weather warning scan is its backstop.
 
 ### Fixed
 - A controls-only `start_date` after a reported planting date inherited from a copied FileX or FileX template is rejected before DSSAT runs ([#317](https://github.com/AbdelrahmanAmr3/dssatlab/issues/317)). Automatic planting A/F retains its existing window rules.

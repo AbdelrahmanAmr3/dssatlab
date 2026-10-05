@@ -93,18 +93,6 @@ def test_forecast_equal_to_start_needs_no_current_season_weather(forecast, overr
     assert forecast.check(False) == []
 
 
-@pytest.mark.parametrize("override", [False, True])
-def test_stock_wth_forecast_equal_to_start_matches_rows(forecast, tmp_path, override):
-    if override:
-        forecast.management = experiment(controls={"forecast_date": "1982-02-25"})
-    else:
-        edit(forecast, "1982057", "1982056")
-    path = tmp_path / "UFGA8201.WTH"
-    write_weather_file(_parse_weather(weather("1981-02-25", "1982-02-24"))[0], path)
-    forecast.weather = path
-    assert forecast.check(False) == []
-
-
 @pytest.mark.parametrize("start,sdate", [("E", "82056"), ("P", "82056"),
                                          ("S", "XXXXX"), ("S", "82366")])
 def test_unavailable_or_emergence_start(forecast, start, sdate):
@@ -239,19 +227,12 @@ def test_long_history_does_not_overflow_calendar(forecast):
     assert "day 56 of -98017" in forecast.check(False)[0]
 
 
-def test_stock_wth_forecast_ignores_a_planned_harvest_after_forecast_date(forecast, tmp_path):
+def test_stock_wth_is_not_coverage_checked_for_a_forecast(forecast, tmp_path):
     forecast.management = experiment(
         harvest=[{"date": "1982-05-30", "stage": "GS000"}],
-        controls={"forecast_date": "1982-02-26", "harvest_management": "R"})
+        controls={"forecast_date": "2036-01-01", "harvest_management": "R"})
     path = tmp_path / "UFGA8201.WTH"
-    write_weather_file(_parse_weather(weather("1981-02-25", "1982-02-25"))[0], path)
+    write_weather_file(_parse_weather(weather("1982-01-01", "1982-02-25"))[0], path)
     forecast.weather = path
-    assert not any("fixed harvest" in text for text in forecast.check(False))
-
-
-def test_stock_wth_forecast_date_at_the_calendar_minimum_does_not_crash(forecast, tmp_path):
-    edit(forecast, "1982057", "0001001")
-    path = tmp_path / "UFGA8201.WTH"
-    write_weather_file(_parse_weather(weather("1981-02-25", "1982-02-25"))[0], path)
-    forecast.weather = path
-    assert isinstance(forecast.check(False), list)
+    assert not any("weather data ends" in text or "fixed harvest" in text
+                   for text in forecast.check(False))

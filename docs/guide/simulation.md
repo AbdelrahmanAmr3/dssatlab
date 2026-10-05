@@ -369,7 +369,7 @@ replaces SDATE under START S only. A controls-only start after an inherited
 reported planting date is rejected; automatic planting A/F keeps its window rules.
 
 Forecast coverage replaces the normal season coverage and start-in-weather
-checks. Supply every day from the start day of year in `start year - NYERS`
+checks for weather rows; stock `.WTH` files are not coverage-checked for a forecast. Supply every day from the start day of year in `start year - NYERS`
 through `forecast date - 1`, including the intervening years. For treatment 1,
 that is 2000-04-30 (day 121 of 2000) through 2023-05-16; for treatment 2,
 1999-05-01 through 2022-06-30. No current-year weather on or after the forecast
