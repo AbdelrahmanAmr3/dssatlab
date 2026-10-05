@@ -30,7 +30,9 @@ def test_edited_harvest_before_start_matches_inherited_bounds(
 @pytest.mark.parametrize('start_date,rejected', [('1982-03-14', False), ('1982-03-20', True)])
 def test_edited_harvest_uses_controls_start_date(tmp_path, fake_dssat, start_date, rejected):
     sim = emergence_simulation(tmp_path, fake_dssat, harvest='82090')
-    sim.filex.write_text(sim.filex.read_text().replace('     E 82056', '     S 82056'))
+    # An unknown planting date isolates the controls start-date harvest bound.
+    sim.filex.write_text(sim.filex.read_text().replace('     E 82056', '     S 82056')
+                        .replace(' 1 82069 82079', ' 1   -99 82079'))
     sim.management = {'treatments': {7: {
         'controls': {'start_date': start_date}, 'harvest': [{'date': '1982-03-15'}]}}}
     problems = sim.check(False)

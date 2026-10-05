@@ -48,7 +48,8 @@ def test_inherited_reported_harvest_on_or_after_bounds(tmp_path, harvest):
     ('S', None, '1989-05-02'),
 ])
 def test_inherited_harvest_start_bound_only_for_start_s(tmp_path, code, override, bound):
-    sim = dated_simulation(tmp_path, '89122', '89080', '89120', '1989-03-01')
+    # An unknown planting date isolates the START S harvest bound.
+    sim = dated_simulation(tmp_path, '89122', '-99', '89120', '1989-03-01')
     sim.filex.write_text(sim.filex.read_text().replace('     S 89122', f'     {code} 89122'))
     if override is not None:
         sim.management = {'treatments': {7: {'controls': {'start_date': override}}}}

@@ -114,6 +114,32 @@ def _season_coverage(source, treatment, start, days, nyers=None):
             "Supply weather for every season, or fewer years."]
 
 
+def _check_inherited_planting(text, treatment, entry, filex):
+    """Compare inherited PLANT R planting with a valid controls-only effective start."""
+    from .irrigation import _effective_management
+    from .sequence import _rotation_components, _simulation_start
+
+    controls = entry.get("controls")
+    if (text is None or not isinstance(controls, dict)
+            or _check_date(controls.get("start_date"), "start_date")
+            or _effective_management(entry, text, treatment, "planting_management", "PLANT") != "R"):
+        return []
+    if len(_rotation_components(None, treatment, text=text)) > 1:
+        return []  # Sequence checks already compare effective component planting dates.
+    start = _simulation_start(text, treatment, {"treatments": {treatment: entry}})
+    try:
+        row = _section_row(text, "TREATMENTS", "N", treatment, ("MP",))
+        planting = _section_row(text, "PLANTING DETAILS", "P", int(row["MP"]), ("PDATE",))
+        day = _filex_date(planting["PDATE"])
+    except (ValueError, TypeError):
+        return []  # Unavailable levels cannot establish an inherited planting date.
+    if start is None or day is None or day >= start:
+        return []
+    return [f"Controls start_date {start} is after the planting date {day} recorded in "
+            f"FileX {filex if filex is not None else 'template'} treatment {treatment}. "
+            "Set start_date on or before planting."]
+
+
 def _check_planting_window(text, treatment, controls, where, start_date=None, weather_range=None):
     """Check a changed automatic window against inherited dates and selected weather."""
     from .management import _check_weather_date

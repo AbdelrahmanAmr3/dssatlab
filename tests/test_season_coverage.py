@@ -127,7 +127,7 @@ def test_run_treatments_labels_season_problem_before_any_run(filex, fake_dssat, 
 
 @pytest.mark.parametrize("template", [False, True])
 def test_seasons_use_resolved_controls_start_override(filex, data, rows, installed, template):
-    data["planting"]["date"] = "1978-03-01"
+    data["planting"]["date"] = "1978-03-02"
     inputs = dict(filex_template=data, soil=rows[1]) if template else dict(filex=filex(sdate="78060"))
     sim = Simulation(**inputs, weather=weather("1978-03-01", "1980-02-29"),
                      management={"treatments": {1: {"controls": {
