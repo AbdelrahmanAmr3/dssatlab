@@ -116,6 +116,7 @@ treatments:
 _MANAGEMENT_CONTROLS_TEXT = """
     # Optional controls; omitted values keep the FileX controls level.
     # controls:
+      # forecast_date: "2023-05-17" # SIMDATES FODAT: quoted ISO date; needs a copied .FCX; four-digit year.
       # weather_source: "M"       # DSSAT WTHER: "M", "W", "S"; W/S need a climate file and a copied FileX.
       # replicates: 1             # DSSAT NREPS: whole 1-99999; above 1 needs a sequence with W/S.
       # random_seed: 0            # DSSAT RSEED: whole 0-99999; 0 is passed as is; a fixed seed repeats.
@@ -181,6 +182,7 @@ _EXPERIMENT_SECTIONS_TEXT = """
     # start_date replaces SDATE in weather and management date checks; START stays unchanged.
     controls:                    # All fields optional; an empty dict keeps the FileX level
       start_date: "1982-02-25"    # Simulation start date (quoted "YYYY-MM-DD")
+      # forecast_date: "2023-05-17" # SIMDATES FODAT: quoted ISO date; needs a copied .FCX; four-digit year.
       water: "Y"                 # Water simulation: "Y" or "N" (strings, not booleans)
       nitrogen: "Y"              # Nitrogen simulation: "Y" or "N" (strings, not booleans)
       output_interval: 1          # Output interval (FROPT), positive integer days; must fit the FileX column

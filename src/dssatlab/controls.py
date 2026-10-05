@@ -37,6 +37,30 @@ def _controls_start_date(source, treatment):
     return None
 
 
+def _filex_forecast_date(text, treatment):
+    """Read selected SIMDATES FODAT from columns 29-36; invalid dates are missing."""
+    try:
+        level = int(_section_row(text, "TREATMENTS", "N", int(treatment), ("SM",))["SM"])
+        lines = text.splitlines()
+        start, end = _section_bounds(lines, "SIMULATION CONTROLS")
+        simdates = False
+        for line in lines[start + 1:end]:
+            if line.startswith("@"):
+                simdates = "SIMDATES" in line.split()
+            elif (simdates and re.fullmatch(r"\s*\+?[0-9]+\s*", line[:3])
+                  and int(line[:3]) == level):
+                value = line[28:36].strip()
+                if not re.fullmatch(r"[0-9]{7}", value):
+                    return None
+                year, doy = int(value[:4]), int(value[4:])
+                if year and 1 <= doy <= date(year, 12, 31).timetuple().tm_yday:
+                    return date(year, 1, 1) + timedelta(days=doy - 1)
+                return None
+    except (ValueError, TypeError, KeyError):
+        pass  # Ordinary FileX checks report unavailable levels.
+    return None
+
+
 def _harvest_bounds(source, text, treatment, row, override, *, first=True):
     """Read known start and planting bounds after experiment edits."""
     from .irrigation import _effective_management
@@ -167,11 +191,7 @@ def _check_planting_window(text, treatment, controls, where, start_date=None, we
 
 
 def _controls_text(text, treatment, controls):
-    """Copy selected controls; sequence weather keys reach every used SM level.
-
-    Other sequence controls apply to its first component as before. Each copied
-    level retains omitted cells and each original level stays unchanged.
-    """
+    """Copy selected controls; only sequence weather keys reach every SM level."""
     from .sequence import _rotation_components
 
     components = _rotation_components(None, treatment, text=text)
@@ -196,12 +216,7 @@ def _controls_text(text, treatment, controls):
 
 
 def _controls_level_text(text, treatment, controls, *, base=None, rotation=None):
-    """Dry-run the same copy operation used by run(), preserving other cells.
-
-    Header token ends follow the DSSAT 4.8 UFGA8201.MZX layout. Copy all
-    selected @N blocks, including automatic management, into one new level.
-    Only requested columns must exist; omitted fields keep their base values.
-    """
+    """Copy every selected @N block; change named cells and retain omitted values."""
     if not controls:
         return text
     section = "SIMULATION CONTROLS"
@@ -216,6 +231,9 @@ def _controls_level_text(text, treatment, controls, *, base=None, rotation=None)
     if "start_date" in controls:
         day = date.fromisoformat(controls["start_date"])
         changes["GENERAL", "SDATE"] = _dssat_date(day)
+    if "forecast_date" in controls:
+        day = date.fromisoformat(controls["forecast_date"])
+        changes["SIMDATES", "FODAT"] = f"{day.year:04d}{day.timetuple().tm_yday:03d}"
     for field, block, column in (("years", "GENERAL", "NYERS"),
                                  ("output_interval", "OUTPUTS", "FROPT")):
         if field in controls:
@@ -238,6 +256,8 @@ def _controls_level_text(text, treatment, controls, *, base=None, rotation=None)
                 marker, header, columns = line.rstrip("\r\n"), None, {}
                 continue
             header, columns = line.rstrip("\r\n"), _columns(line)
+            if "SIMDATES" in columns:
+                columns["FODAT"] = (28, 36)  # DSSAT IPSIM reads (I3,25X,I8).
             if "N" not in columns:
                 raise ValueError(f"{section} header has no N column: {header!r}. "
                                  "Supply a numbered @N header.")
@@ -265,6 +285,9 @@ def _controls_level_text(text, treatment, controls, *, base=None, rotation=None)
                 applied.add((block, column))
         for column, value in updates.items():
             left, right = columns[column]
+            if column == "FODAT":
+                row = row[:28].ljust(28) + str(value).rjust(8) + row[36:]
+                continue
             if len(row) < right:
                 raise ValueError(f"{section} {column}: selected row is truncated. "
                                  "Supply a complete FileX row.")
