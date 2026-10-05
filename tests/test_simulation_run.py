@@ -143,12 +143,12 @@ def test_constructor_stores_all_inputs_without_work(monkeypatch):
 
 
 @pytest.mark.parametrize("suffix", [".FCX", ".fcx", ".FcX"])
-def test_forecast_filex_is_one_check_problem_and_never_runs(inputs, fake_dssat, monkeypatch, suffix):
+def test_missing_forecast_date_is_one_check_problem_and_never_runs(inputs, fake_dssat, monkeypatch, suffix):
     filex = inputs.filex.with_suffix(suffix)
     inputs.filex.rename(filex)
     sim = Simulation(filex, 2, inputs.rows)
-    expected = (f"FileX {filex.name} is a forecast FileX: a Simulation "
-                "does not run forecast mode (Y). Call run() on the FileX instead.")
+    expected = (f"FileX {filex} treatment 2 has no forecast date (SIMDATES FODAT). "
+                "Set controls forecast_date, e.g. 2023-05-17.")
     forbidden = Mock(side_effect=AssertionError("forecast must not run"))
     monkeypatch.setattr(simulation_module, "run", forbidden)
     before = sorted(filex.parent.iterdir())
@@ -174,8 +174,8 @@ def test_run_treatments_reports_forecast_problem_before_running(inputs, fake_dss
         run_treatments(str(filex), inputs.rows)
 
     assert error.value.problems == [
-        "Scenario 'base', treatment 2: FileX UFGA8201.FCX is a forecast FileX: "
-        "a Simulation does not run forecast mode (Y). Call run() on the FileX instead."]
+        f"Scenario 'base', treatment 2: FileX {filex} treatment 2 has no forecast date "
+        "(SIMDATES FODAT). Set controls forecast_date, e.g. 2023-05-17."]
     forbidden.assert_not_called()
     assert fake_dssat.calls == []
     assert sorted(filex.parent.iterdir()) == before
