@@ -2,6 +2,11 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.21.2] - 2026-10-05
+
+### Added
+- A FileX template field can use one `.CLI` path with `controls.weather_source` W or S. Single-crop, crop-entry and rotation templates take the station and coordinates from the climate header, skip daily weather-coverage checks, and copy the file unchanged without writing a `.WTH` for it. Rotation templates also allow replicates above 1. See [use a climate file in a FileX template](guide/generated-weather.md#use-a-climate-file-in-a-filex-template).
+
 ## [0.21.1] - 2026-10-04
 
 ### Added
