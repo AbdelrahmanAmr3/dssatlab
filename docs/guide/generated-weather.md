@@ -3,8 +3,8 @@
 With a copied FileX, DSSAT can generate daily weather from a station's climate
 file instead of reading measured days. Pass the existing `.CLI` file through
 `weather=` and choose WGEN (`W`) or SIMMETEO (`S`) in the treatment's controls.
-No daily weather data is needed for that treatment. FileX templates still require
-measured weather; use `filex=` for generated weather.
+No daily weather data is needed for that treatment. FileX templates can also
+use a climate file as a field's weather, as shown below.
 
 ## Supply the climate file DSSAT reads
 
@@ -12,7 +12,7 @@ The filename must be the **first four characters of the FileX field's WSTA**,
 followed by `.CLI`: `DTCM` or `DTCM6401` needs `DTCM.CLI`. Obtain the file from
 your course inputs or DSSAT's `Weather/Climate` folder and pass its path explicitly.
 dssatlab does not find it in the installation or compute it from daily weather.
-At most one climate file can be supplied.
+For a copied FileX, at most one climate file can be supplied.
 
 ```python
 import dssatlab as dl
@@ -163,6 +163,62 @@ keys inherit the base input. If the base `management` contains other settings
 you need, include them in the scenario's replacement too. The climate filename
 must still match the FileX's WSTA as described above. See
 [scenarios](scenarios.md#overrides-replace-the-whole-input) for the override rules.
+
+## Use a climate file in a FileX template
+
+A template field's `weather` can be one `.CLI` path as a string, `Path` or
+one-item list. Set the treatment's `controls.weather_source` to `"W"` or `"S"`
+through `management=`. This works for single-crop, crop-entry and rotation
+templates; a rotation template can also use `replicates` above 1.
+
+The file keeps its four-letter station name: `UFGA.CLI` for `@ INSI` UFGA,
+with lowercase names accepted. FIELDS station, latitude, longitude and elevation
+come from the climate file header. No daily weather-coverage checks apply to
+that field; calendar dates and their order are still checked. `run()` copies
+the file unchanged under its upper-case name and writes no `.WTH` for it.
+
+```python
+import dssatlab as dl
+
+template = {
+    "crop": "maize", "treatment_name": "Generated weather",
+    "cultivar": {"code": "IB0035"},
+    "planting": {"date": "2021-03-01", "method": "S", "distribution": "R",
+                 "population": 7.2, "row_spacing": 75, "depth": 5},
+}
+soil = [{"soil_id": "SOIL123456", "salb": 0.13, "slro": 60,
+         "sldr": 0.5, "slpf": 1, "slb": 30, "slll": 0.1,
+         "sdul": 0.24, "ssat": 0.45, "srgf": 1}]
+experiment = {"treatments": {1: {"controls": {
+    "weather_source": "W", "years": 3, "random_seed": 1234,
+}}}}
+sim = dl.Simulation(
+    filex_template=template, weather=r"C:\DSSAT48\Weather\Climate\UFGA.CLI",
+    soil=soil, management=experiment, executable=r"C:\DSSAT48\DSCSM048.EXE",
+)
+if not sim.check():
+    result = sim.run()
+    print(dl.read_summary(result.run_dir))  # Three seasons.
+```
+
+Templates default to measured weather (`M`); supplying a `.CLI` does not change
+the method automatically. For field 1 and treatment 1, `check()` reports:
+
+> Field 1 weather is a climate file, but treatment 1 uses WTHER M. Checked the treatment's weather source. Set controls weather_source W or S, or supply weather data rows.
+
+With `W` and data rows instead of a climate file, it reports (the same message
+uses `WTHER S` for `S`):
+
+> Treatment 1 uses generated weather (WTHER W), but field 1 weather is data rows. Checked the field's weather source. Supply the station's .CLI file for this field.
+
+A per-field dict may use rows for one field and a `.CLI` for another. Mixing
+a `.CLI` with rows or another weather path within one field gives:
+
+> Field 1 weather mixes a climate file with other weather. Supply one .CLI path or only data rows.
+
+The [real-DSSAT proof in ADR 0034](../adr/0034-climate-file-as-a-template-fields-weather.md#proof-on-real-dssat)
+verified W and S, fixed seeds, a supplied altered climate file, rotation
+replicates and crop-entry templates on Windows DSSAT 4.8.5.017. Linux was not run.
 
 ## Verified course results
 

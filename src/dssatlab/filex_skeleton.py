@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 
 from .controls import _controls_start_date
+from .climate import _copy_climate_file, _split_weather_inputs
 from .cultivar import _CROPS, _template_data_dir
 from .errors import DSSATCheckError
 from .filex_template import (_check_filex_template, _load_filex_template,
@@ -35,10 +36,15 @@ def _write_template_simulation(sim, experiment_data):
              or date.fromisoformat(first["start_date"] if first["crop"] == "fallow"
                                    else first["planting"]["date"]))
     stations, profiles = {}, {}
-    for rows in weather.values():
-        stations.setdefault(rows[0]["station"], rows)
-    for station, rows in stations.items():
-        write_weather_file(rows, folder / f"{station}{start.year % 100:02d}01.WTH")
+    sources = sim.weather if isinstance(sim.weather, dict) else {1: sim.weather}
+    sources = {int(key): value for key, value in sources.items()}
+    for number, rows in weather.items():
+        stations.setdefault(rows[0]["station"], (sources[number], rows))
+    for station, (source, rows) in stations.items():
+        if _split_weather_inputs(source)[1]:
+            _copy_climate_file(source, folder)
+        else:
+            write_weather_file(rows, folder / f"{station}{start.year % 100:02d}01.WTH")
     for rows in soil.values():
         profiles.setdefault(rows[0]["soil_id"], rows)
     _write_soil_profiles(list(profiles.values()), folder / "SOIL.SOL")
@@ -64,7 +70,7 @@ def write_filex(source, weather_rows: list[dict] | dict[int, list[dict]],
     """Check a FileX template and write its fields and treatments; return its path.
 
     source is a template dict or YAML path. weather_rows and soil_rows must be
-    nonempty checked rows from _parse_weather/_parse_soil, with no problems:
+    nonempty checked weather/soil rows (or one climate station dict), with no problems:
     a list for field 1, or a dict keyed by every field number in the template.
     data_dir is the DSSAT data directory containing Genotype. The destination
     directory must exist. Existing FileX contents are overwritten, like the
@@ -155,7 +161,7 @@ def _skeleton_text(data, weather_rows, soil_rows, stem):
 
 
 def _field_lines(weather_rows, soil_rows, count):
-    """Shared field and coordinate columns for single crops and sequences."""
+    """Field columns from a first weather row or climate station dict, plus soil."""
     field_lines, coordinate_lines = [], []
     for number in range(1, count + 1):
         weather = weather_rows[number][0]

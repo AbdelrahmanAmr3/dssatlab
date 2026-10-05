@@ -271,7 +271,7 @@ If two fields specify the same station code (or soil profile ID) but have differ
 
 Inside the simulation folder, DSSAT receives:
 
-- One generated weather file per distinct station (named `<station><yy>01.WTH` using the selected treatment's start year).
+- One generated weather file per distinct station (named `<station><yy>01.WTH` using the selected treatment's start year). A station whose weather comes from a climate file (`controls.weather_source` W or S) gets the `.CLI` copied unchanged and no `.WTH`.
 - A single `SOIL.SOL` holding every distinct soil profile in field order.
 - A generated FileX defining each field in both `FIELDS` tables with its own station, coordinates, elevation, soil ID, and depth.
 
@@ -334,7 +334,7 @@ under its upper-case filename (`ufga7601.wth` becomes `UFGA7601.WTH`). No weathe
 file is regenerated. Extra columns and flags, line endings and a trailing DOS EOF
 byte (Ctrl-Z) are preserved. A Ctrl-Z inside the daily records is rejected.
 Stock files also work through `run_treatments()`, scenarios and `run_sweep()`.
-FileX templates, including per-field sources, require weather data rows instead.
+FileX templates, including per-field sources, require weather data rows instead, except that a template field may use one `.CLI` climate file with `controls.weather_source` W or S (see [use a climate file in a FileX template](generated-weather.md#use-a-climate-file-in-a-filex-template)).
 
 `check()` reads the station from the first four filename characters (upper-case),
 and latitude, longitude and elevation by the `@ INSI` header. It reads daily

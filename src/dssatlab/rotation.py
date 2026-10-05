@@ -234,7 +234,8 @@ def _render_rotation(data, weather_rows, soil_rows):
 
 def _check_rotation_simulation(sim, data, data_dir, template_problems, experiment_data, load_problems):
     """Check one field and sequence controls without writing a temporary FileX."""
-    weather, wp, wr = _parse_field_data(sim.weather, 1, "weather")
+    weather, wp, wr = _parse_field_data(
+        sim.weather, 1, "weather", weather_method=_selected_controls(experiment_data, 1).get("weather_source", "M"))
     soil, sp, sr = _parse_field_data(sim.soil, 1, "soil")
     for kind in ("weather", "soil"):
         if isinstance(getattr(sim, kind), dict):
@@ -245,8 +246,8 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
                        and re.fullmatch(r"0*1", str(sim.treatment)))
     if not valid_treatment:
         template_problems.append("FileX template has only treatment 1. Supply treatment=1.")
+    coverage_weather = [row for row in weather.get(1, []) if "date" in row]
     text, start, components, sequence_report = None, None, [], []
-    # The checked template already fixes R=1..N, FL=1 and NREPS=1.
     if not template_problems:
         components = [{"CR": "FA" if c["crop"] == "fallow" else _CROPS[c["crop"]][0]}
                       for c in data["rotation"]]
@@ -254,12 +255,11 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
         sequence_report = [f"FileX: treatment 1 is a sequence of {len(components)} rotation "
                            f"components (R 1-{len(components)}: {crops}); "
                            "it runs in DSSAT's sequence mode."]
-        start = (_controls_start_date(experiment_data, 1)
-                 or _rotation_start_date(data["rotation"]))
-        days = [row["date"] for row in weather.get(1, []) if "date" in row]
+        start = _controls_start_date(experiment_data, 1) or _rotation_start_date(data["rotation"])
+        days = [row["date"] for row in coverage_weather]
         template_problems.extend(_sequence_coverage(
-            experiment_data, 1, start, days, _rotation_cycle_years(data["rotation"], experiment_data, start),
-            template=data["rotation"]))
+            experiment_data, 1, start, days,
+            _rotation_cycle_years(data["rotation"], experiment_data, start), template=data["rotation"]))
         if days and start not in days:
             template_problems.append(f"Simulation start date {start} is not covered by weather "
                                      f"data ({min(days)} to {max(days)}). Supply weather for that date.")
@@ -278,7 +278,7 @@ def _check_rotation_simulation(sim, data, data_dir, template_problems, experimen
             found, lines = load_problems, _report_lines("Management data", load_problems)
         else:
             found, lines = _check_management(checked_data, None, sim.treatment,
-                                             weather.get(1, []), start, text=text,
+                                             coverage_weather, start, text=text,
                                              rotation_template=data["rotation"], data_dir=data_dir)
         problems.extend(found)
         report.extend(lines)

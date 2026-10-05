@@ -172,6 +172,7 @@ A DSSAT `*.CLI` file of station monthly averages (for example from DSSAT's `Weat
 folder), handed to a Simulation through `weather=`. DSSAT reads `<first four characters of WSTA>.CLI`
 beside the FileX; it is copied unchanged, under its upper-case name, into the simulation folder.
 The checks read only its header, station row and the table its WTHER method needs (monthly averages for S, WGEN parameters for W).
+A FileX template field can take a climate file as its only weather (ADR 0034).
 
 **Replicate**:
 One repetition of a treatment's seasons with a different random weather series (DSSAT NREPS,
@@ -312,7 +313,8 @@ _Avoid_: climate change scenario, weather modification (in code and messages)
 The one fixed shape a user fills in so dssatlab can write a FileX from scratch: one crop, one or
 more fields, and one treatment or a list of named treatments, each on one field. Every treatment starts from the template's
 cultivar, planting and harvest; experiment data keyed by treatment number varies each one. Built
-from the experiment data plus the crop, station and soil profile. Instead of one crop it can hold a
+from the experiment data plus the crop, station and soil profile. Each field's weather is weather
+data or one climate file, whose station row gives the field's station and coordinates. Instead of one crop it can hold a
 rotation: one sequence of 2 to 99 rotation components (crops or fallows), each crop with its own
 cultivar, planting and harvest, written as a sequence FileX. It starts on the first crop's planting
 date, or on the start date of a leading fallow. Instead of one crop it can also hold numbered crop
