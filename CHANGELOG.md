@@ -2,7 +2,7 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
-## [0.22.0] - 2026-10-04
+## [0.22.0] - 2026-10-05
 
 ### Added
 - A `Simulation` runs one treatment of a copied forecast FileX (`.FCX`) in DSSAT mode Y with your measured weather data. `controls.forecast_date` sets SIMDATES FODAT in the copy, or an existing valid FODAT is retained. `controls.years` counts historical weather years; each Summary row is one year, from start year - NYERS through start year - 1. See [forecast with your weather data](guide/simulation.md#forecast-with-your-weather-data).
