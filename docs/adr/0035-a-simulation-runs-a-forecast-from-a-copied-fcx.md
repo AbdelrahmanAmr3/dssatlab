@@ -36,3 +36,25 @@ a climate file source, and a sequence. The result is the usual one: each summary
 
 - Forecasts from a FileX built from scratch (a FileX template), climate or generated ensembles (WTHER S/W/G),
   FSTRYR/FENDYR ranges and ensemble statistics are still out of scope.
+
+## Real-DSSAT proof
+
+Manual SPEC v0.22 (a)-(d), Windows `C:\DSSAT48\DSCSM048.EXE`, DSSAT
+4.8.5.017, UFAC2301.FCX treatments 1 and 2, on 2026-10-04:
+
+- (a) The 8,903 daily UFAC9925.WTH rows (1999-01-01 through 2023-05-17),
+  passed as weather data, produce one generated multi-year `.WTH` per Simulation.
+  All 46 Summary rows match `ref/UFAC2301.OSU` and `run()` with unchanged stock
+  weather on HWAM and MDAT; no missing-weather warning and no missing HWAM.
+- (b) `controls.forecast_date` 2023-05-10 / 2022-06-24 matches an independently
+  hand-edited stock `.FCX` on HWAM and MDAT in all 46 rows.
+- (c) `controls.years: 5` gives five rows per treatment, WYEAR 2018..2022 and
+  2017..2021 in order, matching the corresponding baseline tails on HWAM and MDAT.
+- (d) Weather trimmed to 2023-05-16 / 2022-06-30 (forecast date minus one day)
+  matches all 46 baseline rows on HWAM and MDAT, without missing-weather warnings.
+
+Evidence is retained locally under `.work/e2e-v022/`: `prove.py`, `results.json`
+with every compared row and source SHA-256 hashes, and run directories with
+DSSAT outputs and batch files. Source inputs and the executable remain unchanged.
+Forecasts from scratch are still outside this proof. No Linux real-DSSAT proof
+was run.

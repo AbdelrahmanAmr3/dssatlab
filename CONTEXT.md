@@ -386,7 +386,7 @@ _Avoid_: batch mode (a batch file is how Q and Y receive their treatments), irri
 A run in DSSAT's forecast mode (Y) of a forecast FileX (`.FCX`): observed weather from the start
 date to the day before the forecast date, then one result per historical weather year, from
 (start year - NYERS) to (start year - 1). `run()` does it, and so does a Simulation whose FileX
-template is a `.FCX` (measured weather only, one treatment).
+is a copied `.FCX` (measured weather only, one treatment).
 _Avoid_: prediction, seasonal analysis (that is NYERS seasons of one weather record)
 
 **Forecast date**:

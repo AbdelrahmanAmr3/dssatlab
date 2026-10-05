@@ -67,12 +67,16 @@ treatments:
 Values are in DSSAT's own units and nothing is converted. Dates are quoted ISO strings
 from 1936-01-01 to 2035-12-31, including both boundaries. Dates outside this range
 are rejected because FileX stores two-digit years; see [FileX dates](simulation.md#filex-dates).
+The exception is `controls.forecast_date`: a quoted real ISO date without that
+year limit, written as YYYYDDD into a copied `.FCX`. Omit it to use the FileX's
+valid FODAT. In a forecast, `controls.years` counts historical weather years.
+See [forecast with your weather data](simulation.md#forecast-with-your-weather-data).
 
 | Section | What `check()` rejects |
 |---|---|
 | `cultivar` | An unknown code without a complete new cultivar definition (`ecotype` and every coefficient); an existing code with `ecotype` or `name`; invalid coefficient names, values or widths. Several `.CUL` files for one crop are rejected, because dssatlab does not choose a model. See [new cultivars](new-cultivars.md) for the code, ecotype and name checks. |
 | `initial_conditions` | Nonpositive or non-ascending layer depths, water outside 0 to 1, negative ammonium, nitrate or residue, and detail values outside the ranges below. Layers may go deeper than the soil profile. Values other than a dict or the quoted string `"off"` are rejected. |
-| `controls` | Simulation or management codes outside the tables below, automatic values outside their ranges, an invalid automatic planting window, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date`. |
+| `controls` | Simulation or management codes outside the tables below, automatic values outside their ranges, an invalid automatic planting window, an `output_interval` that is not a positive integer, `years` that is not a positive integer (or too wide for DSSAT's NYERS column), a bad `start_date` or `forecast_date`, or `forecast_date` on a non-`.FCX` FileX. |
 
 A misspelled field or a misnamed section is reported by name with the allowed list, and every
 problem of every treatment is reported at once. Crop-specific rules are still DSSAT's to check
@@ -81,8 +85,9 @@ at run time.
 A changed `controls` `start_date` replaces the FileX `SDATE` in the weather-coverage and
 planting-date checks under START S. Under START P the effective planting date is
 the simulation start date. `controls.start_date` replaces SDATE under START S only.
-The FileX `START` setting
-is left as it is. See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
+A controls-only start after the planting date inherited from the FileX or FileX
+template is a check problem under reported planting (PLANT R); automatic planting
+A/F keeps its existing window rules. The FileX `START` setting is left as it is. See [simulation start dates](simulation.md#create-a-simulation-and-inspect-the-checks).
 
 ## Soil analysis
 

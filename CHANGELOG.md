@@ -2,6 +2,20 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [0.22.0]
+
+### Added
+- A `Simulation` runs one treatment of a copied forecast FileX (`.FCX`) in DSSAT mode Y with your measured weather data. `controls.forecast_date` sets SIMDATES FODAT in the copy, or an existing valid FODAT is retained. `controls.years` counts historical weather years; each Summary row is one year, from start year - NYERS through start year - 1. See [forecast with your weather data](guide/simulation.md#forecast-with-your-weather-data).
+- Forecast checks collect missing or invalid dates, a forecast before the start, insufficient contiguous history and observations, non-measured weather and multiple rotation components. Coverage ends the day before the forecast date and is a conservative input check; the missing-weather warning scan remains the backstop.
+
+### Fixed
+- A controls-only `start_date` after a reported planting date inherited from a copied FileX or FileX template is rejected before DSSAT runs ([#317](https://github.com/AbdelrahmanAmr3/dssatlab/issues/317)). Automatic planting A/F retains its existing window rules.
+
+### Notes
+- Forecasts require a copied `.FCX`, measured weather and one treatment; FileX from scratch, climate/generated ensembles, forecast scenarios and ensemble statistics are outside this feature.
+- Real-DSSAT proof on Windows 4.8.5.017: UFAC2301 treatments 1 and 2 match all 46 reference and stock-run HWAM/MDAT rows using one generated multi-year weather file. Changed FODAT matches a hand-edited FileX, five-year ensembles keep historical-year order, and observations ending at forecast date - 1 match the baseline without missing-weather warnings. See [ADR 0035](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/docs/adr/0035-a-simulation-runs-a-forecast-from-a-copied-fcx.md#real-dssat-proof).
+- Zero runtime dependencies are preserved.
+
 ## [0.21.2] - 2026-10-04
 
 ### Added
