@@ -7,6 +7,8 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Added
 - `RunResult.warnings` contains distinct DSSAT `WARNING.OUT` blocks, including their module and date, in file order. Its short repr shows the run directory name and counts of output files and warnings ([#374](https://github.com/AbdelrahmanAmr3/dssatlab/issues/374)).
 - `run_sweep(..., base=False)` checks and runs only the factor combinations, with no unchanged-input checks, runs or base rows. The default remains `base=True` ([#371](https://github.com/AbdelrahmanAmr3/dssatlab/issues/371)).
+### Changed
+- Clarified guide examples for cultivar experiment data through `management=`, DSSAT fertilizer rounding, automatic-irrigation grids and percentage limits, whole-input scenario replacement, price matching by `TRNO`, generated-weather seeds, environment output names, constant-observation d-index, initial-condition depth and discovery with a read-only profile ([#379](https://github.com/AbdelrahmanAmr3/dssatlab/issues/379)).
 
 ### Fixed
 - `evaluate()` lists observed rows before the first or after the last Plant growth day in `Evaluation.excluded`, with their scenario, treatment, YYYYDDD date and simulated boundary. Their measurements are not checked; pairs and statistics use only observations in the simulated range. Missing interior days and an evaluation with every row excluded still raise `DSSATCheckError` ([#370](https://github.com/AbdelrahmanAmr3/dssatlab/issues/370)).

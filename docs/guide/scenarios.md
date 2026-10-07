@@ -139,6 +139,13 @@ partial or deep merging:
   run provided custom soil.
 - If an input is not mentioned in a scenario, the scenario uses the base input.
 
+A scenario's `management` replaces the entire base experiment data, including
+all treatments and controls. For an irrigation-only seasonal comparison, repeat
+the base `controls` (for example `years: 10`, `weather_source: "W"`, `co2: "D"`
+and `random_seed: 1234`) alongside the scenario's irrigation settings. If those
+controls are omitted from the replacement, the copied FileX's own controls apply;
+they are not inherited from the base management dict.
+
 Unknown keys (anything other than `weather`, `soil`, or `management`) are rejected
 with a clear error listing the allowed keys.
 

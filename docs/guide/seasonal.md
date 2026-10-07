@@ -253,6 +253,11 @@ the input rows stay unchanged. Price sections match each row's crop `CR` and
 FileX treatment `TRNO`, including fallow (`CR="FA"`); the scenario's `treatment`
 label is not used for price matching.
 
+For example, every scenario of soybean treatment 1 uses the same price section
+for `CR="SB"`, `TRNO=1`. Creating treatment 2 instead requires a soybean treatment
+2 section in the price file; renaming a scenario does not select different
+prices. Check `CR` and `TRNO` in the Summary before choosing a price file.
+
 Fixed prices (`IDIS=0`) use `PAR1`; uniform (`1`) and triangular (`2`) prices
 use their means, and normal (`3`) prices use `PAR1`. **Price risk is not
 modelled**: seasonal statistics describe variation in simulated quantities at

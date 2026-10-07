@@ -68,6 +68,10 @@ layer, with template soil or stock soil. Depths remain positive and strictly
 ascending; water must be from 0 to 1 and ammonium/nitrate nonnegative.
 There is no soil-depth rejection or warning. On real DSSAT, UFGA8222 with
 180 cm initial conditions on profiles from 60 to 210 cm matched 12/12.
+Compare the deepest initial-condition layer with the supplied soil depth before
+interpreting a shallow-profile run. For example, 180 cm initial conditions are
+accepted with a 60 cm soil profile; DSSAT runs on the supplied soil layers,
+and those initial conditions do not extend the soil profile to 180 cm.
 See [initial conditions](experiment.md#cultivar-initial-conditions-and-controls).
 
 ## Prepare the soil template

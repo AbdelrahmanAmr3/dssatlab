@@ -54,6 +54,13 @@ only when nonzero, for example
 `evaluation.to_dataframe()` converts the pairs using optional pandas, imported
 only when needed. Evaluation itself needs no extra dependencies.
 
+With constant observed values, Willmott's `d_index` is 0 whenever any simulated
+value differs, even if the error is small; it is 1 for an exact match. For
+example, six observed anthesis dates of May 12 and six simulated dates of May 13
+give `d_index=0`, RMSE 1 day and bias +1 day. With no observed variation, the
+squared-error sum equals the index's denominator. Interpret the index alongside
+RMSE and bias rather than as a standalone measure of model quality.
+
 Use `plot_evaluation` for a scatter of simulated versus observed values with a
 dashed 1:1 line. Install the optional plotting extra with
 `pip install dssatlab[plot]`. Select one variable to keep different units separate;
