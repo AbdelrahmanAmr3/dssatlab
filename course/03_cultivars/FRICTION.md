@@ -5,10 +5,16 @@
 - **What the student previously had to do:** Supply `SBGRO048.CUL` beside the copied `UFGA7901.SBX` before running cultivar overrides, even though `list_cultivars("soybean")` could already list the installed stock cultivars.
 - **Why it was awkward or wrong:** The cultivar check searched only beside the source FileX and did not find the installed genotype file. Unmodified genotype files must come from the installed DSSAT data directory rather than being bundled with the lesson.
 - **Suggested change:** Resolve the stock cultivar file from the selected executable's data directory when no sibling cultivar file exists, consistently with `list_cultivars()`, and stage the necessary genotype files through the public API. Retain a supplied sibling override.
-- **Classification:** Originally **blocking**, now **resolved: fixed by #353/#354**. PR #354 is not merged yet; validation uses its implementation from the sibling `wt-fix-cul` worktree. No DSSAT file was edited, no private API was used, and no unmodified genotype file was bundled or manually staged.
+- **Classification:** Originally **blocking**; resolved by #353 (PR #354, merged into master).
 
 The original execution stopped before launching simulations with seven cultivar-check problems, each reporting that no soybean `.CUL` file existed beside the FileX.
 With the fix, the prescribed comparison and exercise execute using the installed genotype files.
+
+## 2. Crop names and crop codes differ between calls — non-blocking
+
+- **What the student must do:** call `list_cultivars("soybean")` with the template crop name, but write `"crop": "SB"` (the DSSAT crop code) in a cultivar override.
+- **Why it is awkward:** the FileX and the override use crop codes, so students must translate between the two.
+- **Suggested change:** let `list_cultivars()` also accept DSSAT crop codes (already filed as #349).
 
 ## Validation status
 
@@ -33,7 +39,7 @@ The comparison uses groups 1, 3, 5, 6, 7, 8 and 10; the editable exercise defaul
 
 The exercise shows HWAM of 2011, 2750, 3154, 3004 and 3338 kg/ha for MG 2, 4, 6, 8 and 10, respectively, with MDAT of 1979-09-01, 1979-09-16, 1979-10-03, 1979-10-24 and 1979-11-06.
 
-Every execution and test sets process-local `PYTHONPATH` to the absolute path of the sibling `wt-fix-cul/src` directory.
+Before PR #354 merged, executions set `PYTHONPATH` to the fix branch's `src`; the fix is now on master.
 Process-local `LOCALAPPDATA`, `IPYTHONDIR` and `JUPYTER_RUNTIME_DIR` use system temporary directories outside the worktree so the unchanged setup cell runs in the restricted environment.
 The setup cell is byte-identical to the merged reference lessons and `SETUP_CELL` in `tests/test_course.py`.
 
@@ -42,4 +48,3 @@ All 11 code cells have execution counts and no error outputs; the comparison inc
 `python -m pytest -q tests/test_course.py --basetemp=<system-temp-folder> -p no:cacheprovider` passed all **15 tests**.
 
 Commit preparation was attempted with only `course/03_cultivars` selected, for a commit carrying `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-Git could not create the worktree index lock (`Permission denied`), so the completed lesson remains uncommitted; the original issue/spec copies were left untouched.
