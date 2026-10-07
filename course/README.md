@@ -68,4 +68,3 @@ Follow the [lesson template and checks in the course spec](https://github.com/Ab
 
 Every lesson keeps its committed inputs in `data/` and inventories them exactly once in `data/SOURCE.md`, with columns `file | origin | what it is`.
 Use only stock DSSAT 4.8 data or data written for the course; unchanged genotype files come from the installed DSSAT data directory.
-Record API difficulties in the lesson's `FRICTION.md` as blocking or non-blocking, for the reviewer to triage.

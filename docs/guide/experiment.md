@@ -229,7 +229,7 @@ Omit `environment` to keep the FileX's ME level. `environment: []` sets ME to 0;
 `"off"`, `null` and a dict are rejected. Rotation components reject this section.
 Sweeps keep it in the base experiment data but cannot vary it as a factor.
 See [ADR 0028](../adr/0028-soil-analysis-and-environment-as-new-levels.md) and
-the [tutorial notebook](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_tutorial.ipynb), Case 19.
+course [lesson 10](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/course/10_climate_change/lesson.ipynb).
 
 ## Residues, tillage and harvest
 
@@ -423,7 +423,7 @@ The FileX template still starts with IRRIG R, PLANT R and its automatic defaults
 experiment data applies your changes afterwards. Sequences keep their existing
 controls restriction (`years` and `start_date` only). See
 [ADR 0020](../adr/0020-automatic-management-as-controls-fields.md) and the
-[tutorial notebook](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_tutorial.ipynb), Case 15.
+course [lesson 14](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/course/14_rotations/lesson.ipynb).
 
 ## Initial-condition details
 
@@ -468,7 +468,7 @@ dl.to_dataframe(rows)[["scenario", "controls", "HWAM"]]
 The base runs first, followed by C and L. Each factor value replaces the whole
 `controls` section; `initial_conditions` stays off. Compare grain yield (`HWAM`,
 kg/ha) in the returned rows. `to_dataframe()` requires optional pandas. See
-[sweeps](sweeps.md) and the [tutorial notebook](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/notebook/dssatlab_tutorial.ipynb), Case 14.
+[sweeps](sweeps.md) and course [lesson 12](https://github.com/AbdelrahmanAmr3/dssatlab/blob/master/course/12_phosphorus/lesson.ipynb).
 
 ## Cultivar coefficients
 
