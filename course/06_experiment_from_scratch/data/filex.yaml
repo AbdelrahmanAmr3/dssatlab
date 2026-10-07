@@ -1,0 +1,13 @@
+crop: "maize"
+treatments:
+  - "Sparse 4 plants/m2"
+  - "Dense 8 plants/m2"
+cultivar:
+  code: "IB0035"
+planting:
+  date: "1982-02-26"
+  method: "S"
+  distribution: "R"
+  population: 4
+  row_spacing: 61
+  depth: 7
