@@ -53,6 +53,40 @@ Combinations follow dict insertion order: factor order, then value order. In
 the example, the February 26 combinations run at 0, 60 and 120, followed by the
 March 12 combinations at 0, 60 and 120.
 
+## Read an inherited section
+
+Use `read_experiment()` to keep a treatment's existing planting values while
+changing just its date. It returns one experiment data entry, so wrap the entry
+in `{"treatments": {1: entry}}` when passing it as `management`:
+
+```python
+entry = dl.read_experiment("UFGA8201.MZX", treatment=1)
+planting = entry["planting"]
+rows = dl.run_sweep(
+    "UFGA8201.MZX", "weather.csv", treatments=[1],
+    management=dict(treatments={1: entry}),
+    factors={
+        "planting": {d: {**planting, "date": d}
+                     for d in ("1982-02-26", "1982-03-12")},
+    },
+)
+```
+
+The reader returns only planting, fertilizer and irrigation, using the fields
+accepted by [experiment data](experiment.md), DSSAT units and ISO date strings.
+Level-0 sections are omitted. Irrigation includes `efficiency` and `events`;
+events under IRRIG D use `days_after_planting`, while R/P/W use dates. Other
+sections stay inherited from the FileX. Reading needs no DSSAT executable and
+leaves the source bytes unchanged.
+
+Sequences and forecasts (`.FCX`) raise `DSSATCheckError`. So do repeated event
+dates, timing the data shape cannot express, and values it would discard.
+PLNAME, FERNAME and IRNAME are ignored. Other unrepresented columns must hold
+`-99` or the writer's own constant: for example, FAMC/FAMO can also hold `0`,
+but IDEP/ITHR/IEPT/IOFF/IAME/IAMT and FOCD must hold `-99`. The error names the
+column, level and FileX. Choose a FileX with representable values, or keep
+that section in the FileX and supply the factor's complete section yourself.
+
 ## Base inputs and section replacement
 
 All arguments except `factors` and `base` mean the same as for
