@@ -186,7 +186,7 @@ def _weather_directory(executable):
     return None
 
 
-def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"):
+def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C", historical=False):
     """MAKEFILEW's prerequisite, effective-start lookup, then IPWTH continuation.
 
     e2e22 sections 2-6 prove these branches in mode A. Simulation's mode C
@@ -195,14 +195,18 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
     e2e23 proves mode Q reads the fallback throughout both rotation components.
     Installed weather is checked for shadowing, never used as supplied coverage.
     With no known end, stop at the end of the reachable supplied files.
+    In mode Y, historical annual lookup replaces the observed file's year;
+    multi-year files retain their name (IPWTH_alt.for, 235-240, 277-285).
     Return rows, problems and (first date, filename) for the initial $WEATHER file.
     """
     supplied = {path.name.upper(): path for path in paths}
     fallback = f"{station[:4]}.WTH"
     initial = f"{station}.WTH" if len(station) == 8 else f"{station}{sdate[:2]}01.WTH"
     selected, anchor = None, None
-    for name in dict.fromkeys([initial, f"{station}.WTH" if len(station) == 8
-                              else f"{station}{start.year % 100:02d}01.WTH"]):
+    names = [initial, f"{station}.WTH" if len(station) == 8
+             else f"{station}{start.year % 100:02d}01.WTH"]
+    for index in range(len(names)):
+        name = names[index]
         if name in supplied:
             selected = name
         elif wed is not None and (wed / name).is_file() and fallback in supplied:
@@ -222,6 +226,12 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
                 first = _weather_date(raw[0][1]["date"], start.year)
                 if first is not None:
                     anchor = first, selected
+            if historical and mode == "Y" and not problems and raw:
+                # The observed file's actual year span determines NYEAR before
+                # the historical SEASINIT, even with an eight-character WSTA.
+                annual = raw[0][1]["date"][:-3] == raw[-1][1]["date"][:-3]
+                names[1] = (f"{selected[:4]}{start.year % 100:02d}{selected[6:]}"
+                            if annual and len(selected) == 12 else selected)
 
     rows, current = [], start
     while selected is not None:

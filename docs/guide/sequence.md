@@ -101,6 +101,11 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    end remain in the copied FileX and do not require weather coverage. The
    component that crosses the boundary still finishes in full and needs weather
    through its scheduled end.
+   In Q mode, DSSAT shifts planting to the component start's year, advancing
+   one year if that day of year has already passed (`AUTPLT.for`, 151-158).
+   For example, a stored planting date of `1979-03-16` with a component start
+   of `1978-03-15` executes on `1978-03-16`; it does not require weather for
+   the stored future year.
 6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years`, `start_date`, `weather_source`, `replicates` and `random_seed`, and `rotation` for edits to individual crop or fallow components. Years and start date apply to a copy of the first component's controls level, which later components that share its original controls level also use; the three weather controls apply to every controls level the sequence uses. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
 This fixes [#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205): on real

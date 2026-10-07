@@ -163,6 +163,25 @@ def test_shortened_sequence_checks_only_simulated_component_dates(tmp_path, expl
     assert len(problems) == 1 and '1979-03-14' in problems[0]
 
 
+@pytest.mark.parametrize('explicit', [False, True])
+def test_sequence_future_planting_year_is_not_required_weather(tmp_path, explicit):
+    # DSSAT v4.8.6.0 AUTPLT.for (151-158) shifts this to 1978-03-16.
+    # The raw future year does not require weather beyond the stopping boundary.
+    text = (FILEX.replace('78074', '79075').replace('78274', '79274')
+            .replace('78318', '79318').replace('78325', '79325')
+            .replace('79060', '80060').replace('79073', '80073'))
+    path = tmp_path / 'ZZZZ7801.SQX'
+    path.write_text(text)
+    entry = {'controls': {'years': 1}}
+    if explicit:
+        entry['rotation'] = {1: {'planting': dict(
+            date='1979-03-16', method='S', distribution='R',
+            population=7, row_spacing=75, depth=5)}}
+    _, problems, _ = _check_rotation_data(entry, 1, path, text, date(1978, 3, 15),
+                                          (date(1978, 3, 15), date(1979, 3, 14)))
+    assert problems == []
+
+
 @pytest.mark.parametrize('override', [False, True])
 def test_template_crop_period_is_reported_once(template, override):
     template[2]['harvest_date'] = '1978-11-16'

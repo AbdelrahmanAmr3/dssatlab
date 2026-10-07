@@ -197,9 +197,26 @@ def _simulation_weather(sim, values, experiment_data, components):
         walk_end = end if is_forecast and coverage_start is not None else (
             end if not is_forecast and (harvest is not None or len(components) > 1) else None)
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
-        rows, problems, anchor = _walk_weather_files(paths, station, initial, coverage_start or start, walk_end,
-                                                     wed=_weather_directory(sim.executable),
-                                                     mode="Y" if is_forecast else "Q" if len(components) > 1 else "C")
+        wed = _weather_directory(sim.executable)
+        if is_forecast and coverage_start is not None:
+            rows, problems = [], []
+            # ModForecast.f90 (160-178) reads observations independently of
+            # the ensemble. A historical multi-year file cannot supply them.
+            periods = [(coverage_start, start - timedelta(days=1), True)]
+            if start <= end:
+                periods.append((start, end, False))
+            for first, last, historical in periods:
+                selected, found, anchor = _walk_weather_files(
+                    paths, station, initial, first, last, wed=wed,
+                    mode="Y", historical=historical)
+                if selected:
+                    found.extend(_stock_weather_gaps(selected, first, last, check_bounds=not found))
+                rows.extend(selected)
+                problems.extend(found)
+        else:
+            rows, problems, anchor = _walk_weather_files(
+                paths, station, initial, start, walk_end, wed=wed,
+                mode="Y" if is_forecast else "Q" if len(components) > 1 else "C")
         if values.get("START") == "P":
             if len(components) > 1:
                 where += f".rotation.{int(components[0]['R'])}"
@@ -209,10 +226,9 @@ def _simulation_weather(sim, values, experiment_data, components):
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     # DSSAT reads stock values itself; template value and duplicate checks do not apply.
-    if rows and coverage_start is not None:
+    if rows and not is_forecast:
         coverage_end = walk_end if walk_end is not None else max(row["date"] for row in rows)
-        problems.extend(_stock_weather_gaps(rows, coverage_start, coverage_end,
-                                           check_bounds=is_forecast and not problems))
+        problems.extend(_stock_weather_gaps(rows, start, coverage_end))
     if harvest is not None and not is_forecast and rows and harvest > max(row["date"] for row in rows if "date" in row):
         label = "Controls years" if "years" in _selected_controls(experiment_data, sim.treatment) else "FileX NYERS"
         problems.append(f"{label} {years}: the fixed harvest is on {harvest}, "

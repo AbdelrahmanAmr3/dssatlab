@@ -471,8 +471,12 @@ decoding unselected dates. Coverage uses the **set of dates present** in selecte
 files: repeated dates do not add coverage or cause a problem. Missing days inside
 the required period, including gaps across selected file boundaries, are rejected.
 Gaps before the required start or after a fixed harvest do not affect coverage.
-For a forecast, the required start is the first historical season's start date,
-and coverage ends at forecast date - 1.
+For a forecast, historical coverage runs from the first historical season's
+start date through the day before the simulation start. Observations are checked
+separately from the simulation start through forecast date - 1, using the
+current-season file. Historical files cannot supply missing observations.
+For annual weather, mode Y replaces the filename's year with the historical
+year, including an eight-character `WSTA`; multi-year files keep their name.
 The [weather template checks](#prepare-the-weather-template) still apply in full
 to weather supplied as template data.
 Start coverage, the last seasonal start and scheduled sequence ends use the same

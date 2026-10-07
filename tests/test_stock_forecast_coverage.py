@@ -98,3 +98,32 @@ def test_stock_gap_bounds_at_calendar_limits():
                                    date.min, date.max, check_bounds=True)
     assert 'missing date 0001-01-01.' in problems[0]
     assert 'missing date 9999-12-31.' in problems[-1]
+
+
+def test_annual_forecast_with_eight_character_station(forecast, tmp_path):
+    edit(forecast, 'UFGA       -99', 'UFGA8201   -99')
+    forecast.weather = [
+        stock_file(tmp_path, f'UFGA{year % 100:02d}01.WTH',
+                   days=[row['date'] for row in weather(f'{year}-01-01', f'{year}-12-31')])
+        for year in (1981, 1982)]
+    assert forecast.check(False) == []
+
+
+@pytest.mark.parametrize('literal', [False, True])
+def test_forecast_history_cannot_supply_missing_observations(forecast, tmp_path, literal):
+    if literal:
+        edit(forecast, 'UFGA       -99', 'UFGA8201   -99')
+    forecast.weather = [
+        stock_file(tmp_path, 'UFGA8101.WTH',
+                   days=[row['date'] for row in weather('1981-01-01', '1982-12-31')]),
+        stock_file(tmp_path, 'UFGA8201.WTH',
+                   days=[row['date'] for row in weather('1982-01-01', '1982-02-24')])]
+    problems = forecast.check(False)
+    assert len(problems) == 1
+    assert '1982-02-25' in problems[0] and 'UFGA8201.WTH' in problems[0]
+
+
+def test_forecast_four_character_station_keeps_multi_year_observed_file(forecast, tmp_path):
+    forecast.weather = stock_file(tmp_path, 'UFGA8201.WTH',
+        days=[row['date'] for row in weather('1981-01-01', '1982-12-31')])
+    assert forecast.check(False) == []
