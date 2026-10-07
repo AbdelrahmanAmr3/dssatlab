@@ -20,8 +20,12 @@ The case is stock `Maize/UFGA8201.MZX`, treatment 1, Gainesville maize cultivar 
 
 Water and nitrogen simulation are disabled through experiment controls. The seven 14-day dates begin at the stock PDATE `82057` (26 February 1982); all other supplied planting details match the stock FileX.
 
-The sandbox initially denied `connect()` writing saved configuration in the Windows profile. Validation uses process-local `LOCALAPPDATA`, `IPYTHONDIR` and `JUPYTER_RUNTIME_DIR` under a temporary lesson folder, plus `PYTHONPATH` pointing to this worktree's `src`; the required setup cell is unchanged. This is an execution-environment restriction, not blocking student/API friction.
+The sandbox initially denied `connect()` writing saved configuration in the Windows profile. Validation uses process-local `LOCALAPPDATA`, `IPYTHONDIR` and `JUPYTER_RUNTIME_DIR` under system temporary directories outside the worktree, plus `PYTHONPATH` pointing to this worktree's `src`; the required setup cell is unchanged. This is an execution-environment restriction, not blocking student/API friction.
 
-Both consecutive real-DSSAT executions print `02_planting_dates: ok`. The 21-day exercise also passed in a fresh kernel without saving its trial outputs over the lesson, and all 13 static course tests passed.
+Both consecutive real-DSSAT executions print `02_planting_dates: ok`, including the self-contained 21-day exercise whose table and plot are now saved in the notebook. The exercise also passed in a fresh kernel with only the lesson identifier, setup and tools cells before it; no earlier simulation or sweep cells were needed. All 13 static course tests passed with `--basetemp` outside the worktree and `-p no:cacheprovider`.
 
 The 14-day sweep's HWAM values, in date order, are 11859, 9254, 12321, 9958, 11640, 10217 and 7775 kg/ha. The standalone base and first sweep date both give 11859 kg/ha.
+
+The 21-day exercise plants on 26 February, 19 March, 9 April, 30 April, 21 May, 11 June and 2 July 1982. Its HWAM values, in date order, are 11859, 12521, 9958, 9962, 7775, 9657 and 9589 kg/ha.
+
+The 14-day yield curve zig-zags rather than declining smoothly: each sowing meets different 1982 weather during its season, while water and nitrogen simulation remain off. The course's own DSSAT reference run of this exercise shows the same pattern; the lesson names no specific weather cause without showing supporting weather data.
