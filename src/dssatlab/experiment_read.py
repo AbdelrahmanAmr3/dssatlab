@@ -28,6 +28,10 @@ def _level_rows(text, section, key, level):
             try:
                 number = int(line[:3])
             except ValueError:
+                if selected and "EFIR" not in columns:
+                    # DSSAT's IPIRR stops on an unreadable event number; never drop the event.
+                    raise ValueError(f"{where} column I: {line[:3].strip()!r} is not an "
+                                     "event number. Supply the control level number.") from None
                 continue
             # Irrigation events belong to the preceding control row's block.
             if section != "IRRIGATION AND WATER MANAGEMENT" or "EFIR" in columns:

@@ -118,6 +118,17 @@ def test_mismatched_irrigation_event_numbers_are_rejected(filex, treatment, even
     assert filex.read_bytes() == before
 
 
+def test_malformed_irrigation_event_number_is_rejected(filex):
+    text = filex.read_text(encoding="utf-8")
+    assert " 1 82063 IR001    13" in text
+    filex.write_text(text.replace(" 1 82063 IR001    13", " x 82063 IR001    13"),
+                     encoding="utf-8")
+    with pytest.raises(dl.DSSATCheckError) as error:
+        dl.read_experiment(filex, 1)
+    message = str(error.value)
+    assert all(part in message for part in (str(filex), "level 1", "column I", "'x'", "Supply"))
+
+
 def test_unselected_irrigation_block_is_not_read(filex):
     entry = dl.read_experiment(filex)
     text = filex.read_text(encoding="utf-8")
