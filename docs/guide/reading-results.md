@@ -297,9 +297,17 @@ plt.show()
 
 ### Plotting behavior
 
-- **Date on x-axis**: The horizontal axis is plotted against `DATE`.
+- **Date on x-axis**: The horizontal axis is plotted against `DATE`, with
+  matplotlib's `ConciseDateFormatter` for compact calendar labels.
+- **Variable meanings and units**: Common variables use DSSAT's `DATA.CDE`
+  meanings, for example `GWAD: grain weight (kg/ha)` and
+  `LAID: leaf area index (m²/m²)`. Weight variables are dry matter. The table covers
+  `LAID`, `CWAD`, `GWAD`, `HWAD`, `HWAM`, `CWAM`, `SWXD`, `LWAD`, `SWAD`, `RWAD`,
+  `PWAD`, `NWAD`, `ADAT` and `MDAT`. Variables present in the output but absent
+  from this label table keep their code alone; values are never converted.
 - **One line per simulation**: Each distinct simulation is drawn as a separate curve,
   labelled by its treatment name (`TNAM` from `Summary.OUT`, or fallback `Run X Treatment Y`).
+- **Larger legends**: More than four entries use two columns and small text.
 - **Returns matplotlib Axes**: The function returns the matplotlib `Axes` object, allowing
   you to adjust titles, labels, or save the figure (`ax.figure.savefig("lai.png")`).
 - **Optional matplotlib**: Plotting requires matplotlib (ADR 0004). Install it using the

@@ -235,6 +235,12 @@ for the required quantities and missing-value limits.
 
 ::: dssatlab.to_dataframe
 
+`plot_plant_growth()` and `plot_observed()` label common variables with their code,
+meaning and native DSSAT unit (for example `GWAD: grain weight (kg/ha)`). Unlisted
+variables keep the code alone. Weight units describe dry matter and LAID uses
+`m²/m²`; values are unchanged. Date axes use matplotlib's `ConciseDateFormatter`.
+Legends with more than four entries use two columns and small text.
+
 ::: dssatlab.plot_plant_growth
     options:
       docstring_options:
@@ -265,6 +271,11 @@ omitting it creates an independent empty list. Its representation includes the
 excluded count only when nonzero. `to_dataframe()` continues to return pairs.
 
 ::: dssatlab.evaluate.Evaluation
+
+`plot_evaluation()` labels axes with `Observed` or `Simulated`, the variable code
+and its known DSSAT unit (for example `Observed GWAD (kg/ha)`). Unlisted variables
+keep their code without a unit. ADAT and MDAT labels retain the native `YrDoy`
+unit, with calendar dates formatted by `ConciseDateFormatter` on both axes.
 
 ::: dssatlab.plot_evaluation
     options:

@@ -66,7 +66,11 @@ dashed 1:1 line. Install the optional plotting extra with
 `pip install dssatlab[plot]`. Select one variable to keep different units separate;
 you can omit `variable` when the Evaluation contains exactly one variable. The
 function returns a matplotlib Axes. Date variables use calendar dates on both
-axes; their errors and statistics are in days.
+axes with matplotlib's `ConciseDateFormatter`; their errors and statistics are
+in days. Axes include the variable code and its known DSSAT unit, for example
+`Observed GWAD (kg/ha)` and `Simulated GWAD (kg/ha)`. Summary date labels retain
+the native `YrDoy` unit while tick labels show calendar dates. Variables absent
+from the label table keep their code without a unit.
 
 ```python
 ax = dl.plot_evaluation(evaluation, variable="HWAM")
@@ -143,7 +147,10 @@ weather date, which dssatlab does not read here). Seven-digit `yyyyddd` dates ne
 
 `plot_observed()` returns a matplotlib Axes, using the optional `plot` extra.
 It draws one Plant growth line per observed scenario and treatment, with measured
-points in the same colour. Points outside the simulated season are still drawn;
+points in the same colour. Its y label includes the meaning and DSSAT unit for
+common variables, such as `GWAD: grain weight (kg/ha)`; unlisted variables keep
+their code. Dates use `ConciseDateFormatter`, and legends with more than four
+entries use two columns and small text. Points outside the simulated season are still drawn;
 `evaluate()` lists observations before the first or after the last simulated
 day in `excluded`, so you can evaluate a shipped FileT without filtering those
 rows by hand. Missing simulated dates inside the range remain check problems.
