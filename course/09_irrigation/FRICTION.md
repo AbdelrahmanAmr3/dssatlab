@@ -16,6 +16,13 @@ No blocking dssatlab friction was found. The lesson uses public API and unchange
 - **Suggested change:** Offer an optional way to omit the base while preserving the current default, and document base filtering before grid plots.
 - **Classification:** **non-blocking**; the lesson shows all ten rows, then explicitly selects the nine automatic settings for plotting.
 
+## 3. Automatic-irrigation percentages lack reference limits in the guide — non-blocking
+
+- **What the student must do:** Consult [DSSAT documentation](https://dssat.net/wp-content/uploads/2011/10/DSSAT-vol2.pdf) to interpret the automatic-irrigation threshold and refill percentages.
+- **Why it is awkward:** `docs/guide/experiment.md` lists `auto_irrigation_threshold` and `auto_irrigation_refill` units merely as `%`, without defining their reference limits or management depth. Threshold is plant-available water remaining between the lower limit and drained upper limit within that depth; refill 100% targets the drained upper limit.
+- **Suggested change:** Document both percentages' reference limits and the role of `auto_irrigation_depth` in the guide's automatic-management section.
+- **Classification:** **non-blocking**; the controls work, and the lesson now defines the percentage basis explicitly.
+
 ## Case and results
 
 The case is stock `Maize/UFGA8201.MZX`, treatment 1, with `Weather/UFGA8201.WTH` and `Soil/SOIL.SOL`, copied byte-for-byte from the installed DSSAT data directory. The cultivar is McCurdy 84aa (`IB0035`), planting is 26 February 1982, and soil profile `IBMZ910014` is Millhopper Fine Sand. No additional case files or genotype files are bundled.
