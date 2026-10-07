@@ -8,6 +8,12 @@ No blocking dssatlab friction was found. The lesson uses public API, stock DSSAT
 - **Why awkward:** `list_cultivars()` returns codes and names, without ecotypes or coefficients. Starting a new definition from a known cultivar requires understanding the `.CUL` layout and risks transcription errors; the notebook compares the typed values with the source row to make the single change visible.
 - **Suggested change:** Add a public helper that reads a cultivar's ecotype and coefficients from a supplied `.CUL` into the experiment-data shape, with a soybean example in the new-cultivar guide.
 
+## 2. Cultivar experiment data uses the `management` argument — non-blocking
+
+- **Student action:** Pass the cultivar experiment data to `Simulation` as `management=experiment`.
+- **Why awkward:** Cultivar coefficients are broader than management data, so the argument name does not clearly describe the experiment data it accepts; notebook cell 14 explains this naming hurdle.
+- **Suggested change:** Add an `experiment` argument alias, retaining `management` for compatibility.
+
 ## Validation notes
 
 The case is stock `Soybean/UFGA7901.SBX`, irrigated treatment 1, Gainesville, planted on 19 June 1979. It uses `Weather/UFGA7901.WTH`, `Soil/SOIL.SOL` (profile IBSB910015) and the three bundled `Genotype/SBGRO048` companions (`.CUL`, `.ECO`, `.SPE`), as required by the ticket for a new cultivar.
