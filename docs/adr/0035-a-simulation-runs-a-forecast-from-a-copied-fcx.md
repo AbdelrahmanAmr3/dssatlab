@@ -24,6 +24,11 @@ start to forecast date - 1, replaces the normal season coverage rule; it is a co
 check, and the WARNING.OUT scan after the run stays the backstop. They also report WTHER other than M,
 a climate file source, and a sequence. The result is the usual one: each summary row is one historical weather year.
 
+Stock `.WTH` coverage follows the files DSSAT selects in mode Y, from the first
+historical season start through forecast date - 1, using the shared stock-weather
+gap check. FODAT and its override use four-digit years without the FileX date
+century restriction (#324).
+
 ## Considered options
 
 - A `forecast_date` key that turns any FileX into a forecast: rejected. It is a hidden mode

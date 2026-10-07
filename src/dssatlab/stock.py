@@ -1,6 +1,6 @@
 """Narrow reads of stock DSSAT files, without rewriting or repairing them."""
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 import re
 import shutil
@@ -10,6 +10,7 @@ from .climate import (_copy_climate_file, _measured_weather_source, _split_weath
                       _parse_template_weather, _template_climate_problems)
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
+from .forecast import _forecast_date, _forecast_start
 from .irrigation import _effective_management
 from .operations import _component_management, _harvest_end
 from .rotation_data import _calendar_date, _level_date
@@ -160,13 +161,26 @@ def _simulation_weather(sim, values, experiment_data, components):
             harvest = None  # The season checks report years outside the calendar.
         if harvest is not None:
             end = harvest
-    # A forecast reads history up to forecast_date and plans its own season, so the end
-    # of the stock weather is not checked for it (the run scans WARNING.OUT).
     is_forecast = Path(sim.filex).suffix.upper() == ".FCX"
+    coverage_start = start
+    forecast = (_forecast_date(text, sim.treatment, _selected_controls(experiment_data, sim.treatment))
+                if is_forecast else None)
+    if forecast is not None and forecast >= start:
+        coverage_start = _forecast_start(start, years)
+        if coverage_start is None:
+            return [], [f"Stock weather: forecast history starts in year {start.year - years}, "
+                        "outside the calendar range 1 to 9999. "
+                        f"Checked simulation start {start} and NYERS {years}. "
+                        "Supply fewer historical years with controls.years."]
+        end = forecast - timedelta(days=1)
+    elif is_forecast:
+        coverage_start = None  # Forecast checks report missing/invalid dates.
     if len(components) > 1:
         stop = _sequence_stop(start, years)
         if stop is not None:
             end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
+            if "years" in _selected_controls(experiment_data, sim.treatment):
+                dates = [(field, day) for field, day in dates if day is None or day <= end]
     # The preliminary read checks structure only; the walk decodes the dates.
     _, problems = _read_stock_weather(paths)
     stations = sorted({path.name[:4].upper() for path in paths})
@@ -180,11 +194,12 @@ def _simulation_weather(sim, values, experiment_data, components):
     else:
         # Maturity is unknown until DSSAT runs. Without a known end, check only
         # the files reachable through DSSAT's selection walk.
-        walk_end = None if is_forecast else (end if harvest is not None or len(components) > 1 else None)
+        walk_end = end if is_forecast and coverage_start is not None else (
+            end if not is_forecast and (harvest is not None or len(components) > 1) else None)
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
-        rows, problems, anchor = _walk_weather_files(paths, station, initial, start, walk_end,
+        rows, problems, anchor = _walk_weather_files(paths, station, initial, coverage_start or start, walk_end,
                                                      wed=_weather_directory(sim.executable),
-                                                     mode="Q" if len(components) > 1 else "C")
+                                                     mode="Y" if is_forecast else "Q" if len(components) > 1 else "C")
         if values.get("START") == "P":
             if len(components) > 1:
                 where += f".rotation.{int(components[0]['R'])}"
@@ -194,9 +209,10 @@ def _simulation_weather(sim, values, experiment_data, components):
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
     # DSSAT reads stock values itself; template value and duplicate checks do not apply.
-    if rows and not is_forecast:
+    if rows and coverage_start is not None:
         coverage_end = walk_end if walk_end is not None else max(row["date"] for row in rows)
-        problems.extend(_stock_weather_gaps(rows, start, coverage_end))
+        problems.extend(_stock_weather_gaps(rows, coverage_start, coverage_end,
+                                           check_bounds=is_forecast and not problems))
     if harvest is not None and not is_forecast and rows and harvest > max(row["date"] for row in rows if "date" in row):
         label = "Controls years" if "years" in _selected_controls(experiment_data, sim.treatment) else "FileX NYERS"
         problems.append(f"{label} {years}: the fixed harvest is on {harvest}, "

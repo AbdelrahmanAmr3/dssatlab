@@ -281,15 +281,19 @@ def _weather_anchor_problems(anchor, dates):
     return problems
 
 
-def _stock_weather_gaps(rows, start, end):
+def _stock_weather_gaps(rows, start, end, *, check_bounds=False):
     """Check coverage inside the required period, using the set of stock dates."""
     days = sorted({row["date"] for row in rows})
+    gaps = [(earlier + timedelta(days=1), later - timedelta(days=1))
+            for earlier, later in zip(days, days[1:]) if (later - earlier).days > 1]
+    if check_bounds and days:
+        if days[0] > start:
+            gaps.insert(0, (start, days[0] - timedelta(days=1)))
+        if days[-1] < end:
+            gaps.append((days[-1] + timedelta(days=1), end))
     problems = []
-    for earlier, later in zip(days, days[1:]):
-        if (later - earlier).days <= 1:
-            continue
-        first = max(start, earlier + timedelta(days=1))
-        last = min(end, later - timedelta(days=1))
+    for first, last in gaps:
+        first, last = max(start, first), min(end, last)
         if first > last:
             continue
         missing = f"date {first}" if first == last else f"dates {first} to {last}"

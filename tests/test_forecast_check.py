@@ -227,7 +227,7 @@ def test_long_history_does_not_overflow_calendar(forecast):
     assert "day 56 of -98017" in forecast.check(False)[0]
 
 
-def test_stock_wth_is_not_coverage_checked_for_a_forecast(forecast, tmp_path):
+def test_stock_forecast_checks_history_instead_of_planned_harvest(forecast, tmp_path):
     forecast.management = experiment(
         harvest=[{"date": "1982-05-30", "stage": "GS000"}],
         controls={"forecast_date": "2036-01-01", "harvest_management": "R"})
@@ -236,3 +236,4 @@ def test_stock_wth_is_not_coverage_checked_for_a_forecast(forecast, tmp_path):
     forecast.weather = path
     assert not any("weather data ends" in text or "fixed harvest" in text
                    for text in forecast.check(False))
+    assert forecast.check(False)  # Missing historical weather is still reported.

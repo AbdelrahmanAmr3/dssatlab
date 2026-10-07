@@ -6,6 +6,9 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Removed
 - The old `notebook/` walkthrough and tutorial notebooks and their test; the [course](course.md) replaces them. The README Colab badge opens course lesson 00, and guide links point at the matching lessons ([#345](https://github.com/AbdelrahmanAmr3/dssatlab/issues/345)).
+### Fixed
+- Shortened sequences (`controls.years`) check weather only for simulated component dates, through the component that crosses DSSAT's stopping boundary; later dates retained in the FileX no longer reject the run ([#347](https://github.com/AbdelrahmanAmr3/dssatlab/issues/347)).
+- Forecast stock `.WTH` coverage follows DSSAT's selected files from the start day of year in `start year - NYERS` through `forecast date - 1`, using the stock-weather gap checks. Forecast dates after 2035 are accepted ([#324](https://github.com/AbdelrahmanAmr3/dssatlab/issues/324)).
 
 ## [0.23.0] - 2026-10-06
 

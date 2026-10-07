@@ -293,7 +293,8 @@ def test_sequence_weather_end(sequence, fake_dssat, capsys, override, start, yea
     problems = sequence.check(True)
     inherited = [p for p in problems if 'outside weather range' in p
                  or 'before simulation start date' in p]
-    expected_count = (6 if start == '1980-02-29' else 2) if override and years == 1 else 0
+    # Shortening omits future component dates; dates before the start still fail.
+    expected_count = 6 if override and years == 1 and start == '1980-02-29' else 0
     assert len(inherited) == expected_count
     if override and start == '1980-02-29':
         before_start = [p for p in inherited if 'before simulation start date' in p]

@@ -133,6 +133,36 @@ def test_unchanged_filex_crop_end_must_follow_planting():
         'or the planting before harvest.']
 
 
+@pytest.mark.parametrize('explicit', [False, True])
+def test_shortened_sequence_checks_only_simulated_component_dates(tmp_path, explicit):
+    # Four components end at the one-year boundary. A later crop/fallow stays
+    # in the FileX, like the dated components in stock MSKB8902.SQX.
+    text = FILEX.replace('\n*CULTIVARS',
+        ' 1 5 0 0 Rotation                   3  1  0  0  3  0  0  0  0  0  0  4  3\n'
+        ' 1 6 0 0 Rotation                   2  1  0  0  0  0  0  0  0  0  0  5  4\n'
+        '\n*CULTIVARS')
+    text = text.replace('\n*HARVEST DETAILS',
+        ' 3 80325   -99   7.2   7.2     S     R    75     0     5   -99   -99   -99   -99   -99\n'
+        '\n*HARVEST DETAILS')
+    text = text.replace('\n*SIMULATION CONTROLS',
+        ' 4 81060 GS000   -99   -99   -99   -99 -99\n'
+        ' 5 81073 GS000   -99   -99   -99   -99 -99\n'
+        '\n*SIMULATION CONTROLS')
+    path = tmp_path / 'ZZZZ7801.SQX'
+    path.write_text(text)
+    entry = {'controls': {'years': 1}}
+    if explicit:
+        entry['rotation'] = {5: {'harvest': [{'date': '1981-03-01'}]},
+                             6: {'harvest': [{'date': '1981-03-14'}]}}
+    _, problems, _ = _check_rotation_data(entry, 1, path, text, date(1978, 3, 15),
+                                          (date(1978, 3, 15), date(1979, 3, 14)))
+    assert problems == []
+    # Dates inside the simulated component still need weather.
+    _, problems, _ = _check_rotation_data(entry, 1, path, text, date(1978, 3, 15),
+                                          (date(1978, 3, 15), date(1979, 3, 13)))
+    assert len(problems) == 1 and '1979-03-14' in problems[0]
+
+
 @pytest.mark.parametrize('override', [False, True])
 def test_template_crop_period_is_reported_once(template, override):
     template[2]['harvest_date'] = '1978-11-16'

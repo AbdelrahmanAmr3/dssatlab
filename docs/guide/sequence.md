@@ -97,6 +97,10 @@ Because DSSAT's sequence mode has strict formatting and execution constraints, `
    FileX NYERS 10: the sequence runs from 1978-04-20 through 1988-04-18, after the weather data ends (1987-12-31). Supply weather through 1988-04-18, or fewer years.
    ```
    If `years` was set via experiment data controls, the prefix is `Controls years 10: ...`.
+   When `controls.years` shortens a sequence, component dates after the simulated
+   end remain in the copied FileX and do not require weather coverage. The
+   component that crosses the boundary still finishes in full and needs weather
+   through its scheduled end.
 6. **Experiment data restrictions**: A sequence entry accepts `controls` with `years`, `start_date`, `weather_source`, `replicates` and `random_seed`, and `rotation` for edits to individual crop or fallow components. Years and start date apply to a copy of the first component's controls level, which later components that share its original controls level also use; the three weather controls apply to every controls level the sequence uses. See [Experiment data per rotation component](#experiment-data-per-rotation-component) for the supported sections and date checks.
 
 This fixes [#205](https://github.com/AbdelrahmanAmr3/dssatlab/issues/205): on real
