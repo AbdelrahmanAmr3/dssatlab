@@ -8,6 +8,22 @@ from .controls import _filex_forecast_date, _selected_controls
 from .experiment import _check_date
 
 
+def _forecast_date(text, treatment, controls):
+    """Resolve FODAT or its ISO override without the FileX century restriction."""
+    if "forecast_date" in controls:
+        value = controls["forecast_date"]
+        return None if _check_date(value, "forecast_date", filex_year=False) else date.fromisoformat(value)
+    return _filex_forecast_date(text, treatment)
+
+
+def _forecast_start(start, years):
+    """Keep the start day of year in the first historical weather year."""
+    year = start.year - years
+    if year >= date.min.year:
+        return date(year, 1, 1) + timedelta(days=start.timetuple().tm_yday - 1)
+    return None
+
+
 def _check_forecast(sim, source, components, values, start, days):
     """Collect forecast problems independently; ordinary checks report bad inputs."""
     try:
@@ -21,10 +37,7 @@ def _check_forecast(sim, source, components, values, start, days):
         text = Path(sim.filex).read_text(encoding="latin-1")
     except (OSError, TypeError, ValueError):
         text = ""
-    forecast = _filex_forecast_date(text, sim.treatment)
-    if "forecast_date" in controls:
-        value = controls["forecast_date"]
-        forecast = None if _check_date(value, "forecast_date", filex_year=False) else date.fromisoformat(value)
+    forecast = _forecast_date(text, sim.treatment, controls)
     name = Path(sim.filex).name if isinstance(sim.filex, (str, Path)) else ""
     if len(name) != 12:
         problems.append(f"FileX filename {name!r} has {len(name)} characters; forecast mode Y needs "
@@ -76,8 +89,9 @@ def _forecast_coverage(controls, start, forecast, days, nyers):
     year, doy = start.year - years, start.timetuple().tm_yday
     last = forecast - timedelta(days=1)
     first = f"day {doy} of {year}"
-    if year >= date.min.year:
-        first = date(year, 1, 1) + timedelta(days=doy - 1)
+    historical = _forecast_start(start, years)
+    if historical is not None:
+        first = historical
         supplied = {day for day in days if first <= day <= last}
         if len(supplied) == (last - first).days + 1:
             return []

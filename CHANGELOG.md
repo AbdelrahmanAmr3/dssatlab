@@ -6,6 +6,9 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Removed
 - The old `notebook/` walkthrough and tutorial notebooks and their test; the [course](course.md) replaces them. The README Colab badge opens course lesson 00, and guide links point at the matching lessons ([#345](https://github.com/AbdelrahmanAmr3/dssatlab/issues/345)).
+### Fixed
+- Shortened sequences (`controls.years`) suppress component-date weather coverage beyond the simulated end only when scheduled components prove that end. If a reached component has an unknown end (including HARVS M), every component retains its ordinary date coverage checks; the NYERS boundary fallback does not suppress them ([#347](https://github.com/AbdelrahmanAmr3/dssatlab/issues/347)).
+- Forecast stock `.WTH` coverage checks the selected files from the start day of year in `start year - NYERS` through `forecast date - 1` only for uniform station layouts: all annual one-year files, or one single multi-year file. Mixed or unproven layouts skip forecast coverage; structure checks and the `WARNING.OUT` missing-weather scan remain. Forecast dates after 2035 are accepted ([#324](https://github.com/AbdelrahmanAmr3/dssatlab/issues/324)).
 
 ## [0.23.0] - 2026-10-06
 

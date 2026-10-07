@@ -12,7 +12,7 @@ from .management import (_check_events, _check_planting, _check_weather_date,
                          _report_lines)
 from .operations import (_OPERATION_FIELDS, _check_operation_events,
                          _component_management, _harvest_end)
-from .sequence import _rotation_components
+from .sequence import _rotation_components, _sequence_end, _sequence_stop
 
 
 _SECTIONS = ('planting', 'cultivar', 'fertilizer', 'irrigation', *_OPERATION_FIELDS)
@@ -157,7 +157,7 @@ def _rotation_keys(rotation, components, where):
 
 
 def _check_component(entry, row, index, known, where, filex, text, treatment,
-                     start, weather_range, cultivar_path, executable=None):
+                     start, weather_range, cultivar_path, executable=None, run_end=None):
     number = int(row['R'])
     where = f'{where}, rotation component {number}'
     if not isinstance(entry, dict):
@@ -170,6 +170,9 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
         return found, _report_lines(f'    rotation component {number}', found), text
     shape_problems = _unknown_keys(entry, _SECTIONS, where, 'Experiment')
     problems, report = list(shape_problems), []
+    supplied_weather = weather_range
+    if run_end is not None:
+        weather_range = None  # Check simulated event dates individually below.
     for section in _SECTIONS:
         label = f'      {section}'
         if section not in entry:
@@ -218,6 +221,8 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
                 day = _calendar_date(event.get(field))
                 if day is not None:
                     location_field = f"{location}, field {field!r}"
+                    if run_end is not None and day <= run_end:
+                        found.extend(_check_weather_date(event[field], location_field, supplied_weather))
                     found.extend(_period_problems(
                         day, location_field, index, known, start,
                         check_end=not (section == 'planting' and field == 'date')))
@@ -256,6 +261,14 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         return ordinary, [], []  # Sequence checks already report invalid R numbers.
     edits, problems = _rotation_keys(entry.get('rotation', {}), components, where)
     known, notes = _known_dates(components, template, text, edits, where)
+    run_end = None
+    controls = entry.get('controls', {})
+    years = controls.get('years') if isinstance(controls, dict) else None
+    if start is not None and type(years) is int and 1 <= years <= 99999:
+        stop = _sequence_stop(start, years)
+        if stop is not None:
+            run_end = _sequence_end({'treatments': {treatment: entry}}, treatment,
+                                    start, stop, filex, template, proven_only=True)
     cycle_start = (known[0][1] or _calendar_date(template[0].get('start_date'))
                    if template is not None else None)
     if cycle_start is not None and known[-1][2] is not None:
@@ -277,6 +290,8 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         override = edits.get(number, {})
         planting_override = isinstance(override, dict) and 'planting' in override
         _, planting, end, crop = known[index]
+        # Only a proven scheduled end permits suppressing later date coverage.
+        # Unknown ends retain the ordinary checks for every component.
         if index == 0 and crop == 'FA' and start is not None and end is not None and end <= start:
             problem = (f'{where}, rotation component {number}: the leading fallow ends on {end}, '
                        f'not after simulation start date {start}. Move controls start_date '
@@ -304,7 +319,8 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         # Supplied plantings are checked below; also check untouched known dates.
         for field, day in zip(('planting date', 'harvest/end date'), known[index][1:3]):
             if day is not None and not (field == 'planting date' and planting_override):
-                found = _check_weather_date(day.isoformat(), f'{where}, rotation component {number}, {field}', weather_range)
+                coverage = weather_range if run_end is None or day <= run_end else None
+                found = _check_weather_date(day.isoformat(), f'{where}, rotation component {number}, {field}', coverage)
                 if index == 0 and field == 'planting date' and start is not None and day < start:
                     found.extend(_period_problems(day, f'{where}, rotation component {number}, planting',
                                                   index, known, start, check_end=False))
@@ -312,7 +328,7 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
                 report.extend(f'      {p}' for p in found)
         if number in edits:
             found, lines, text = _check_component(edits[number], row, index, known, where, filex,
-                                                  text, treatment, start, weather_range, cultivar_path, executable)
+                                                  text, treatment, start, weather_range, cultivar_path, executable, run_end)
             problems.extend(found)
             report.extend(lines)
     return ordinary, problems, report + notes

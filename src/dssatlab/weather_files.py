@@ -186,7 +186,37 @@ def _weather_directory(executable):
     return None
 
 
-def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"):
+def _forecast_weather_uniform(paths, station, wed=None):
+    """Check only annual one-year files or one multi-year file for this station.
+
+    Include installed WED candidates, with supplied names taking priority.
+    Mixed layouts need DSSAT's per-ensemble file-span state, which we do not model.
+    """
+    candidates = {}
+    if wed is not None and wed.is_dir():
+        candidates.update((path.name.upper(), path) for path in wed.iterdir()
+                          if path.is_file() and path.suffix.upper() == '.WTH'
+                          and path.name[:4].upper() == station[:4]
+                          and len(path.stem) in (4, 8))
+    candidates.update((path.name.upper(), path) for path in paths)
+    annual = []
+    for name, path in candidates.items():
+        raw, problems = _read_weather_file(path)
+        if problems or not raw:
+            return False  # Cannot prove a uniform layout.
+        codes = [row['date'] for _, row in raw]
+        if any(not re.fullmatch(r'[0-9]{5}|[0-9]{7}', code) for code in codes):
+            return False
+        one_year = len({code[:-3] for code in codes}) == 1
+        if not one_year and codes[0][:-3] == codes[-1][:-3]:
+            return False  # The record years do not prove DSSAT's file span.
+        if one_year and (len(name) != 12 or not name[4:6].isdigit() or name[6:8] != '01'):
+            return False  # This is not DSSAT's annual-file layout.
+        annual.append(one_year)
+    return bool(annual) and (all(annual) or len(annual) == 1 and not annual[0])
+
+
+def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C", historical=False):
     """MAKEFILEW's prerequisite, effective-start lookup, then IPWTH continuation.
 
     e2e22 sections 2-6 prove these branches in mode A. Simulation's mode C
@@ -195,14 +225,18 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
     e2e23 proves mode Q reads the fallback throughout both rotation components.
     Installed weather is checked for shadowing, never used as supplied coverage.
     With no known end, stop at the end of the reachable supplied files.
+    In mode Y, historical annual lookup replaces the observed file's year;
+    multi-year files retain their name (IPWTH_alt.for, 235-240, 277-285).
     Return rows, problems and (first date, filename) for the initial $WEATHER file.
     """
     supplied = {path.name.upper(): path for path in paths}
     fallback = f"{station[:4]}.WTH"
     initial = f"{station}.WTH" if len(station) == 8 else f"{station}{sdate[:2]}01.WTH"
     selected, anchor = None, None
-    for name in dict.fromkeys([initial, f"{station}.WTH" if len(station) == 8
-                              else f"{station}{start.year % 100:02d}01.WTH"]):
+    names = [initial, f"{station}.WTH" if len(station) == 8
+             else f"{station}{start.year % 100:02d}01.WTH"]
+    for index in range(len(names)):
+        name = names[index]
         if name in supplied:
             selected = name
         elif wed is not None and (wed / name).is_file() and fallback in supplied:
@@ -222,6 +256,12 @@ def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C"
                 first = _weather_date(raw[0][1]["date"], start.year)
                 if first is not None:
                     anchor = first, selected
+            if historical and mode == "Y" and not problems and raw:
+                # The observed file's actual year span determines NYEAR before
+                # the historical SEASINIT, even with an eight-character WSTA.
+                annual = raw[0][1]["date"][:-3] == raw[-1][1]["date"][:-3]
+                names[1] = (f"{selected[:4]}{start.year % 100:02d}{selected[6:]}"
+                            if annual and len(selected) == 12 else selected)
 
     rows, current = [], start
     while selected is not None:
@@ -281,15 +321,19 @@ def _weather_anchor_problems(anchor, dates):
     return problems
 
 
-def _stock_weather_gaps(rows, start, end):
+def _stock_weather_gaps(rows, start, end, *, check_bounds=False):
     """Check coverage inside the required period, using the set of stock dates."""
     days = sorted({row["date"] for row in rows})
+    gaps = [(earlier + timedelta(days=1), later - timedelta(days=1))
+            for earlier, later in zip(days, days[1:]) if (later - earlier).days > 1]
+    if check_bounds and days:
+        if days[0] > start:
+            gaps.insert(0, (start, days[0] - timedelta(days=1)))
+        if days[-1] < end:
+            gaps.append((days[-1] + timedelta(days=1), end))
     problems = []
-    for earlier, later in zip(days, days[1:]):
-        if (later - earlier).days <= 1:
-            continue
-        first = max(start, earlier + timedelta(days=1))
-        last = min(end, later - timedelta(days=1))
+    for first, last in gaps:
+        first, last = max(start, first), min(end, last)
         if first > last:
             continue
         missing = f"date {first}" if first == last else f"dates {first} to {last}"

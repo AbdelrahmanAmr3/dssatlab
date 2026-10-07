@@ -165,7 +165,8 @@ class Simulation:
             start_date = _simulation_start(text, self.treatment, experiment_data)
             skip_reason = None if start_date is not None else "START P planting date is unavailable; check PDATE"
         if forecast:
-            filex_problems.extend(_check_forecast(self, experiment_data, components, values, start_date, days))
+            filex_problems.extend(_check_forecast(
+                self, experiment_data, components, values, start_date, [] if paths else days))
         else:
             if len(components) > 1:
                 filex_problems.extend(_sequence_coverage(

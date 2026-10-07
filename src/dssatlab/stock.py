@@ -1,6 +1,6 @@
 """Narrow reads of stock DSSAT files, without rewriting or repairing them."""
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 import re
 import shutil
@@ -10,6 +10,7 @@ from .climate import (_copy_climate_file, _measured_weather_source, _split_weath
                       _parse_template_weather, _template_climate_problems)
 from .experiment import _overrides_section
 from .filex import _filex_date, _read_filex, _section_rows, _weather_filename
+from .forecast import _forecast_date, _forecast_start
 from .irrigation import _effective_management
 from .operations import _component_management, _harvest_end
 from .rotation_data import _calendar_date, _level_date
@@ -17,7 +18,8 @@ from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory,
-                            _weather_anchor_problems, _stock_weather_gaps)
+                            _weather_anchor_problems, _stock_weather_gaps,
+                            _forecast_weather_uniform)
 
 
 def _stock_weather_paths(source):
@@ -160,13 +162,29 @@ def _simulation_weather(sim, values, experiment_data, components):
             harvest = None  # The season checks report years outside the calendar.
         if harvest is not None:
             end = harvest
-    # A forecast reads history up to forecast_date and plans its own season, so the end
-    # of the stock weather is not checked for it (the run scans WARNING.OUT).
     is_forecast = Path(sim.filex).suffix.upper() == ".FCX"
+    coverage_start = start
+    forecast = (_forecast_date(text, sim.treatment, _selected_controls(experiment_data, sim.treatment))
+                if is_forecast else None)
+    if forecast is not None and forecast >= start:
+        coverage_start = _forecast_start(start, years)
+        if coverage_start is None:
+            return [], [f"Stock weather: forecast history starts in year {start.year - years}, "
+                        "outside the calendar range 1 to 9999. "
+                        f"Checked simulation start {start} and NYERS {years}. "
+                        "Supply fewer historical years with controls.years."]
+        end = forecast - timedelta(days=1)
+    elif is_forecast:
+        coverage_start = None  # Forecast checks report missing/invalid dates.
     if len(components) > 1:
         stop = _sequence_stop(start, years)
         if stop is not None:
             end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
+            if "years" in _selected_controls(experiment_data, sim.treatment):
+                proven_end = _sequence_end(experiment_data, sim.treatment, start, stop,
+                                           sim.filex, None, proven_only=True)
+                if proven_end is not None:
+                    dates = [(field, day) for field, day in dates if day is None or day <= proven_end]
     # The preliminary read checks structure only; the walk decodes the dates.
     _, problems = _read_stock_weather(paths)
     stations = sorted({path.name[:4].upper() for path in paths})
@@ -180,11 +198,24 @@ def _simulation_weather(sim, values, experiment_data, components):
     else:
         # Maturity is unknown until DSSAT runs. Without a known end, check only
         # the files reachable through DSSAT's selection walk.
-        walk_end = None if is_forecast else (end if harvest is not None or len(components) > 1 else None)
+        walk_end = end if is_forecast and coverage_start is not None else (
+            end if not is_forecast and (harvest is not None or len(components) > 1) else None)
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
-        rows, problems, anchor = _walk_weather_files(paths, station, initial, start, walk_end,
-                                                     wed=_weather_directory(sim.executable),
-                                                     mode="Q" if len(components) > 1 else "C")
+        wed = _weather_directory(sim.executable)
+        if is_forecast and not _forecast_weather_uniform(paths, station, wed):
+            return [], []  # WARNING.OUT remains the missing-weather backstop.
+        if is_forecast and coverage_start is not None:
+            # Uniform layouts permit one walk through history and observations.
+            rows, problems, anchor = _walk_weather_files(
+                paths, station, initial, coverage_start, end, wed=wed,
+                mode="Y", historical=True)
+            if rows:
+                problems.extend(_stock_weather_gaps(rows, coverage_start, end,
+                                                     check_bounds=not problems))
+        else:
+            rows, problems, anchor = _walk_weather_files(
+                paths, station, initial, start, walk_end, wed=wed,
+                mode="Y" if is_forecast else "Q" if len(components) > 1 else "C")
         if values.get("START") == "P":
             if len(components) > 1:
                 where += f".rotation.{int(components[0]['R'])}"
