@@ -6,12 +6,12 @@ No blocking friction was found. The lesson uses public `dssatlab` exports, CSV d
 
 - **What the student must do:** write the filled FileX template YAML under `RUNS` and pass its path through `filex_template=`, including in the self-contained exercise.
 - **Why it is awkward:** passing the same template as an in-memory dictionary writes simulation folders in the current directory. In the first development execution, the exercise created two folders beside `lesson.ipynb`, outside the disposable `runs/` copy; there is no public run-directory argument.
-- **Suggested change:** accept an explicit parent directory for generated simulation folders, and explain dictionary-versus-YAML output placement in the FileX-template guide.
+- **Suggested change:** accept an explicit parent directory for generated simulation folders. The existing [FileX-template explanation](../../docs/guide/simulation.md#start-from-a-filex-template) already documents YAML-versus-dictionary output placement.
 - **Classification:** **non-blocking**; the supported YAML-path form puts the simulation folders beside that YAML in `runs/`. The final notebook uses that form, and development folders were moved into `runs/` before the repeat executions.
 
 ## 2. Changing density requires repeating the planting section - non-blocking
 
-- **What the student must do:** supply the planting date, method, distribution, population, row spacing and depth again for treatment 2, and set emergence population to the same density.
+- **What the student must do:** supply the required planting date, method, distribution, population, row spacing and depth again for treatment 2. Emergence population is optional and defaults to `population` when omitted; the exercise updates both because the YAML explicitly supplies both.
 - **Why it is awkward:** an experiment-data planting section replaces the whole section, so a population-only override fails the required-field checks. Students changing one factor must keep all the other planting details consistent.
 - **Suggested change:** provide a public helper for making a complete planting override from a FileX template with selected values changed, and show a density-only example in the guide.
 - **Classification:** **non-blocking**; the short experiment YAML explicitly supplies the complete section, and the exercise edits sowing and emergence populations together.
@@ -23,13 +23,22 @@ No blocking friction was found. The lesson uses public `dssatlab` exports, CSV d
 - **Suggested change:** expose a public warning summary on the run result and demonstrate it in the guide, so students can distinguish complete outputs from assumptions made by DSSAT.
 - **Classification:** **non-blocking**; both runs have complete yield, development and growth outputs. Stock CSV values and missing markers were preserved; no soil or weather values were changed to suppress warnings.
 
+## 4. Restarting template creation needs setup again - non-blocking
+
+- **What the student must do:** rerun from the setup cell when restarting template creation in cell 10.
+- **Why it is awkward:** `write_filex_template()` raises `DSSATError` if `experiment_filex.yaml` already exists, so rerunning cell 10 alone after a successful execution fails.
+- **Suggested change:** include a short restart instruction with template-writing examples, explaining the existing-file guard and how to start again with fresh inputs.
+- **Classification:** **non-blocking**; the lesson now gives that instruction, and setup recreates `runs/` before template creation.
+
 ## Validation
 
 The case is Gainesville maize, cultivar McCurdy 84aa (`IB0035`), planted on 26 February 1982 at 4 and 8 plants/m2, with 61 cm row spacing and 7 cm planting depth. Both treatments have water and nitrogen simulation off and harvest at maturity.
-Weather contains all 365 days of stock `Weather/UFGA8201.WTH` for 1982 in the columns of `write_weather_template()`, with optional PAR omitted; rain totals 1544.5 mm.
+The stock soil photosynthesis factor remains 0.92, so this is not fully unconstrained potential production. The [CERES-Maize source](https://github.com/DSSAT/dssat-csm-os/blob/develop/Plant/CERES-Maize/MZ_GROSUB.for#L1131-L1132) applies SLPF to growth even with water and nitrogen simulation off.
+Weather contains all 365 days of stock `Weather/UFGA8201.WTH` for 1982 in the columns of `write_weather_template()`, including daily PAR preserved from the stock weather file; rain totals 1544.5 mm.
 Soil contains all eight layers of stock `Soil/SOIL.SOL` profile `IBMZ910014`, in the columns of `write_soil_template()`, to 180 cm with extractable water 160.95 mm.
 
-The weather and soil CSVs were made independently because lessons 04/05 were not available in this worktree; their reviewer can align the files later. The two additional lesson-written inputs are `filex.yaml` (the filled template recipe) and `experiment.yaml` (treatment overrides).
+The earlier independent stock-data transcriptions were compared with the committed lesson 04 weather CSV (`d0d76a940d9ad8065285c4a0324a268cf974cb97`) and lesson 05 soil CSV (`84cb540657cd01002d5fddce8a84a94756218a27`), obtained from neighboring worktrees. All columns and row values matched; both inputs were replaced with byte-identical copies of those committed CSVs, with SHA-256 checksums in `data/SOURCE.md`.
+The two additional lesson-written inputs are `filex.yaml` (the filled template recipe) and `experiment.yaml` (treatment overrides).
 The generated FileX holds both named treatments, and unchanged maize genotype files come from the installed DSSAT data directory.
 The executable identifies itself as DSSAT 4.8.5.017 pre-release.
 
