@@ -23,6 +23,20 @@ No blocking friction was found. The lesson uses only public dssatlab API, unchan
 - **Suggested change:** Use the same variable layout for overall and per-year statistics, or document one consistent access pattern for single-span summaries.
 - **Classification:** **non-blocking**; the lesson retains the annual table and drops the month exercise to make room for a model-based warming exercise.
 
+## 4. Template and NASA import destinations are protected on rerun - non-blocking
+
+- **What the student must do:** Restart from the setup cell and run forward, or choose a new destination when rerunning the template cell or a previously successful NASA import.
+- **Why it is awkward:** `write_weather_template()` and `import_nasa_power()` raise `DSSATError` when their destination already exists, protecting the student's data rather than overwriting it. A single-cell rerun therefore fails even though a full execution resets `runs/`.
+- **Suggested change:** Explain existing-file protection and the restart or new-destination choices in the API examples.
+- **Classification:** **non-blocking**; the notebook now notes both choices beside the template and NASA steps, and setup prepares fresh destinations for each full run.
+
+## 5. NASA POWER cannot supply the lesson's 1982 solar radiation - non-blocking
+
+- **What the student must do:** Choose dates covered by every requested parameter; the optional import now uses Gainesville from 2001-01-01 through 2001-12-31 and displays `dl.summarize_weather(power_weather)` after import.
+- **Why it is awkward:** [NASA POWER solar radiation coverage starts in 1984](https://power.larc.nasa.gov/docs/methodology/energy-fluxes/), so a 1982 request cannot provide the complete daily weather used for this maize case.
+- **Suggested change:** Document parameter coverage beside download examples and summarize imported data before using it for a simulation.
+- **Classification:** **non-blocking**; NASA is an optional, separate import demonstration, while the required 1982 simulations use the bundled stock and station weather.
+
 ## Validation
 
 The inputs are stock `Maize/UFGA8201.MZX`, `Soil/SOIL.SOL` and `Weather/UFGA8201.WTH`, matching lesson 01 byte-for-byte, plus `station_weather.csv` written for the course.
@@ -49,6 +63,8 @@ Process-local LOCALAPPDATA, IPYTHONDIR and JUPYTER_RUNTIME_DIR point under syste
 The inline plot was visually checked, and the notebook's source and textual outputs contain none of the encoding corruption patterns `??`, `m?` or ` ? `.
 
 Both successful runs retain the stock warnings about zero soil saturated hydraulic conductivity, SLPF 0.92 and SRAD 0.80 MJ/m2/day on day 98 of 1982, also recorded by lesson 01; none is a missing-weather warning.
-The optional NASA POWER cell requests Gainesville (29.63 N, 82.37 W) daily AG-community CSV data for 1982, then passes the downloaded file to `dl.import_nasa_power()`.
-Network errors are caught without exposing exception paths; both executions printed exactly `NASA POWER skipped: no network`.
-The online import branch was not exercised against the remote service because network access is blocked; all required cells run offline against the local installation.
+The optional NASA POWER cell requests Gainesville (29.63 N, 82.37 W) daily AG-community CSV data for 2001 as a separate import demonstration, then passes the downloaded file to `dl.import_nasa_power()`.
+HTTP errors report their status code; URL errors and timeouts separately report `NASA POWER download unavailable; optional step skipped.` without claiming that the cause is no network.
+Both executions printed exactly `NASA POWER download unavailable; optional step skipped.`; this message does not identify the underlying download failure.
+The online import branch was not exercised against the remote service; all required cells run against bundled inputs and the local DSSAT installation.
+Targeted checks confirmed HTTP status reporting, separate URL-error and timeout handling, and propagation of unexpected errors.
