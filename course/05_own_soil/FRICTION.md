@@ -1,6 +1,6 @@
 # Friction: Your own soil
 
-No blocking friction was found. The lesson uses the public dssatlab API; the stock FileX is unchanged, and the CSVs preserve the stock values in the template writers' columns.
+No blocking friction was found. The lesson uses the public dssatlab API; the stock FileX is unchanged, and the CSVs preserve the stock values in the template writers' columns, with optional daily `par` added to the weather template's example columns.
 
 ## 1. A stock soil profile must be transcribed into the soil template — non-blocking
 
@@ -16,11 +16,20 @@ No blocking friction was found. The lesson uses the public dssatlab API; the sto
 - **Suggested change:** Expose a public warning summary on the run result, with a short guide example that avoids printing machine paths.
 - **Classification:** **non-blocking**; the case yields complete results, and the notebook preserves the stock input values.
 
+## 3. Initial-condition depths can exceed the soil depth without an advisory — non-blocking
+
+- **Student action:** Manually compare the FileX initial-condition depths with the supplied soil profile's depth before interpreting a shallower-profile run.
+- **Why awkward:** The stock FileX initial conditions extend to 180 cm, but dssatlab accepts them for the 60 cm profile without warning. Successful execution does not remove this usability gap: students must notice the mismatch and understand that DSSAT runs on the supplied soil layers.
+- **Suggested change:** Provide an advisory reporting both the initial-condition depth (180 cm here) and the soil depth (60 cm here), and explaining how DSSAT handles initial conditions that extend below the supplied profile.
+- **Classification:** **non-blocking**; the simulations complete, but students still need to compare the depths manually.
+
 ## Validation
 
 Case: stock `Maize/UFGA8201.MZX`, treatment 1, Gainesville maize McCurdy 84aa (`IB0035`), planted on 26 February 1982. Water and nitrogen simulation remain on. Despite the RAINFED LOW NITROGEN name, the stock treatment includes 13 mm of irrigation on 4 March; the notebook states this and keeps it unchanged.
 
-The weather CSV contains all 365 days of stock `Weather/UFGA8201.WTH`, station UFGA at 29.630° N, 82.370° W and 10 m elevation. Its columns exactly match `write_weather_template()`, including `tav`, `amp`, `refht` and `wndht`; optional daily PAR is omitted as in the writer's example. The soil CSV contains every column of `write_soil_template()`, preserving all profile and layer values for `IBMZ910014` from stock `Soil/SOIL.SOL`.
+`station_weather.csv` contains the weather-template columns plus optional daily `par`, transcribed from stock `UFGA8201.WTH`. It contains all 365 days of 1982, station UFGA at 29.630° N, 82.370° W and 10 m elevation, including the station values `tav`, `amp`, `refht` and `wndht`.
+
+The soil CSV contains every column of `write_soil_template()`, preserving all profile and layer values for `IBMZ910014` from stock `Soil/SOIL.SOL`.
 
 | Profile | Layers | Depth (cm) | Extractable water (mm) | HWAM (kg/ha) | Change from full (kg/ha) |
 | --- | --- | --- | --- | --- | --- |
