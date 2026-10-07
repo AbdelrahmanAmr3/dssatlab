@@ -5,7 +5,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 ### Removed
-- The old `notebook/` walkthrough and tutorial notebooks and their test; the [course](course/README.md) replaces them. The README Colab badge opens course lesson 00, and guide links point at the matching lessons ([#345](https://github.com/AbdelrahmanAmr3/dssatlab/issues/345)).
+- The old `notebook/` walkthrough and tutorial notebooks and their test; the [course](course.md) replaces them. The README Colab badge opens course lesson 00, and guide links point at the matching lessons ([#345](https://github.com/AbdelrahmanAmr3/dssatlab/issues/345)).
 
 ## [0.23.0] - 2026-10-06
 
