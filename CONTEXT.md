@@ -400,8 +400,10 @@ folder, and its output files are moved into the run directory when the run ends.
 _Avoid_: output folder, working directory
 
 **Run result**:
-What `run()` hands back: exit status, run directory, the output files found, and a
-tail of DSSAT's console output. It holds no parsed values itself, but gives access to
+What `run()` hands back: exit status, run directory, the output files found, a
+tail of DSSAT's console output, and distinct warning blocks from `WARNING.OUT`.
+Reading those warnings is an exception to output files being listed only. It holds
+no parsed simulation values itself, but gives access to
 the parsed output files (summary, plant growth, soil water, plant nitrogen, and weather).
 
 **Output file**:

@@ -316,3 +316,111 @@ def test_refuses_to_run_beside_a_csv_dssat_deletes(fake_dssat, name):
 def test_other_csv_files_do_not_stop_a_run(fake_dssat):
     (fake_dssat.filex.parent / "notes.csv").write_text("mine", encoding="utf-8")
     assert run(fake_dssat.filex).returncode == 0
+
+
+_SOIL_WARNING = (
+    "IPSOIL  YEAR DOY =    0   0\n"
+    "Saturated hydraulic conductivity equal to zero for one or more soil layers.\n"
+    "Data will be treated as missing."
+)
+_SLPF_WARNING = (
+    "SOILDYN  YEAR DOY = 1982  56\n"
+    "Soil photosynthesis factor (SLPF) = 0.92"
+)
+_SOLAR_WARNING = (
+    "IPWTH   YEAR DOY = 1982  98\n"
+    "Warning: SRAD < 1 MJ.m-2.d-1.\n"
+    "UFGA8201.WTH\nLine      103\nSRAD =   0.80 MJ.m-2.d-1"
+)
+_MISSING_WARNING = (
+    "IPWTH   YEAR DOY = 1982  98\n"
+    "Weather record not found for YR DOY: 1982  98\n"
+    "UFGA8201.WTH\nSimulation will end."
+)
+
+
+@pytest.mark.parametrize("name, expected", [
+    ("single", [_SOIL_WARNING, _SLPF_WARNING, _SOLAR_WARNING]),
+    ("all", [_SOIL_WARNING, _SLPF_WARNING, _SOLAR_WARNING]),
+    ("seasonal", [_SOIL_WARNING, _SLPF_WARNING, _SOLAR_WARNING,
+                  _SOLAR_WARNING.replace("1982", "1983").replace("103", "468"),
+                  _SOLAR_WARNING.replace("1982", "1984").replace("103", "833")]),
+    ("missing_weather", [_SOIL_WARNING, _SLPF_WARNING, _MISSING_WARNING]),
+])
+def test_run_reads_real_warning_blocks(fake_dssat, recwarn, name, expected):
+    warning = (Path(__file__).parent / "fixtures/run_warnings" / name / "WARNING.OUT")
+    contents = warning.read_bytes()
+    fake_dssat.outputs["WARNING.OUT"] = contents
+
+    result = run(fake_dssat.filex, treatment=None if name == "all" else 1)
+
+    assert result.warnings == expected
+    assert len(recwarn) == 0
+    collected = result.run_dir / "WARNING.OUT"
+    assert collected in result.outputs
+    assert collected.read_bytes() == contents
+    assert result.run_dir.is_absolute()
+    if name == "missing_weather":
+        with pytest.raises(DSSATRunError, match="1982, day of year 98"):
+            runner._check_missing_weather(result)
+    else:
+        runner._check_missing_weather(result)
+
+
+@pytest.mark.parametrize("contents", [None, "", "\n  \n", (
+    "*WARNING DETAIL FILE\n******\n*DSSAT Cropping System Model\n"
+    "*RUN   1\n MODEL : MZCER048\n TREATMENT 1 : RAINFED\n"
+)])
+def test_no_warning_blocks_gives_empty_list(fake_dssat, contents):
+    if contents is not None:
+        fake_dssat.outputs["WARNING.OUT"] = contents
+    assert run(fake_dssat.filex).warnings == []
+
+
+def test_unchanged_warning_file_is_not_read(fake_dssat):
+    previous = fake_dssat.filex.parent / "WARNING.OUT"
+    previous.write_text(_SOLAR_WARNING, encoding="utf-8")
+    result = run(fake_dssat.filex)
+    assert result.warnings == []
+    assert previous.read_text(encoding="utf-8") == _SOLAR_WARNING
+
+
+def test_warning_dates_and_text_both_distinguish_blocks(fake_dssat):
+    dated = _SLPF_WARNING.replace("1982", "1983")
+    changed = _SLPF_WARNING.replace("0.92", "0.93")
+    fake_dssat.outputs["WARNING.OUT"] = "\n".join(
+        [_SLPF_WARNING, dated, _SLPF_WARNING, changed, dated])
+    assert run(fake_dssat.filex).warnings == [_SLPF_WARNING, dated, changed]
+
+
+def test_warning_continuations_skip_blanks_and_strip_lines(fake_dssat):
+    fake_dssat.outputs["WARNING.OUT"] = (
+        "Text before a block\n  IPWTH YEAR DOY = 1982 98  \n"
+        "  first line  \n\n\t\n  next line  \n*RUN 2\n MODEL : MZCER048\n"
+        "  SOILDYN YEAR DOY = 1983 56\n  last line  "
+    )
+    assert run(fake_dssat.filex).warnings == [
+        "IPWTH YEAR DOY = 1982 98\nfirst line\nnext line",
+        "SOILDYN YEAR DOY = 1983 56\nlast line",
+    ]
+
+
+def test_run_result_positional_constructor_and_independent_defaults(tmp_path):
+    first = runner.RunResult(0, tmp_path, [], "console")
+    second = runner.RunResult(0, tmp_path, [], "console")
+    assert first.warnings == second.warnings == []
+    first.warnings.append("warning")
+    assert second.warnings == []
+
+
+def test_run_result_repr_shows_only_directory_name_and_counts(tmp_path):
+    directory = tmp_path / "dssat_run_2026-10-06_101500"
+    outputs = [directory / f"output{i}.OUT" for i in range(23)]
+    result = runner.RunResult(0, directory, outputs, "console\n" * 50,
+                              ["warning"] * 3)
+    assert repr(result) == (
+        "RunResult(returncode=0, run_dir='dssat_run_2026-10-06_101500', "
+        "23 output files, 3 warnings)"
+    )
+    assert result.run_dir == directory
+    assert "0 output files, 0 warnings" in repr(runner.RunResult(0, directory, [], ""))

@@ -160,9 +160,10 @@ A successful call returns a `RunResult` with these fields:
 | Field | Contents |
 | --- | --- |
 | `returncode` | DSSAT's integer exit status; a returned result has status `0` |
-| `run_dir` | `pathlib.Path` to the run directory |
+| `run_dir` | Absolute `pathlib.Path` to the run directory |
 | `outputs` | List of `pathlib.Path` objects for files moved into the run directory, ordered by filename |
 | `stdout_tail` | Last 20 lines of DSSAT's standard output, as a string |
+| `warnings` | Distinct warning blocks read from the collected `WARNING.OUT`, in file order; an empty list when none were written |
 
 After either run above, inspect the result in another notebook cell:
 
@@ -171,16 +172,32 @@ print(result.returncode)
 print(result.stdout_tail)
 for path in result.outputs:
     print(path.name, path)
+for warning in result.warnings:
+    print(warning)
 ```
 
-The result contains file paths, not parsed simulation values. A nonzero exit
+Each warning includes its module and `YEAR DOY` header plus its following text.
+Lines are stripped and joined with newlines; blank lines and run banners are
+excluded. Identical blocks, including the date, appear once. Warnings are data
+on the result: reading them emits no Python warnings and raises nothing.
+`WARNING.OUT` remains in `outputs` as well.
+
+Displaying the result shows only the run directory name and counts:
+
+```text
+RunResult(returncode=0, run_dir='dssat_run_2026-10-06_101500', 23 output files, 3 warnings)
+```
+
+The result contains file paths and warnings, with methods to read simulation
+values. A nonzero exit
 status or a collected `ERROR.OUT` raises `DSSATRunError`. The message includes the
 command, the last 20 lines of combined standard output and standard error, and
 the first 20 lines of `ERROR.OUT` when collected. The run directory is kept for
 inspection. If the DSSAT executable cannot start, the empty run directory is
 removed instead.
 
-`run()` does not inspect missing-weather warnings. When using your own weather
+`run()` includes missing-weather warnings in `result.warnings` without raising.
+When using your own weather
 data, [create a Simulation](simulation.md) to apply the weather checks and detect
 DSSAT's missing-weather warning after the run. See
 [Troubleshooting](troubleshooting.md) for error messages and next steps.

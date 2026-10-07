@@ -12,6 +12,29 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.run
 
+### RunResult
+
+`run()` and `Simulation.run()` return `RunResult(returncode, run_dir, outputs,
+stdout_tail, warnings=[])`. The four-argument positional constructor remains
+valid; each result gets its own default warnings list. `run_dir` remains an
+absolute `Path`. The repr shows its name, exit status, output count and warning
+count, for example:
+
+```text
+RunResult(returncode=0, run_dir='dssat_run_2026-10-06_101500', 23 output files, 3 warnings)
+```
+
+`warnings: list[str]` is filled after a successful run from the collected
+`WARNING.OUT`. Each block starts with a module and `YEAR DOY = <year> <day>`
+header (including zero dates) and includes following text until another header,
+a banner line starting with `*`, or EOF. Each line is stripped; blank lines and
+text outside blocks are ignored. Lines are joined with newlines and exact
+duplicates, including the date, appear once in first-seen order. A missing or
+empty `WARNING.OUT` gives `[]`. This is an exception to listed-only output files;
+the file remains in `outputs`. No Python warnings are emitted and these blocks
+do not cause an exception. The existing `Simulation.run()` missing-weather scan
+still raises `DSSATRunError` when DSSAT runs out of measured weather.
+
 ## Simulation, weather, soil, and management
 
 ::: dssatlab.Simulation

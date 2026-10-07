@@ -21,16 +21,21 @@ from .outputs import (read_dssat_evaluation, read_plant_growth,
 
 @dataclass(frozen=True)
 class RunResult:
-    """Exit status, run directory, output paths and console tail for one run."""
+    """Exit status, run directory, output paths, console tail and DSSAT warnings.
+
+    Warnings are stripped WARNING.OUT blocks, including their module/date header,
+    with exact duplicates kept once in file order. They are data, not Python warnings.
+    """
 
     returncode: int
     run_dir: Path
     outputs: list[Path] = field(repr=False)
     stdout_tail: str = field(repr=False)
+    warnings: list[str] = field(default_factory=list, repr=False)
 
     def __repr__(self) -> str:
-        return (f"RunResult(returncode={self.returncode}, run_dir={str(self.run_dir)!r}, "
-                f"{len(self.outputs)} output files)")
+        return (f"RunResult(returncode={self.returncode}, run_dir={self.run_dir.name!r}, "
+                f"{len(self.outputs)} output files, {len(self.warnings)} warnings)")
 
     def summary(self) -> list[dict]:
         """Read the Summary from this run directory."""
@@ -140,7 +145,8 @@ def run(
             connect(interactive=False) to locate the executable.
 
     Returns:
-        RunResult: Dataclass containing returncode, run_dir, outputs, and stdout_tail.
+        RunResult: Dataclass containing returncode, run_dir, outputs, stdout_tail,
+            and warnings read from the collected WARNING.OUT.
 
     Raises:
         DSSATRunError: If the FileX does not exist, its filename has an invalid length,
@@ -261,7 +267,36 @@ def _run_command(folder: Path, arguments: list[str], executable=None, batch_text
             "Open ERROR.OUT and WARNING.OUT in the run directory for details; "
             "correct the reported problem and try again."
         )
-    return RunResult(completed.returncode, run_dir, outputs, stdout_tail)
+    warnings = _read_run_warnings(run_dir / "WARNING.OUT")
+    return RunResult(completed.returncode, run_dir, outputs, stdout_tail, warnings)
+
+
+def _read_run_warnings(path: Path) -> list[str]:
+    r"""Read warning blocks as observed in DSSAT 4.8 WARNING.OUT files.
+
+    A stripped line matching ``\S+\s+YEAR DOY\s*=\s*\d+\s+\d+`` in full starts
+    a block (module, year and day, including zero dates). Include that header and
+    every following nonblank stripped line until the next header, a line starting
+    with ``*`` (a run banner), or EOF. Ignore text outside blocks and blank lines.
+    Join each block with newlines; keep exact duplicates, including the date,
+    only once in first-seen order. A missing file yields an empty list.
+    """
+    if not path.is_file():
+        return []
+    blocks = []
+    block = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        header = re.fullmatch(r"\S+\s+YEAR DOY\s*=\s*\d+\s+\d+", line)
+        if header or line.startswith("*"):
+            if block:
+                blocks.append("\n".join(block))
+            block = [line] if header else []
+        elif line and block:
+            block.append(line)
+    if block:
+        blocks.append("\n".join(block))
+    return list(dict.fromkeys(blocks))
 
 
 def _check_missing_weather(result):
