@@ -47,7 +47,7 @@ def check_paths(text, html=False):
     text = re.sub(r"https?://[^\s\"'<>]+", "", text)
     if html:
         text = re.sub(r"<[^>]*>", "", text)
-    pattern = r"\b[A-Za-z]:[\\/]|~[\\/]|(?<![\w.\\])\\\\[\w.-]+[\\/]|(?<![\w./])/[\w~.-]+"
+    pattern = r"\b[A-Za-z]:[\\/]|~[\\/]|(?<![\w.\\])\\\\(?:\\\\)?[\w.-]+[\\/]|(?<![\w./])/[\w~.-]+"
     assert not re.search(pattern, text), "absolute path or user home in code/output"
 
 
