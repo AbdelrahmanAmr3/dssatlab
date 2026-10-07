@@ -14,7 +14,7 @@ All dssatlab calls use the public API.
 ## 2. The unsupported-platform error still names v0.1 - non-blocking
 
 - **What the student must do:** interpret the `DSSATInstallError` message as a platform restriction and use an existing Windows installation with `connect()`.
-- **Why it is awkward:** the message says installation is supported only on Linux/Colab "in v0.1", even though this worktree's package is 0.22.0; it can suggest a later version might enable Windows builds.
+- **Why it is awkward:** the message says installation is supported only on Linux/Colab "in v0.1"; the obsolete version qualifier can suggest a later version might enable Windows builds.
 - **Suggested change:** remove the obsolete version qualifier and explicitly direct Windows users to install DSSAT 4.8 and connect to it.
 - **Classification:** **non-blocking**; the notebook guards the build with the Colab condition and explains the message in its troubleshooting note.
 
@@ -25,28 +25,35 @@ All dssatlab calls use the public API.
 - **Suggested change:** avoid rewriting an unchanged saved executable and report an actionable DSSAT error if config cannot be saved.
 - **Classification:** **non-blocking**; validation directs process-local `LOCALAPPDATA` to system temp, as in the reference lessons, without changing package code or DSSAT files.
 
-## Course development limitation - non-blocking
+## Colab validation remains pending - non-blocking
 
-- **What the student must do:** during course development on Windows, install the course and development extras from the repository, as the course README instructs.
-- **Why it is awkward:** the Colab branch uses the shared `dssatlab[course]>=0.23,<0.24` pin, while this worktree is still 0.22.0; this Windows validation cannot establish that the release-time Colab path works.
-- **Suggested change:** complete the planned T17/T18 release and Colab verification before advertising the course as ready, then regenerate the notebook.
-- **Classification:** **non-blocking** for this Windows lesson implementation; the notebook clearly labels its development status and Windows outputs. Colab verification remains pending in the parent spec.
+- **What the student must do:** on Colab, install the pinned course package and build DSSAT in the runtime using the guarded cells.
+- **Why it is awkward:** executing on Windows skips the Colab installation and build, so the saved outputs do not establish that this route succeeds.
+- **Suggested change:** complete the parent spec's planned release and Colab verification, then regenerate the notebook.
+- **Classification:** **non-blocking** for this Windows revision; the notebook identifies its saved outputs as Windows results. Colab verification remains pending.
 
 ## Validation
 
 The real existing installation is `C:/DSSAT48/DSCSM048.EXE`; no stock data files were copied or edited.
 The saved notebook shows Python **3.14.7**, detection fields `windows`, `AMD64` and `DSCSM048.EXE`, and successful connecting with `File exists: True` in both the main step and the exercise.
-The troubleshooting table shows **three** setup errors with complete recovery instructions; the notebook explains the documented **51-character** managed-install prefix limit.
+The troubleshooting table shows **three** setup errors with recovery instructions: missing DSSAT, unsupported installation platform and missing build tools.
+The prefix-limit and cache-location details were dropped because they are not among those three selected errors.
 
-The notebook has eight setup steps plus one self-contained exercise.
+The notebook now has **six** walkthrough steps plus **one** self-contained exercise, with all imports and `%matplotlib inline` in the tools cell immediately after the lesson identifier and its short introductory sentence.
 It includes the lesson identifier, but deliberately has no shared setup cell, `data/`, `SOURCE.md` or actual `runs/` copy.
-The later lessons' three copy commands are displayed as text only.
+The later lessons' three copy commands are displayed as text only; the copy explanation still says what is removed and where fresh inputs come from.
+Folder assignment is part of the connection step, whose table shows `HERE` as `.` and `RUNS` as `runs` using `.relative_to(HERE).as_posix()`.
+Each walkthrough cell shows one printed result or table, with no cell mixing a printed report and an unassigned returned value.
+
+Windows instructions now tell students to install DSSAT 4.8 into `C:\DSSAT48`, run `pip install "dssatlab[course]"`, download or clone the repository, and open `course/00_setup/lesson.ipynb` in Jupyter or VS Code.
+The `install()` explanation is two sentences: what it builds, first-build duration and subsequent reuse.
 
 Execution uses process-local `PYTHONPATH` pointing at this worktree's `src`, because the existing editable install resolves to the main checkout.
 Process-local `LOCALAPPDATA`, `IPYTHONDIR` and `JUPYTER_RUNTIME_DIR` point into system temp outside the worktree; `PYTHONDONTWRITEBYTECODE=1` avoids writing validation bytecode.
 The executor emitted Windows kernel transport/event-loop warnings outside the notebook; all saved lesson outputs are free of user names and errors.
 
-Both consecutive `python course/execute.py 00_setup` runs printed `00_setup: ok`.
+Both consecutive `python course/execute.py 00_setup` runs printed `00_setup: ok` after the revision.
 The exercise also passed in fresh kernels with only the tools cell preceding it, for automatic discovery and explicit `C:/DSSAT48` directory selection.
 `python -m pytest -q tests/test_course.py --basetemp=<system-temp-folder> -p no:cacheprovider` passed all **15 tests**.
-UTF-8 inspection found no `??`, `m?`, ` ? ` or corrupted lesson-title separator or Python icons.
+The test file and `SETUP_CELL` are byte-identical to their pre-revision versions, and every later lesson retains the exact shared setup cell.
+No validation temp folders were created in this worktree.
