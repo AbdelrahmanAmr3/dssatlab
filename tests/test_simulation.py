@@ -1,5 +1,6 @@
 """Weather checks through the public Simulation and weather template."""
 import csv
+from cProfile import Profile
 from copy import deepcopy
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -412,6 +413,26 @@ def test_csv_shape_problem_includes_valid_date(tmp_path, rows):
                for p in problems)
     assert any(p.startswith("Weather data row 3 (2021-03-02): missing value for 'rain'")
                for p in problems)
+
+
+def test_csv_shape_diagnostics_take_linear_work(tmp_path, rows):
+    from dssatlab.weather import _parse_weather
+
+    days = [date(1982, 1, 1) + timedelta(days=i) for i in range(1000)]
+    path = write_csv(tmp_path / "weather.csv",
+                     [dict(rows[0], date=day) for day in days])
+    header, *records = path.read_text(encoding="utf-8").splitlines()
+    path.write_text(header + "\n" + "\n".join(row + "," for row in records) + "\n",
+                    encoding="utf-8")
+    with Profile() as profile:
+        parsed, problems = _parse_weather(path)
+    assert len(parsed) == len(days)
+    assert problems == [
+        f"Weather data row {i + 2} ({day}): found 10 values for 9 columns. "
+        "Supply one value per column." for i, day in enumerate(days)
+    ]
+    # Count work instead of wall time: rescanning every diagnostic costs N**2 calls.
+    assert sum(entry.callcount for entry in profile.getstats()) < 200 * len(days)
 
 
 @pytest.mark.parametrize("label", ["Soil data", "Observed data"])

@@ -193,8 +193,9 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
     row_label = "row" if isinstance(source, (str, Path)) else "index"
     if problems and problems[0][0] == "source":
         return [], _all_messages(problems)
-    row_shape_problems = [(i, message) for i, (kind, message) in enumerate(problems)
-                          if kind == "row shape"]
+    row_shape_problems = {message.split(" has ", 1)[0]: (i, message)
+                          for i, (kind, message) in enumerate(problems)
+                          if kind == "row shape"}
     if columns is not None:
         for column in dict.fromkeys(columns):
             if columns.count(column) > 1:
@@ -250,10 +251,10 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
             location += f" ({result['date']})"
             if row_label == "row":
                 prefix = f"Weather data row {line}"
-                for i, message in row_shape_problems:
-                    if message.startswith(prefix + " has"):
-                        problems[i] = ("row shape", message.replace(
-                            prefix + " has", f"Weather data {location}: found", 1))
+                if prefix in row_shape_problems:
+                    i, message = row_shape_problems[prefix]
+                    problems[i] = ("row shape", message.replace(
+                        prefix + " has", f"Weather data {location}: found", 1))
         if columns is None:  # rows without a header: report each column problem once
             found = []
             _check_columns(row, location, found)
