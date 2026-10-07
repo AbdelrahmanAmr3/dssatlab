@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .errors import DSSATCheckError
 from .management_file import _load_management
+from .runner import _resolve_directory
 from .scenarios import _select_treatments, combine_summaries, run_treatments
 
 
@@ -15,7 +16,8 @@ _SECTIONS = ("planting", "irrigation", "fertilizer", "residues", "tillage", "har
 
 
 def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None,
-              management=None, executable=None, filex_template=None, base=True) -> list[dict]:
+              management=None, executable=None, filex_template=None, base=True, *,
+              directory=None) -> list[dict]:
     """Check every grid combination and treatment, then return labelled Summary rows.
 
     Supply a non-empty ``factors`` dict mapping experiment data section names to
@@ -28,6 +30,9 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
     every selected treatment. Caller data is never changed. Other arguments
     and treatment selection mean exactly what they mean for run_treatments,
     including copied FileX and FileX template inputs.
+    ``directory=`` (str or Path) places simulation folders inside that directory;
+    each run directory stays inside its simulation folder. Relative paths are
+    resolved against cwd at this call; missing parents are created.
 
     All sweep problems raise one DSSATCheckError before run_treatments is called.
     Its Simulation checks validate section values and scenario names before any
@@ -42,6 +47,7 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
         factors={"cultivar": {p1: {"crop": "MZ", "code": "IB0035",
                  "coefficients": {"P1": p1}} for p1 in (200, 259, 320)}}
     """
+    directory = _resolve_directory(directory)
     experiment, problems = _load_management(management)
     if management is None:
         experiment = {"treatments": {}}
@@ -115,7 +121,7 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
     results = run_treatments(filex=filex, weather=weather, treatments=treatments,
                              soil=soil, management=management, executable=executable,
                              filex_template=filex_template, scenarios=scenarios,
-                             _include_base=base)
+                             _include_base=base, directory=directory)
     rows = combine_summaries(results)
     for row in rows:
         name = row["scenario"]

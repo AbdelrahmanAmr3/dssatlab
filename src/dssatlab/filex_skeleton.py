@@ -29,7 +29,7 @@ def _write_template_simulation(sim, experiment_data):
     soil, _, _ = _parse_field_data(sim.soil, count, "soil")
     parent = (Path(sim.filex_template).resolve().parent
               if isinstance(sim.filex_template, (str, Path)) else Path.cwd())
-    folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder")
+    folder = _create_dated_folder(parent, "dssat_sim_", "simulation folder", directory=sim.directory)
     filex = write_filex(data, weather, soil, folder, data_dir=data_dir)
     first = data["rotation"][0] if rotation else _template_crop_entry(data, sim.treatment)
     start = (_controls_start_date(experiment_data, sim.treatment)

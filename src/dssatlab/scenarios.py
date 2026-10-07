@@ -8,7 +8,7 @@ from .filex import read_treatment_numbers
 from .filex_template import _load_filex_template, _template_treatment_names
 from .management_file import _load_yaml
 from .outputs import read_summary
-from .runner import RunResult
+from .runner import RunResult, _resolve_directory
 from .simulation import Simulation
 from .climate import _select_batch_weather
 
@@ -73,14 +73,16 @@ def _select_treatments(filex, filex_template, treatments):
 
 
 def run_treatments(filex=None, weather=None, treatments=None, soil=None, management=None,
-                   executable=None, scenarios=None, filex_template=None,
-                   *, _include_base=True) -> dict[tuple[str, int], RunResult]:
+                   executable=None, scenarios=None, filex_template=None, *,
+                   directory=None, _include_base=True) -> dict[tuple[str, int], RunResult]:
     """Check every scenario/treatment, then run each in its own simulation folder.
 
     Supply exactly one of ``filex`` (a FileX path) or ``filex_template`` (a YAML
     path or dict). Templates require soil data, as for Simulation. Simulation
     folders go beside the FileX or template YAML, or in the current directory
-    for a template dict.
+    for a template dict. With ``directory=`` (str or Path), simulation folders
+    go inside that directory, with run directories inside each simulation folder.
+    Relative paths are resolved against cwd at this call; missing parents are created.
 
     ``treatments=None`` selects each FileX treatment number once in file order, or 1..N
     in template name order (one for ``treatment_name``). Otherwise,
@@ -107,6 +109,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     The first DSSATRunError stops the batch and names earlier kept run
     directories. ``executable`` selects the DSSAT executable as for Simulation.
     """
+    directory = _resolve_directory(directory)
     treatments = _select_treatments(filex, filex_template, treatments)
 
     base = dict(weather=weather, soil=soil, management=management)
@@ -114,7 +117,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     for name, overrides, scenario_problems in _scenario_inputs(scenarios, include_base=_include_base):
         inputs = {**base, **overrides}
         selected = [Simulation(filex, treatment, filex_template=filex_template,
-                               executable=executable, name=name, **inputs)
+                               executable=executable, name=name, directory=directory, **inputs)
                     for treatment in treatments]
         if filex_template is None:
             problems.extend(f"Scenario {name!r}, treatment all: {problem}"

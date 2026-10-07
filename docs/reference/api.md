@@ -16,6 +16,11 @@ install DSSAT 4.8 from [dssat.net](https://dssat.net), then call `connect(path=.
 
 ::: dssatlab.run
 
+`run(filex, treatment=None, executable=None, *, directory=None)` accepts a
+keyword-only `directory` (`str`, `Path`, or `None`) as the parent of its dated
+run directory. DSSAT runs in the FileX folder. `None` keeps the run directory
+beside the FileX. See [where the files go](../guide/run-filex.md#where-the-files-go).
+
 ### RunResult
 
 `run()` and `Simulation.run()` return `RunResult(returncode, run_dir, outputs,
@@ -42,6 +47,12 @@ still raises `DSSATRunError` when DSSAT runs out of measured weather.
 ## Simulation, weather, soil, and management
 
 ::: dssatlab.Simulation
+
+`Simulation(..., directory=None)` accepts a keyword-only parent for simulation
+folders, for copied FileX, template YAML and dict template inputs. Each run
+directory stays inside its simulation folder. `None` keeps the existing
+FileX/template location. Relative paths resolve against cwd at construction;
+construction and `check()` write no folders.
 
 With a copied FileX, stock `.WTH` paths are copied unchanged. `check()` checks
 structure, filename selection, century handling and required date coverage,
@@ -173,6 +184,13 @@ and codes. `list_crops()` is unchanged.
 `run_sweep(..., base=True)` includes unchanged inputs first (the default).
 Pass `base=False` to check and run only the factor combinations and return no
 `"base"` rows. `base` must be a bool; other values raise `DSSATCheckError`.
+
+`run_treatments(..., directory=None)` and `run_sweep(..., directory=None)` accept
+the same keyword-only parent for every simulation folder. Relative paths resolve
+against cwd at the call. All four APIs create missing parents when running and
+raise `DSSATError` if the path is a file or the folder cannot be created; the
+message names the path and asks for a writable folder. See
+[choose where simulation folders go](../guide/simulation.md#choose-where-simulation-folders-go).
 
 ::: dssatlab.combine_summaries
 

@@ -398,8 +398,9 @@ The first day a forecast run takes from the historical weather years instead of 
 must not be before the start date.
 
 **Run directory**:
-A new, dated folder created beside the FileX for one run. DSSAT runs in the FileX's own
-folder, and its output files are moved into the run directory when the run ends.
+A new, dated folder created for one run, beside the FileX unless a `directory` is given.
+DSSAT runs in the FileX's own folder, and its output files are moved into the run
+directory when the run ends.
 _Avoid_: output folder, working directory
 
 **Run result**:

@@ -67,8 +67,32 @@ class RunResult:
         return plot_plant_growth(self.run_dir, variable)
 
 
-def _create_dated_folder(parent: Path, prefix: str, label: str) -> Path:
+def _resolve_directory(directory) -> Path | None:
+    """Resolve directory= at the call, naming unusable paths and their remedy."""
+    if directory is None:
+        return None
+    try:
+        return Path(directory).resolve()
+    except (OSError, ValueError, RuntimeError) as error:  # RuntimeError: symlink loop (3.10-3.12)
+        raise DSSATRunError(
+            f"Cannot resolve directory {directory}: "
+            f"tried to resolve it against the current directory ({error}). "
+            "Pass directory= with a valid writable folder path instead."
+        ) from error
+
+
+def _create_dated_folder(parent: Path, prefix: str, label: str, *, directory=None) -> Path:
     """Create a fresh dated folder, adding a suffix for each existing name."""
+    if directory is not None:
+        parent = Path(directory)
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+        except (OSError, ValueError) as error:
+            raise DSSATRunError(
+                f"Cannot create {label} inside directory {parent}: "
+                f"checked or tried to create its parents ({error}). "
+                "Pass directory= with a writable folder path instead of a file."
+            ) from error
     directory_name = prefix + datetime.now().strftime("%Y-%m-%d_%H%M%S")
     folder = parent / directory_name
     suffix = 2
@@ -79,7 +103,13 @@ def _create_dated_folder(parent: Path, prefix: str, label: str) -> Path:
         except FileExistsError:
             folder = parent / f"{directory_name}-{suffix}"
             suffix += 1
-        except OSError as error:
+        except (OSError, ValueError) as error:
+            if directory is not None:
+                raise DSSATRunError(
+                    f"Cannot create {label} {folder}: directory {parent} "
+                    f"is not writable ({error}). "
+                    "Pass directory= with a writable folder path instead."
+                ) from error
             raise DSSATRunError(
                 f"Cannot create {label} {folder}: the FileX folder "
                 f"{parent} is not writable ({error}). "
@@ -125,12 +155,14 @@ def run(
     filex: str | Path,
     treatment: int | None = None,
     executable: str | Path | None = None,
+    *,
+    directory: str | Path | None = None,
 ) -> RunResult:
     """Run all treatments or one treatment, collecting outputs even on failure.
 
     Executes the DSSAT executable on the specified FileX. Creates a dated run
-    directory beside the FileX (dssat_run_YYYY-MM-DD_HHMMSS) and moves all output
-    files generated or updated during the run into it. Picks forecast mode Y for
+    directory beside the FileX, or inside directory= (dssat_run_YYYY-MM-DD_HHMMSS).
+    Moves all files generated or updated during the run into it. Picks forecast mode Y for
     .FCX, sequence mode Q for a selected treatment with several TREATMENTS rows,
     otherwise A (all treatments) or C (one treatment). Q/Y write DSSBatch.v48 and
     collect it with the outputs; a failed launch removes it.
@@ -143,6 +175,9 @@ def run(
         executable: Optional explicit path to the DSSAT executable or its directory.
             Validated without modifying saved configuration. If None, uses
             connect(interactive=False) to locate the executable.
+        directory: Parent of the run directory. DSSAT still runs in the FileX
+            folder. Relative paths are resolved against cwd at this call;
+            missing parents are created. None keeps the FileX folder default.
 
     Returns:
         RunResult: Dataclass containing returncode, run_dir, outputs, stdout_tail,
@@ -150,11 +185,12 @@ def run(
 
     Raises:
         DSSATRunError: If the FileX does not exist, its filename has an invalid length,
-            a Q/Y run finds DSSBatch.v48 or Q needs a treatment selected,
+            directory cannot be created, a Q/Y run finds DSSBatch.v48 or Q needs a treatment selected,
             the FileX folder holds a .csv file DSSAT would delete (such as weather.csv),
             the DSSAT executable cannot be executed, DSSAT exits with a non-zero code,
             or ERROR.OUT is generated during the run.
     """
+    directory = _resolve_directory(directory)
     filex = Path(filex).resolve()
     if not filex.is_file():
         raise DSSATRunError(
@@ -204,10 +240,11 @@ def run(
         batch_text = _batch_text(filex.name, mode, rows)
     else:
         arguments = ["A", filex.name] if treatment is None else ["C", filex.name, str(treatment)]
-    return _run_command(filex.parent, arguments, executable, batch_text)
+    return _run_command(filex.parent, arguments, executable, batch_text, directory=directory)
 
 
-def _run_command(folder: Path, arguments: list[str], executable=None, batch_text=None) -> RunResult:
+def _run_command(folder: Path, arguments: list[str], executable=None, batch_text=None,
+                 *, directory=None) -> RunResult:
     """Resolve DSSAT, execute its arguments, and collect outputs in a run directory."""
     if executable is None:
         executable = connect(interactive=False)
@@ -217,7 +254,7 @@ def _run_command(folder: Path, arguments: list[str], executable=None, batch_text
         if executable is None:
             raise core._invalid_path(path)
 
-    run_dir = _create_dated_folder(folder, "dssat_run_", "run directory")
+    run_dir = _create_dated_folder(folder, "dssat_run_", "run directory", directory=directory)
 
     before = {path.name: path.stat().st_mtime_ns
               for path in folder.iterdir() if path.is_file()}
