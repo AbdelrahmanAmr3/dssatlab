@@ -26,8 +26,12 @@ a climate file source, and a sequence. The result is the usual one: each summary
 
 Stock `.WTH` coverage follows the files DSSAT selects in mode Y, from the first
 historical season start through forecast date - 1, using the shared stock-weather
-gap check. FODAT and its override use four-digit years without the FileX date
-century restriction (#324).
+gap check, only for uniform station layouts: all annual one-year files, or one
+single multi-year file. Supplied files and installed WED candidates count toward
+the layout, with supplied names taking priority. Mixed or unproven layouts skip
+forecast coverage; stock structure checks and the `WARNING.OUT` missing-weather
+scan remain the backstop. FODAT and its override use four-digit years without
+the FileX date century restriction (#324).
 
 ## Considered options
 

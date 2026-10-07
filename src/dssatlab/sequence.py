@@ -98,18 +98,19 @@ def _sequence_shift(day, year):
     return date(year, 1, 1) + timedelta(days=day.timetuple().tm_yday - 1)
 
 
-def _sequence_end(source, treatment, start, stop, filex, template):
-    """Follow scheduled components; an unknown end keeps the boundary check."""
+def _sequence_end(source, treatment, start, stop, filex, template, *, proven_only=False):
+    """Follow scheduled components; optionally return None for an unknown end."""
     from .operations import _component_management
     from .rotation_data import _calendar_date, _known_dates, _rotation_keys
 
+    fallback = None if proven_only else stop
     try:
         text = Path(filex).read_text(encoding='latin-1') if filex is not None else None
         components = (_rotation_components(filex, treatment, text=text) if template is None else
                       [dict(R=str(i), SM=str(i), CR='FA' if c['crop'] == 'fallow' else '?')
                        for i, c in enumerate(template, 1)])
         if len(components) < 2 or any(not row['R'].isdigit() for row in components):
-            return stop
+            return fallback
         entries = source.get('treatments', {}) if isinstance(source, dict) else {}
         entry = next((value for key, value in entries.items()
                       if str(key).isascii() and str(key).isdigit() and int(key) == int(treatment)
@@ -142,7 +143,7 @@ def _sequence_end(source, treatment, start, stop, filex, template):
         while current <= stop:
             for (_, planting, end, crop), first in zip(known, first_ends):
                 if end is None or first is None or crop != 'FA' and planting is None:
-                    return stop
+                    return fallback
                 shift = 0
                 if crop != 'FA' or run:
                     anchor = first if crop == 'FA' else planting
@@ -152,14 +153,14 @@ def _sequence_end(source, treatment, start, stop, filex, template):
                     shift = moved.year - anchor.year
                 actual_end = _sequence_shift(end, end.year + shift) if first < current else end
                 if actual_end < current:
-                    return stop  # Invalid schedules are reported by the ordinary checks.
+                    return fallback  # Invalid schedules are reported by the ordinary checks.
                 if actual_end >= stop:
                     return actual_end
                 current = actual_end + timedelta(days=1)
                 run += 1
     except (OSError, ValueError, TypeError, KeyError, OverflowError):
         pass  # Unreadable dates/levels cannot establish a scheduled end.
-    return stop
+    return fallback
 
 
 def _sequence_coverage(source, treatment, start, days, nyers=None, *, filex=None, template=None):

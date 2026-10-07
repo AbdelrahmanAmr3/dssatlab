@@ -134,7 +134,8 @@ def test_unchanged_filex_crop_end_must_follow_planting():
 
 
 @pytest.mark.parametrize('explicit', [False, True])
-def test_shortened_sequence_checks_only_simulated_component_dates(tmp_path, explicit):
+@pytest.mark.parametrize('proven', [False, True])
+def test_shortened_sequence_filters_only_with_proven_end(tmp_path, explicit, proven):
     # Four components end at the one-year boundary. A later crop/fallow stays
     # in the FileX, like the dated components in stock MSKB8902.SQX.
     text = FILEX.replace('\n*CULTIVARS',
@@ -148,6 +149,15 @@ def test_shortened_sequence_checks_only_simulated_component_dates(tmp_path, expl
         ' 4 81060 GS000   -99   -99   -99   -99 -99\n'
         ' 5 81073 GS000   -99   -99   -99   -99 -99\n'
         '\n*SIMULATION CONTROLS')
+    if proven:
+        text = text.replace(' 1 MA              R     R     R     N     M',
+                            ' 1 MA              R     R     R     N     R')
+        text = text.replace(
+            ' 1 1 0 0 Rotation                   1  1  0  0  1  0  0  0  0  0  0  0  1',
+            ' 1 1 0 0 Rotation                   1  1  0  0  1  0  0  0  0  0  0  6  1')
+        text = text.replace('\n*SIMULATION CONTROLS',
+                            ' 6 78200 GS000   -99   -99   -99   -99 -99\n'
+                            '\n*SIMULATION CONTROLS')
     path = tmp_path / 'ZZZZ7801.SQX'
     path.write_text(text)
     entry = {'controls': {'years': 1}}
@@ -156,17 +166,25 @@ def test_shortened_sequence_checks_only_simulated_component_dates(tmp_path, expl
                              6: {'harvest': [{'date': '1981-03-14'}]}}
     _, problems, _ = _check_rotation_data(entry, 1, path, text, date(1978, 3, 15),
                                           (date(1978, 3, 15), date(1979, 3, 14)))
-    assert problems == []
+    if proven:
+        assert problems == []
+    else:
+        _, ordinary, _ = _check_rotation_data(
+            {key: value for key, value in entry.items() if key != 'controls'},
+            1, path, text, date(1978, 3, 15), (date(1978, 3, 15), date(1979, 3, 14)))
+        assert problems == ordinary
+        assert all('weather range' in problem for problem in problems)
     # Dates inside the simulated component still need weather.
     _, problems, _ = _check_rotation_data(entry, 1, path, text, date(1978, 3, 15),
                                           (date(1978, 3, 15), date(1979, 3, 13)))
-    assert len(problems) == 1 and '1979-03-14' in problems[0]
+    assert len(problems) == (1 if proven else 6 if explicit else 4)
+    assert '1979-03-14' in problems[0]
 
 
 @pytest.mark.parametrize('explicit', [False, True])
-def test_sequence_future_planting_year_is_not_required_weather(tmp_path, explicit):
+def test_sequence_unknown_end_keeps_future_planting_check(tmp_path, explicit):
     # DSSAT v4.8.6.0 AUTPLT.for (151-158) shifts this to 1978-03-16.
-    # The raw future year does not require weather beyond the stopping boundary.
+    # Without a proven end, retain the ordinary check on the stored date.
     text = (FILEX.replace('78074', '79075').replace('78274', '79274')
             .replace('78318', '79318').replace('78325', '79325')
             .replace('79060', '80060').replace('79073', '80073'))
@@ -179,7 +197,12 @@ def test_sequence_future_planting_year_is_not_required_weather(tmp_path, explici
             population=7, row_spacing=75, depth=5)}}
     _, problems, _ = _check_rotation_data(entry, 1, path, text, date(1978, 3, 15),
                                           (date(1978, 3, 15), date(1979, 3, 14)))
-    assert problems == []
+    _, ordinary, _ = _check_rotation_data(
+        {key: value for key, value in entry.items() if key != 'controls'},
+        1, path, text, date(1978, 3, 15), (date(1978, 3, 15), date(1979, 3, 14)))
+    assert problems == ordinary
+    assert any('1979-03-16' in problem and 'outside weather range' in problem
+               for problem in problems)
 
 
 @pytest.mark.parametrize('override', [False, True])

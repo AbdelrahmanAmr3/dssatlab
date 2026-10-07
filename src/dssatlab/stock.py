@@ -18,7 +18,8 @@ from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory,
-                            _weather_anchor_problems, _stock_weather_gaps)
+                            _weather_anchor_problems, _stock_weather_gaps,
+                            _forecast_weather_uniform)
 
 
 def _stock_weather_paths(source):
@@ -180,7 +181,10 @@ def _simulation_weather(sim, values, experiment_data, components):
         if stop is not None:
             end = _sequence_end(experiment_data, sim.treatment, start, stop, sim.filex, None)
             if "years" in _selected_controls(experiment_data, sim.treatment):
-                dates = [(field, day) for field, day in dates if day is None or day <= end]
+                proven_end = _sequence_end(experiment_data, sim.treatment, start, stop,
+                                           sim.filex, None, proven_only=True)
+                if proven_end is not None:
+                    dates = [(field, day) for field, day in dates if day is None or day <= proven_end]
     # The preliminary read checks structure only; the walk decodes the dates.
     _, problems = _read_stock_weather(paths)
     stations = sorted({path.name[:4].upper() for path in paths})
@@ -198,21 +202,16 @@ def _simulation_weather(sim, values, experiment_data, components):
             end if not is_forecast and (harvest is not None or len(components) > 1) else None)
         initial = values.get("SDATE", f"{start.year % 100:02d}001")
         wed = _weather_directory(sim.executable)
+        if is_forecast and not _forecast_weather_uniform(paths, station, wed):
+            return [], []  # WARNING.OUT remains the missing-weather backstop.
         if is_forecast and coverage_start is not None:
-            rows, problems = [], []
-            # ModForecast.f90 (160-178) reads observations independently of
-            # the ensemble. A historical multi-year file cannot supply them.
-            periods = [(coverage_start, start - timedelta(days=1), True)]
-            if start <= end:
-                periods.append((start, end, False))
-            for first, last, historical in periods:
-                selected, found, anchor = _walk_weather_files(
-                    paths, station, initial, first, last, wed=wed,
-                    mode="Y", historical=historical)
-                if selected:
-                    found.extend(_stock_weather_gaps(selected, first, last, check_bounds=not found))
-                rows.extend(selected)
-                problems.extend(found)
+            # Uniform layouts permit one walk through history and observations.
+            rows, problems, anchor = _walk_weather_files(
+                paths, station, initial, coverage_start, end, wed=wed,
+                mode="Y", historical=True)
+            if rows:
+                problems.extend(_stock_weather_gaps(rows, coverage_start, end,
+                                                     check_bounds=not problems))
         else:
             rows, problems, anchor = _walk_weather_files(
                 paths, station, initial, start, walk_end, wed=wed,

@@ -98,3 +98,49 @@ trims observations to forecast date minus one day. Every comparison passes;
 see [ADR 0035](../adr/0035-a-simulation-runs-a-forecast-from-a-copied-fcx.md#real-dssat-proof)
 for the values and local evidence location. Use copies of all course inputs
 when repeating this manual check.
+
+## Narrowed stock coverage proof (#324, #347)
+
+On 2026-10-07, Windows DSSAT 4.8.5.017 ran these treatment-1 Simulations
+from copied stock inputs, with no missing-weather failure:
+
+| FileX and weather | Overrides | `check(False)` | Exit | Summary rows |
+| --- | --- | --- | --- | --- |
+| `Sequence/MSKB8902.SQX`, all stock `Weather/MSKB*.WTH` | `controls.years: 3` | `[]` | 0 | 6 |
+| `YieldForecast/CAPE2002.FCX`, `Weather/CAPE8437.WTH` | none | `[]` | 0 | 36 |
+
+MSKB's scheduled prefix proves an end of 1992-05-17; only dates beyond that
+proven end are exempted from component weather coverage. CAPE's station has
+one multi-year weather file, so forecast coverage runs rather than being skipped.
+Reproduce with a real DSSAT installation and a writable parent for simulation
+folders:
+
+```python
+from pathlib import Path
+from tempfile import gettempdir
+from dssatlab import Simulation
+
+root = Path("C:/DSSAT48")
+executable = root / "DSCSM048.EXE"
+proof_directory = Path(gettempdir()) / "dssatlab-coverage-proof"
+cases = [
+    (root / "Sequence/MSKB8902.SQX",
+     sorted((root / "Weather").glob("MSKB*.WTH")),
+     {"treatments": {1: {"controls": {"years": 3}}}}),
+    (root / "YieldForecast/CAPE2002.FCX", root / "Weather/CAPE8437.WTH", None),
+]
+for filex, weather, management in cases:
+    sim = Simulation(filex, weather=weather, executable=executable,
+                     management=management, directory=proof_directory)
+    assert sim.check(False) == []
+    result = sim.run()
+    assert result.returncode == 0
+    print(filex.name, len(result.summary()), result.run_dir)
+```
+
+Unit regressions cover the narrowed exclusions: an unknown HARVS M end after
+a fallow retains the missing 1979-03-16 planting-date problem, while mixed
+`UFGA8001.WTH` (1980–1982) and `UFGA8201.WTH` (1982) skip the forecast coverage
+walk and return `[]`. The latter still raises if the run's `WARNING.OUT` reports
+missing weather. These checks do not prove maturity or every forecast ensemble's
+season-end coverage.

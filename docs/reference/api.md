@@ -59,8 +59,13 @@ structure, filename selection, century handling and required date coverage,
 including cross-file gaps, using the set of dates present. Template value ranges,
 identical station values and duplicate-date checks apply only to template weather.
 DSSAT reads the stock values itself; `run()` still raises `DSSATRunError` when
-`WARNING.OUT` reports missing weather. Stock forecasts keep their existing
-coverage exemption. See [stock weather files](../guide/simulation.md#use-stock-weather-files).
+`WARNING.OUT` reports missing weather. Stock forecast coverage runs only for
+uniform station layouts: all annual one-year files, or one single multi-year
+file, considering supplied files and installed WED candidates. Mixed or
+unproven layouts skip forecast coverage; structure checks and the missing-weather
+scan remain. Shortened sequences suppress component-date coverage beyond a
+proven scheduled end only; unknown ends retain every component's ordinary
+checks. See [stock weather files](../guide/simulation.md#use-stock-weather-files).
 
 Weather template daily-row problems from `Simulation.check()`, `Simulation.run()`
 and `summarize_weather()` include the calendar date when valid, for example

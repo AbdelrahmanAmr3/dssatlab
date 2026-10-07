@@ -397,15 +397,22 @@ replaces SDATE under START S only. A controls-only start after an inherited
 reported planting date is rejected; automatic planting A/F keeps its window rules.
 
 Forecast coverage replaces the normal season coverage and start-in-weather
-checks for weather rows and stock `.WTH` files. Supply every day from the start day of year in `start year - NYERS`
+checks for weather rows and eligible stock `.WTH` layouts described below.
+Supply every day from the start day of year in `start year - NYERS`
 through `forecast date - 1`, including the intervening years. For treatment 1,
 that is 2000-04-30 (day 121 of 2000) through 2023-05-16; for treatment 2,
 1999-05-01 through 2022-06-30. No current-year weather on or after the forecast
 date is required, and planned management dates after it need not be in your
 observed weather. The generated weather remains one multi-year `.WTH`.
-Stock weather uses the same filename selection and gap checks as other stock
-simulations, in forecast mode Y: only files DSSAT opens count as coverage.
-Missing historical years or observed days are check problems. FODAT and
+Stock forecast coverage runs only when every station weather file available
+to DSSAT has a uniform layout: all annual one-year files (`SSSSYY01.WTH`), or
+one single multi-year file. This includes supplied files and installed WED
+candidates; supplied names take priority. Mixed annual/multi-year files,
+multiple multi-year files and unproven layouts skip forecast coverage.
+Their structure is still checked, and the `WARNING.OUT` missing-weather scan
+remains the backstop. For eligible layouts, mode Y filename selection and gap
+checks count only selected files; missing historical years or observed days
+are check problems. FODAT and
 `controls.forecast_date` use four-digit years without the 1936–2035 FileX date
 restriction.
 
@@ -471,14 +478,17 @@ decoding unselected dates. Coverage uses the **set of dates present** in selecte
 files: repeated dates do not add coverage or cause a problem. Missing days inside
 the required period, including gaps across selected file boundaries, are rejected.
 Gaps before the required start or after a fixed harvest do not affect coverage.
-For a forecast, historical coverage runs from the first historical season's
-start date through the day before the simulation start. Observations are checked
-separately from the simulation start through forecast date - 1, using the
-current-season file. Historical files cannot supply missing observations.
+For a forecast with a uniform station layout (all annual one-year files, or
+one single multi-year file), coverage runs from the first historical season's
+start date through forecast date - 1. Annual files roll over into the
+current-season file for observations; a single multi-year file supplies the
+whole range.
 For annual weather, mode Y replaces the filename's year with the historical
 year, including an eight-character `WSTA`; multi-year files keep their name.
 The [weather template checks](#prepare-the-weather-template) still apply in full
 to weather supplied as template data.
+Mixed or unproven stock forecast layouts skip this coverage check and rely on
+the post-run `WARNING.OUT` missing-weather scan; stock structure checks remain.
 Start coverage, the last seasonal start and scheduled sequence ends use the same
 FileX checks as template weather. Stock weather must also cover a fixed harvest
 (HARVS R), including the last season's inherited HDATE. Supplied experiment-data event dates are

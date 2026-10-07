@@ -186,6 +186,36 @@ def _weather_directory(executable):
     return None
 
 
+def _forecast_weather_uniform(paths, station, wed=None):
+    """Check only annual one-year files or one multi-year file for this station.
+
+    Include installed WED candidates, with supplied names taking priority.
+    Mixed layouts need DSSAT's per-ensemble file-span state, which we do not model.
+    """
+    candidates = {}
+    if wed is not None and wed.is_dir():
+        candidates.update((path.name.upper(), path) for path in wed.iterdir()
+                          if path.is_file() and path.suffix.upper() == '.WTH'
+                          and path.name[:4].upper() == station[:4]
+                          and len(path.stem) in (4, 8))
+    candidates.update((path.name.upper(), path) for path in paths)
+    annual = []
+    for name, path in candidates.items():
+        raw, problems = _read_weather_file(path)
+        if problems or not raw:
+            return False  # Cannot prove a uniform layout.
+        codes = [row['date'] for _, row in raw]
+        if any(not re.fullmatch(r'[0-9]{5}|[0-9]{7}', code) for code in codes):
+            return False
+        one_year = len({code[:-3] for code in codes}) == 1
+        if not one_year and codes[0][:-3] == codes[-1][:-3]:
+            return False  # The record years do not prove DSSAT's file span.
+        if one_year and (len(name) != 12 or not name[4:6].isdigit() or name[6:8] != '01'):
+            return False  # This is not DSSAT's annual-file layout.
+        annual.append(one_year)
+    return bool(annual) and (all(annual) or len(annual) == 1 and not annual[0])
+
+
 def _walk_weather_files(paths, station, sdate, start, end, *, wed=None, mode="C", historical=False):
     """MAKEFILEW's prerequisite, effective-start lookup, then IPWTH continuation.
 

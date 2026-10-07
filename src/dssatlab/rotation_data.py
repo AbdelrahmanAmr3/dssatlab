@@ -268,7 +268,7 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         stop = _sequence_stop(start, years)
         if stop is not None:
             run_end = _sequence_end({'treatments': {treatment: entry}}, treatment,
-                                    start, stop, filex, template)
+                                    start, stop, filex, template, proven_only=True)
     cycle_start = (known[0][1] or _calendar_date(template[0].get('start_date'))
                    if template is not None else None)
     if cycle_start is not None and known[-1][2] is not None:
@@ -290,8 +290,8 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
         override = edits.get(number, {})
         planting_override = isinstance(override, dict) and 'planting' in override
         _, planting, end, crop = known[index]
-        # A shortened sequence finishes the crossing component, then stops.
-        # Later component dates are retained in the FileX but are not simulated.
+        # Only a proven scheduled end permits suppressing later date coverage.
+        # Unknown ends retain the ordinary checks for every component.
         if index == 0 and crop == 'FA' and start is not None and end is not None and end <= start:
             problem = (f'{where}, rotation component {number}: the leading fallow ends on {end}, '
                        f'not after simulation start date {start}. Move controls start_date '

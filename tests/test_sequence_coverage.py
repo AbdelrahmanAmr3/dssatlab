@@ -99,6 +99,42 @@ def test_maturity_end_stays_with_warning_scan(fixed_sequence, fake_dssat):
         sim.run()
 
 
+@pytest.mark.parametrize('explicit', [False, True])
+def test_fallow_then_maturity_checks_planting_after_boundary(fixed_sequence, explicit):
+    from datetime import date
+    from dssatlab.sequence import _sequence_end, _sequence_stop
+
+    sim = fixed_sequence
+    text = sim.filex.read_text().replace(
+        ' 1 1 0 0 Crop                       1  1  0  0  1  0  0  0  0  0  0  1  1\n'
+        ' 1 2 0 0 Fallow                     2  1  0  0  0  0  0  0  0  0  0  2  2',
+        ' 1 1 0 0 Fallow                     2  1  0  0  0  0  0  0  0  0  0  2  2\n'
+        ' 1 2 0 0 Crop                       1  1  0  0  1  0  0  0  0  0  0  0  1')
+    text = (text.replace('89124', '79075').replace('90126', '79072')
+            .replace(' 1 GE              9     1     S 89060  2150 Sequence',
+                     ' 1 GE              9     1     S 89060  2150 Sequence\n'
+                     ' 2 GE              9     1     S 89060  2150 Sequence')
+            .replace(' 1 MA              R     N     R     N     R',
+                     ' 1 MA              R     N     R     N     M'))
+    sim.filex.write_text(text)
+    entry = {'controls': {'start_date': '1978-03-15', 'years': 1}}
+    if explicit:
+        entry['rotation'] = {2: {'planting': dict(
+            date='1979-03-16', method='S', distribution='R',
+            population=7.2, row_spacing=75, depth=5)}}
+    sim.management = {'treatments': {1: entry}}
+    sim.weather = weather('1978-03-15', '1979-03-14', 'MSKB')
+    start = date(1978, 3, 15)
+    stop = _sequence_stop(start, 1)
+    assert _sequence_end(sim.management, 1, start, stop, sim.filex, None) == stop
+    assert _sequence_end(sim.management, 1, start, stop, sim.filex, None,
+                         proven_only=True) is None
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert 'rotation component 2' in problems[0] and '1979-03-16' in problems[0]
+    assert 'outside weather range' in problems[0]
+
+
 @pytest.mark.parametrize('later_maturity', [False, True])
 @pytest.mark.parametrize('last', ['1989-09-22', '1989-09-23'])
 def test_fixed_crop_can_end_sequence_before_final_fallow(fixed_sequence, last, later_maturity):
