@@ -29,22 +29,24 @@ def source(cell):
     return "".join(cell.get("source", []))
 
 
-def text_values(value):
-    """Read textual output fields, skipping embedded images and their base64 data."""
+def text_values(value, html=False):
+    """Yield (text, is_html) for textual output fields, skipping embedded images."""
     if isinstance(value, str):
-        yield value
+        yield value, html
     elif isinstance(value, list):
         for item in value:
-            yield from text_values(item)
+            yield from text_values(item, html)
     elif isinstance(value, dict):
         for key, item in value.items():
             if not key.startswith("image/"):
-                yield from text_values(item)
+                yield from text_values(item, html or key == "text/html")
 
 
-def check_paths(text):
-    # Web links and HTML tags are not filesystem paths.
-    text = re.sub(r"https?://[^\s\"'<>]+|<[^>]*>", "", text)
+def check_paths(text, html=False):
+    # Web links are not filesystem paths; neither are tags in HTML outputs (never in code or plain text).
+    text = re.sub(r"https?://[^\s\"'<>]+", "", text)
+    if html:
+        text = re.sub(r"<[^>]*>", "", text)
     pattern = r"\b[A-Za-z]:[\\/]|~[\\/]|\\\\[\w.-]+[\\/]|(?<![\w./])/[\w~.-]+"
     assert not re.search(pattern, text), "absolute path or user home in code/output"
 
@@ -78,8 +80,8 @@ def check_lesson(folder):
         assert not any(out.get("output_type") == "error" for out in cell.get("outputs", [])), "error output"
         if not setup_lesson:
             check_paths(source(cell))
-            for text in text_values(cell.get("outputs", [])):
-                check_paths(text)
+            for text, html in text_values(cell.get("outputs", [])):
+                check_paths(text, html)
     assert len(cells) >= 3, "missing template section"
     title = source(cells[0]).splitlines()
     assert cells[0]["cell_type"] == "markdown" and re.fullmatch(
@@ -172,6 +174,18 @@ def test_absolute_paths_in_source_and_outputs(tmp_path):
             cells[5]["outputs"] = [{"output_type": "stream", "text": [path]}] if output else []
             save_lesson(folder, cells)
             expect_failure(folder, "absolute path")
+
+
+def test_paths_between_comparisons_and_in_reprs_caught(tmp_path):
+    folder, cells = fake_lesson(tmp_path)
+    cells[5]["source"] = '# Compare.\nif value < 10: path = "/tmp/results"\nif value > 20: pass'
+    save_lesson(folder, cells)
+    expect_failure(folder, "absolute path")
+    cells[5]["source"] = "# Read data.\nvalue = 2"
+    cells[5]["outputs"] = [{"output_type": "execute_result", "data": {
+        "text/plain": "<module 'x' from '/usr/lib/x.py'>"}}]
+    save_lesson(folder, cells)
+    expect_failure(folder, "absolute path")
 
 
 def test_web_links_relative_paths_and_images_allowed(tmp_path):
