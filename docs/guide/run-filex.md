@@ -143,6 +143,19 @@ files beside the FileX. dssatlab creates a new **run directory** beside the File
 named `dssat_run_YYYY-MM-DD_HHMMSS`. A numeric suffix is added if that name already
 exists.
 
+Pass `directory=` to create the run directory inside a folder you choose:
+
+```python
+result = dl.run("UFGA8201.MZX", directory="results/maize")
+print(result.run_dir)
+```
+
+`directory` accepts a string or `Path`. A relative path is resolved against the
+current directory at the call, and missing parents are created. A file path or
+a folder that cannot be created raises `DSSATError`, naming the path and asking
+for a writable folder. DSSAT still runs in the FileX folder. Omitting
+`directory` or passing `None` keeps the default location beside the FileX.
+
 After DSSAT exits, dssatlab moves newly created files and files whose modification
 timestamps changed into the run directory. Unchanged files stay beside the FileX.
 This also means that a pre-existing file overwritten by DSSAT is moved; its

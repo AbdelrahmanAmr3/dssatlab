@@ -58,10 +58,13 @@ class Simulation:
         name (str | None): Scenario name written to the copied treatment, even
             without experiment overrides. None and "base" keep the FileX name.
             Sequences keep their component names. Other names must fit the column.
+        directory (str | Path | None): Keyword-only parent of simulation folders.
+            Relative paths are resolved against cwd at construction; missing
+            parents are created by run(). None keeps the FileX/template default.
     """
 
     def __init__(self, filex=None, treatment=1, weather=None, executable=None, *, soil=None,
-                 management=None, name=None, filex_template=None):
+                 management=None, name=None, filex_template=None, directory=None):
         self.filex = filex
         self.filex_template = filex_template
         self.treatment = treatment
@@ -70,6 +73,7 @@ class Simulation:
         self.management = management
         self.executable = executable
         self.name = name
+        self.directory = Path(directory).resolve() if directory is not None else None
 
     def check(self, verbose: bool | None = None) -> list[str]:
         """Return all input problems without writing files or running DSSAT.
@@ -239,6 +243,8 @@ class Simulation:
         For a template, creates the folder beside its YAML (or in cwd for a dict),
         writes the FileX and SOIL.SOL, and copies the crop's genotype files from
         Genotype beside the DSSAT executable. Experiment edits then apply as usual.
+        With directory=, creates the simulation folder inside that directory;
+        the run directory stays inside the simulation folder where DSSAT runs.
         With management data, adds a new level for each section given (planting,
         irrigation, fertilizer, cultivar, initial conditions, controls) in the copy
         and repoints only the selected treatment; the original FileX is never changed.
@@ -281,7 +287,8 @@ class Simulation:
                 values["WSTA"] = station
             soil_rows, _, template_id = _simulation_soil(self, values, _overrides_section(experiment_data, self.treatment))
             filex = Path(self.filex).resolve()
-            sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder")
+            sim_folder = _create_dated_folder(filex.parent, "dssat_sim_", "simulation folder",
+                                             directory=self.directory)
             shutil.copy2(filex, sim_folder / filex.name)
             for sibling in filex.parent.iterdir():
                 if self.soil is not None and sibling.suffix.upper() == ".SOL":

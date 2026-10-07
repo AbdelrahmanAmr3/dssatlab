@@ -7,6 +7,31 @@ Prepare the FileX and its supporting files, then
 [find or install a DSSAT executable](install.md). The examples use
 `UFGA8201.MZX`; replace it with your FileX path and choose one of its treatments.
 
+## Choose where simulation folders go
+
+Pass `directory=` to place simulation folders inside a folder you choose:
+
+```python
+import dssatlab as dl
+
+sim = dl.Simulation("UFGA8201.MZX", weather="weather.csv", directory="results/maize")
+result = sim.run()
+print(result.run_dir)
+```
+
+This also works with a FileX template YAML or dict. `run_treatments()` and
+`run_sweep()` accept the same keyword and place every simulation folder inside
+it. DSSAT runs in each simulation folder, and the run directory stays inside
+that folder.
+
+`directory` accepts a string or `Path`. Relative paths use the current directory
+at construction for `Simulation`, or at the call for `run_treatments()` and
+`run_sweep()`. Missing parents are created when running; construction and
+`check()` create no folders. A file path or a folder that cannot be created
+raises `DSSATError`, naming the path and asking for a writable folder.
+With `None` (the default), simulation folders go beside the FileX or template
+YAML, or in the current directory for a dict template.
+
 ## Start from a FileX template
 
 For any of the ten template crops, supply a FileX template instead of an existing FileX:
