@@ -20,13 +20,6 @@ def checked_rows(source):
     return rows
 
 
-def test_tutorial_observed_data_passes_checks():
-    path = Path(__file__).resolve().parent.parent / "notebook" / "tutorial_data" / "my_observed.csv"
-    rows, problems = _load_observed(path)
-    assert problems == []
-    assert len(rows) == 5
-
-
 def write_csv(tmp_path, text):
     path = tmp_path / "observed.csv"
     path.write_text(text, encoding="utf-8")

@@ -1,8 +1,0 @@
-# Invented observed data for the tutorial, not real measurements.
-# HWAM: kg[dm]/ha; LAID: m2/m2; ADAT/MDAT and date: yyyy-mm-dd.
-scenario,treatment,date,HWAM,ADAT,MDAT,LAID
-base,1,,4500,1982-05-10,1982-06-28,
-base,2,,6000,1982-05-12,1982-06-30,
-base,1,1982-04-15,,,,1.8
-base,1,1982-05-15,,,,3.2
-base,2,1982-05-15,,,,4.0
