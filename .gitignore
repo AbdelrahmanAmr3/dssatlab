@@ -18,3 +18,4 @@ docs/agents/
 docs/Diagrams/
 .claude/
 site/
+course/*/runs/

@@ -1,0 +1,71 @@
+# Learn DSSAT with dssatlab
+
+Learn DSSAT with dssatlab in 16 Jupyter lessons across seven modules, from connecting to DSSAT to seasonal analysis, economics, rotations and yield forecasts. Each lesson will contain its own data and visible results, and can be run independently. The course is being built; the lesson links below become available as their notebooks are added.
+
+## How to start
+
+On **Google Colab**, open lesson 00 with its badge below, then run the cells from top to bottom.
+The shared setup cell installs `dssatlab[course]>=0.23,<0.24`, copies this repository once, and builds DSSAT.
+The first build takes a few minutes; Colab execution will be verified in T17/T18 before the course is released.
+
+On **local Windows**, use Python 3.10 or newer and install DSSAT 4.8 at `C:\DSSAT48`.
+Clone this repository and, during course development, install the course and development extras from its root:
+
+```powershell
+python -m pip install -e ".[course,dev]"
+```
+
+Open `course/00_setup/lesson.ipynb` in Jupyter or VS Code using that Python kernel.
+For later lessons, start in the lesson's folder and run every cell in order; `connect()` finds your DSSAT executable.
+The setup cell replaces `runs/` with a fresh copy of `data/`, so all results are disposable and the committed inputs stay intact.
+
+## Syllabus
+
+| # | Folder | Lesson | Case basis | dssatlab feature (guide page) | Open in Colab |
+| --- | --- | --- | --- | --- | --- |
+| M0 Start |  |  |  |  |  |
+| 00 | `00_setup` | [Setup on Colab or Windows](00_setup/lesson.ipynb) | none | `install`, `connect`, `detect` (install.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/00_setup/lesson.ipynb) |
+| 01 | `01_first_simulation` | [Your first simulation](01_first_simulation/lesson.ipynb) | stock `Maize/UFGA8201.MZX` | `run`, `read_summary`, `read_plant_growth`, `plot_plant_growth` (run-filex.md, reading-results.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/01_first_simulation/lesson.ipynb) |
+| M1 Potential production |  |  |  |  |  |
+| 02 | `02_planting_dates` | [Planting-date sweep](02_planting_dates/lesson.ipynb) | maize, Gainesville, water and N off, 7 dates 14 days apart | `Simulation`, `run_sweep` (sweeps.md, simulation.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/02_planting_dates/lesson.ipynb) |
+| 03 | `03_cultivars` | [Comparing cultivars and maturity groups](03_cultivars/lesson.ipynb) | stock `Soybean/UFGA7901.SBX` treatment 1, maturity-group cultivars swapped in by scenarios | `list_crops`, `list_cultivars`, scenarios (scenarios.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/03_cultivars/lesson.ipynb) |
+| M2 Your own site |  |  |  |  |  |
+| 04 | `04_own_weather` | [Your own weather](04_own_weather/lesson.ipynb) | stock UFGA weather written out as a CSV; optional NASA POWER cell | `write_weather_template`, weather checks, `import_nasa_power`, `summarize_weather` (simulation.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/04_own_weather/lesson.ipynb) |
+| 05 | `05_own_soil` | [Your own soil](05_own_soil/lesson.ipynb) | a stock soil profile written out as a CSV | `write_soil_template`, `summarize_soil` (soil.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/05_own_soil/lesson.ipynb) |
+| 06 | `06_experiment_from_scratch` | [An experiment from scratch](06_experiment_from_scratch/lesson.ipynb) | maize at Gainesville from lessons 04/05 data | `write_filex_template`, experiment data YAML (experiment.md, management.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/06_experiment_from_scratch/lesson.ipynb) |
+| M3 Calibration |  |  |  |  |  |
+| 07 | `07_simulated_vs_observed` | [Simulated vs observed](07_simulated_vs_observed/lesson.ipynb) | stock `Maize/UFGA8201.MZA/.MZT` | `evaluate`, `plot_observed`, `plot_evaluation`, `read_dssat_observed` (evaluate.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/07_simulated_vs_observed/lesson.ipynb) |
+| 08 | `08_new_cultivar` | [A new cultivar](08_new_cultivar/lesson.ipynb) | soybean, coefficients typed in the notebook | new cultivars (new-cultivars.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/08_new_cultivar/lesson.ipynb) |
+| M4 Water and environment |  |  |  |  |  |
+| 09 | `09_irrigation` | [Rainfed vs irrigated, automatic irrigation](09_irrigation/lesson.ipynb) | maize, rainfed vs automatic irrigation over depth x threshold | management, controls (management.md, experiment.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/09_irrigation/lesson.ipynb) |
+| 10 | `10_climate_change` | [CO2, radiation and temperature](10_climate_change/lesson.ipynb) | maize potential production with changed CO2; one radiation/temperature change | environment modifications (experiment.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/10_climate_change/lesson.ipynb) |
+| M5 Nutrients |  |  |  |  |  |
+| 11 | `11_nitrogen` | [Nitrogen rates and N fixation](11_nitrogen/lesson.ipynb) | maize rainfed/irrigated x N rates 0-200 kg/ha; one peanut N-fixation on/off comparison | fertilizer, controls | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/11_nitrogen/lesson.ipynb) |
+| 12 | `12_phosphorus` | [Phosphorus](12_phosphorus/lesson.ipynb) | stock `Maize/GHWA0401.MZX` (Wa, Ghana), P rates 0/20/40 kg P/ha at 120 kg N/ha | soil analysis, P controls | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/12_phosphorus/lesson.ipynb) |
+| M6 Long-term |  |  |  |  |  |
+| 13 | `13_seasonal_economics` | [Seasonal analysis and economics](13_seasonal_economics/lesson.ipynb) | treatment 1 plus 3 management scenarios over 10+ seasons, stock weather, stock `Economic/DEFAULT.PRI` prices | `summarize_seasons`, `net_returns` (seasonal.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/13_seasonal_economics/lesson.ipynb) |
+| 14 | `14_rotations` | [Crop rotations](14_rotations/lesson.ipynb) | stock `Sequence/MSKB8902.SQX` unchanged, run as a copied FileX | `run`, sequence results (sequence.md) | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/14_rotations/lesson.ipynb) |
+| 15 | `15_yield_forecast` | [In-season yield forecast](15_yield_forecast/lesson.ipynb) | stock `YieldForecast/CAPE2002.FCX` with `CAPE8437.WTH` | forecast | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AbdelrahmanAmr3/dssatlab/blob/master/course/15_yield_forecast/lesson.ipynb) |
+
+## Executing and checking lessons
+
+From the repository root, execute one lesson, several lessons, or all available lessons:
+
+```powershell
+python course/execute.py 01_first_simulation
+python course/execute.py 01_first_simulation 02_planting_dates
+python course/execute.py
+python -m pytest -q tests/test_course.py
+```
+
+Each lesson runs in a fresh kernel with its folder as the current directory and a 1800-second timeout per cell.
+The executor saves outputs in place and prints one status line per lesson; a failure includes the zero-based notebook cell index and error and returns a nonzero exit status.
+Run each lesson twice before review to prove the setup can be repeated.
+
+Use the exact `SETUP_CELL` from `tests/test_course.py` in lessons 01-15, immediately after the one-line `LESSON = "NN_slug"` cell.
+Lesson 00 explains setup instead and may show machine paths; later lessons show only paths relative to the lesson folder.
+Follow the [lesson template and checks in the course spec](https://github.com/AbdelrahmanAmr3/dssatlab/issues/326).
+
+Every lesson keeps its committed inputs in `data/` and inventories them exactly once in `data/SOURCE.md`, with columns `file | origin | what it is`.
+Use only stock DSSAT 4.8 data or data written for the course; unchanged genotype files come from the installed DSSAT data directory.
+Record API difficulties in the lesson's `FRICTION.md` as blocking or non-blocking, for the reviewer to triage.
