@@ -84,6 +84,25 @@ in saved config, a JSON file with an `executable` entry:
 Later discovery reuses that path if it still passes the file and permission
 checks. An unreadable or invalid saved config is ignored during discovery.
 
+### Use DSSAT with a read-only profile
+
+`connect()` saves config even when it discovers an existing DSSAT executable.
+If your profile cannot be written, use `detect()` and pass the discovered path
+explicitly through `executable=` to `run()`, `Simulation`, `run_treatments()` or
+`run_sweep()`. This avoids saving config; your FileX and run location still need
+to be writable.
+
+```python
+dssat = dl.detect()["dssat_path"]
+if dssat is None:
+    raise RuntimeError(
+        "DSSAT discovery found no executable. Checked saved config, DSSAT_HOME, "
+        "platform defaults and the Linux managed cache. "
+        "Pass your installed DSSAT path through executable=."
+    )
+result = dl.run("UFGA8201.MZX", executable=dssat)
+```
+
 ## Install on Linux or Colab
 
 `install()` never prompts. It requires `git`, `cmake`, and `gfortran` on `PATH`

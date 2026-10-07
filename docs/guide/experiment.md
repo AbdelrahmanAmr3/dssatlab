@@ -7,6 +7,11 @@ start (**initial conditions**), measured **soil analysis**, dated **environment 
 and how the simulation is **controlled**. dssatlab applies it to a copy of your FileX; the
 original is never changed. You still start from a FileX you already have.
 
+Pass all experiment data through `management=`, including `cultivar` and its
+`coefficients`: use `management=experiment` when your dict is named `experiment`,
+or `management="experiment.yaml"` for a YAML file. The argument name also covers
+these sections beyond planting, irrigation and fertilizer.
+
 ## Generate the experiment template
 
 ```python
@@ -165,6 +170,11 @@ MODIFICATIONS level (ME) for a treatment of a copied FileX or a FileX template.
 From an event's date onwards, DSSAT uses that event until the next one; on each
 day it uses the last event dated on or before that day. The source weather file
 and dssatlab's weather checks stay unchanged.
+
+To inspect the effective changes, use `dl.read_weather(result.run_dir)`.
+Experiment data names `co2`, `tmax`, `tmin` and `srad` appear in Weather output
+as `CO2D` (ppm), `TMXD` (degrees C), `TMND` (degrees C) and `SRAD` (MJ/m²/day),
+respectively. The reader keeps DSSAT's output column names.
 
 ```yaml
 treatments:
@@ -378,6 +388,13 @@ events under either code. IREFF applies to **automatic irrigation**; the
 `irrigation` dict's `efficiency` (EFIR) applies to **that irrigation level's events**.
 See [irrigation timing and efficiency](management.md#irrigation-timing-and-efficiency)
 for day events (`days_after_planting`, IDATE), the dict form and the IRRIG checks.
+
+The AUTO-IRR percentages refer to plant-available water within
+`auto_irrigation_depth`: 0% is the soil's lower limit and 100% is its drained
+upper limit. `auto_irrigation_threshold` triggers irrigation when the remaining
+available water falls below that percentage; under `"A"`,
+`auto_irrigation_refill: 100` targets the drained upper limit. Both percentages
+must be from 0 to 100; depth is in cm and must be above 0.
 
 ```yaml
 treatments:

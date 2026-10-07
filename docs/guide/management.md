@@ -122,6 +122,13 @@ Values use DSSAT's native units without automatic conversion:
 | `fertilizer` | `p` | No | kg/ha | Elemental phosphorus applied; must be nonnegative (`>= 0`, defaults to 0) |
 | `fertilizer` | `k` | No | kg/ha | Elemental potassium applied; must be nonnegative (`>= 0`, defaults to 0) |
 
+dssatlab writes fertilizer amounts as supplied. DSSAT rounds each application
+to whole kg/ha when it prepares its internal inputs: two applications of
+37.5 kg N/ha remain 37.5 in the copied FileX but become 38 each in DSSAT, so
+Summary reports `NICM = 76`, rather than the requested total of 75. Compare
+requested nitrogen with `NICM` when interpreting fractional rates; dssatlab
+adds no rounding or check for this difference.
+
 ## Irrigation timing and efficiency
 
 An event gives exactly one of `date` or `days_after_planting` (DSSAT IDATE).

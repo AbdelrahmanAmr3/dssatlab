@@ -87,6 +87,13 @@ not select seed 2510.** With the same inputs and DSSAT executable, a fixed seed
 repeats the generated weather results, including seed 0. In the verified W and S
 examples, seed 1234 repeated on rerun and seed 4321 changed the results.
 
+A common seed reproduces each management option, but does not guarantee the
+same generated daily weather across different options. In the seasonal soybean
+comparison, options with seed 1234 had different rainfall in later seasons.
+Treat them as separate weather samples and avoid attributing their differences
+solely to irrigation. For a comparison using shared weather, supply the same
+measured weather to each option with `weather_source: "M"`, covering every season.
+
 ## Replicate a sequence and read every row
 
 For a copied [sequence FileX](sequence.md), set the controls at treatment level:

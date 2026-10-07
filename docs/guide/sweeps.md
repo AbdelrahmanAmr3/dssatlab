@@ -166,6 +166,41 @@ line with a new `DLnnnn` code, and its copied FileX points at that code. The sou
 (`None` for base). See [coefficient checks](experiment.md#cultivar-coefficients) and
 [ADR 0017](../adr/0017-cultivar-coefficients-as-a-changed-cul-line.md).
 
+## Automatic-irrigation depth by threshold
+
+Depth and threshold both belong to `controls`, so build their grid inside one
+factor. Each value replaces the whole base controls section; retain water,
+nitrogen, refill, method and efficiency in every value. This example uses
+numeric labels 1 to 4, then recovers both numeric settings for plotting:
+
+```python
+from itertools import product
+
+controls_grid = {
+    label: {"water": "Y", "nitrogen": "N", "irrigation_management": "A",
+            "auto_irrigation_depth": depth, "auto_irrigation_threshold": threshold,
+            "auto_irrigation_refill": 100, "auto_irrigation_method": "IR001",
+            "auto_irrigation_efficiency": 1}
+    for label, (depth, threshold) in enumerate(product((15, 30), (30, 50)), 1)
+}
+rows = dl.run_sweep(
+    "UFGA8201.MZX", "weather.csv", treatments=[1],
+    management={"treatments": {1: {
+        "irrigation": [],
+        "controls": {"water": "Y", "nitrogen": "N", "irrigation_management": "N"},
+    }}},
+    factors={"controls": controls_grid},
+)
+grid_rows = [dict(row, depth=controls_grid[row["controls"]]["auto_irrigation_depth"],
+                 threshold=controls_grid[row["controls"]]["auto_irrigation_threshold"])
+             for row in rows if row["controls"] is not None]
+```
+
+`irrigation: []` keeps reported events out of every combination. The unchanged
+rainfed base has `controls=None` and is left out of `grid_rows`. See
+[automatic management](experiment.md#automatic-management) for the percentage basis
+and allowed ranges.
+
 ## Scope
 
 Sweeping `cultivar` can select existing cultivar codes or change their coefficients.
