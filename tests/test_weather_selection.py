@@ -294,3 +294,39 @@ def test_rollover_file_with_old_year_records_fails_in_that_file(tmp_path, monkey
                                       date(1983, 1, 2))
     assert len(problems) == 1
     assert all(part in problems[0] for part in ("UFGA8301.WTH", "1983-01-01", "Checked", "Supply"))
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stock_station_values_can_change_between_yearly_files(tmp_path, reverse):
+    sim = period(tmp_path)
+    first = stock_file(tmp_path, "UFGA8201.WTH", days=days("1982-12-30", "1982-12-31"))
+    second = stock_file(tmp_path, "UFGA8301.WTH", days=days("1983-01-01", "1983-01-02"))
+    first.write_bytes(first.read_bytes().replace(b"    10", b"   285"))
+    second.write_bytes(second.read_bytes().replace(b"    10", b"   200"))
+    sim.weather = [second, first] if reverse else [first, second]
+    assert sim.check(False) == []
+
+
+@pytest.mark.parametrize("cross_file", [False, True])
+def test_stock_coverage_reports_missing_day_even_with_duplicates(tmp_path, cross_file):
+    sim = period(tmp_path)
+    if cross_file:
+        first = stock_file(tmp_path, "UFGA8201.WTH", days=days("1982-12-30", "1982-12-31"))
+        second = stock_file(tmp_path, "UFGA8301.WTH", days=[date(1983, 1, 2)] * 2, wide=True)
+        sim.weather = [second, first]
+        missing = "1983-01-01"
+    else:
+        sim.weather = stock_file(tmp_path, "UFGA8201.WTH", days=[
+            date(1982, 12, 30), date(1982, 12, 30), date(1983, 1, 2)])
+        missing = "1982-12-31"
+    problems = sim.check(False)
+    assert len(problems) == 1
+    assert all(part in problems[0] for part in (missing, "Checked", "Supply"))
+    assert "duplicate" not in problems[0]
+
+
+def test_stock_gaps_outside_fixed_harvest_period_are_not_checked(tmp_path):
+    sim = period(tmp_path, "82056", "82057")
+    sim.weather = stock_file(tmp_path, "UFGA8201.WTH", days=[
+        date(1982, 1, 1), date(1982, 2, 25), date(1982, 2, 26), date(1982, 12, 31)])
+    assert sim.check(False) == []

@@ -39,6 +39,14 @@ still raises `DSSATRunError` when DSSAT runs out of measured weather.
 
 ::: dssatlab.Simulation
 
+With a copied FileX, stock `.WTH` paths are copied unchanged. `check()` checks
+structure, filename selection, century handling and required date coverage,
+including cross-file gaps, using the set of dates present. Template value ranges,
+identical station values and duplicate-date checks apply only to template weather.
+DSSAT reads the stock values itself; `run()` still raises `DSSATRunError` when
+`WARNING.OUT` reports missing weather. Stock forecasts keep their existing
+coverage exemption. See [stock weather files](../guide/simulation.md#use-stock-weather-files).
+
 ::: dssatlab.write_weather_template
 
 Weather template columns are `station`, `latitude`, `longitude`, `elevation`,

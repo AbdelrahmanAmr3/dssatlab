@@ -22,7 +22,7 @@ def _header_spans(header):
 
 
 def _stock_number(value):
-    """Drop one trailing letter flag; leave bad values for weather checks."""
+    """Drop one trailing letter flag; DSSAT checks the stock values itself."""
     value = value.strip()
     flagged = re.fullmatch(r"([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))[A-Za-z]", value)
     if flagged:
@@ -60,7 +60,7 @@ def _weather_date(value, previous_year, *, start_date=None):
 
 
 def _read_weather_file(path):
-    """Return line-numbered weather template rows with unresolved date codes."""
+    """Return line-numbered stock rows with unresolved date codes."""
     try:
         lines = path.read_text(encoding="latin-1").splitlines()
     except (OSError, ValueError) as error:
@@ -122,7 +122,7 @@ def _read_weather_file(path):
 
 
 def _read_stock_weather(source, start_date=None) -> tuple[list[dict], list[str]]:
-    """Read a stock path or list of paths into weather template rows and problems.
+    """Read a stock path or list of paths into stock rows and problems.
 
     Without start_date, check structure and leave date codes unresolved.
     Otherwise start_date supplies the weather century. Files and rows keep
@@ -281,3 +281,19 @@ def _weather_anchor_problems(anchor, dates):
     return problems
 
 
+def _stock_weather_gaps(rows, start, end):
+    """Check coverage inside the required period, using the set of stock dates."""
+    days = sorted({row["date"] for row in rows})
+    problems = []
+    for earlier, later in zip(days, days[1:]):
+        if (later - earlier).days <= 1:
+            continue
+        first = max(start, earlier + timedelta(days=1))
+        last = min(end, later - timedelta(days=1))
+        if first > last:
+            continue
+        missing = f"date {first}" if first == last else f"dates {first} to {last}"
+        problems.append(f"Stock weather: missing {missing}. "
+                        f"Checked dates present in the selected files from {start} through {end}. "
+                        "Supply stock weather covering every day in that period.")
+    return problems
