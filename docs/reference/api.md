@@ -140,6 +140,10 @@ See [Summarise your weather and soil before a run](../guide/simulation.md#summar
 
 ::: dssatlab.run_sweep
 
+`run_sweep(..., base=True)` includes unchanged inputs first (the default).
+Pass `base=False` to check and run only the factor combinations and return no
+`"base"` rows. `base` must be a bool; other values raise `DSSATCheckError`.
+
 ::: dssatlab.combine_summaries
 
 ::: dssatlab.summarize_seasons
