@@ -47,7 +47,7 @@ def check_paths(text, html=False):
     text = re.sub(r"https?://[^\s\"'<>]+", "", text)
     if html:
         text = re.sub(r"<[^>]*>", "", text)
-    pattern = r"\b[A-Za-z]:[\\/]|~[\\/]|\\\\[\w.-]+[\\/]|(?<![\w./])/[\w~.-]+"
+    pattern = r"\b[A-Za-z]:[\\/]|~[\\/]|(?<![\w.\\])\\\\[\w.-]+[\\/]|(?<![\w./])/[\w~.-]+"
     assert not re.search(pattern, text), "absolute path or user home in code/output"
 
 
@@ -174,6 +174,15 @@ def test_absolute_paths_in_source_and_outputs(tmp_path):
             cells[5]["outputs"] = [{"output_type": "stream", "text": [path]}] if output else []
             save_lesson(folder, cells)
             expect_failure(folder, "absolute path")
+
+
+def test_escaped_relative_windows_paths_allowed(tmp_path):
+    folder, cells = fake_lesson(tmp_path)
+    escaped = repr("runs\\weather\\UFGA8201.WTH")
+    cells[5]["source"] = f"# Read data.\nfile = {escaped}"
+    cells[5]["outputs"] = [{"output_type": "execute_result", "data": {"text/plain": escaped}}]
+    save_lesson(folder, cells)
+    check_course(tmp_path)
 
 
 def test_paths_between_comparisons_and_in_reprs_caught(tmp_path):
