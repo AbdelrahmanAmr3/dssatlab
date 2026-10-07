@@ -92,12 +92,25 @@ def test_zero_levels_omit_sections_even_when_sections_are_absent(filex):
 
 
 def test_names_are_ignored(filex):
+    entry = dl.read_experiment(filex)
     for section, column in (("PLANTING DETAILS", "PLNAME"),
                             ("FERTILIZERS", "FERNAME"),
                             ("IRRIGATION AND WATER MANAGEMENT", "IRNAME")):
         _change(filex, section, column, "name")
-    entry = dl.read_experiment(filex)
-    assert all("name" not in value for value in entry.values())
+        assert dl.read_experiment(filex) == entry
+
+
+@pytest.mark.parametrize("treatment,event_level,event_number", [
+    (1, 1, 9), (1, 2, 1), (3, 2, 1),
+])
+def test_irrigation_events_follow_control_block(filex, treatment, event_level, event_number):
+    entry = dl.read_experiment(filex, treatment)
+    text = filex.read_text(encoding="utf-8")
+    event = f" {event_level} 82063 IR001    13"
+    assert event in text
+    filex.write_text(text.replace(event, f" {event_number} 82063 IR001    13"),
+                     encoding="utf-8")
+    assert dl.read_experiment(filex, treatment) == entry
 
 
 @pytest.mark.parametrize("section,column,value", [
@@ -209,10 +222,13 @@ def test_missing_treatment_and_unreadable_path(filex, tmp_path):
         dl.read_experiment(None)
 
 
-def test_sequence_is_rejected(filex):
+@pytest.mark.parametrize("number", [" 1", "01"])
+def test_sequence_is_rejected(filex, number):
     text = filex.read_text(encoding="utf-8")
     line = next(line for line in text.splitlines() if line.startswith(" 1 1 0 0"))
-    filex.write_text(text.replace(line, line + "\n" + line.replace(" 1 1 ", " 1 2 ", 1)),
+    first = number + line[2:]
+    second = number + " 2" + line[4:]
+    filex.write_text(text.replace(line, first + "\n" + second),
                      encoding="utf-8")
     with pytest.raises(dl.DSSATCheckError, match="sequences"):
         dl.read_experiment(filex)

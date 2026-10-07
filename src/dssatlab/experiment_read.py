@@ -19,6 +19,7 @@ def _level_rows(text, section, key, level):
     if bounds is None:
         raise ValueError(f"{where}: section is missing. Supply the referenced section.")
     rows, columns = [], {}
+    selected = False
     for line in lines[bounds[0] + 1:bounds[1]]:
         if line.startswith("@"):
             columns = _columns(line)
@@ -28,7 +29,10 @@ def _level_rows(text, section, key, level):
                 number = int(line[:3])
             except ValueError:
                 continue
-            if number == level:
+            # Irrigation events belong to the preceding control row's block.
+            if section != "IRRIGATION AND WATER MANAGEMENT" or "EFIR" in columns:
+                selected = number == level
+            if selected:
                 row = {name: line[max(start, 3) if name != key else start:end].strip()
                        for name, (start, end) in columns.items()}
                 row[key] = str(number)
@@ -214,7 +218,7 @@ def read_experiment(filex: str | Path, treatment: int | str = 1) -> dict:
         rows = _treatment_rows(text, problems)
         if problems:
             raise ValueError("; ".join(problems))
-        if sum(number == str(treatment) for _, (number, _) in rows) > 1:
+        if sum(int(number) == treatment for _, (number, _) in rows if number) > 1:
             raise ValueError("sequences (several TREATMENTS rows for this number) are "
                              "not supported. Choose a one-row treatment.")
         row = _section_row(text, "TREATMENTS", "N", treatment, ("MP", "MF", "MI", "SM"))
