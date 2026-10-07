@@ -17,6 +17,66 @@ def test_sweep_public_api():
     assert "run_sweep" in lab.__all__
 
 
+@pytest.mark.parametrize("options,names", [
+    ({}, ["base", "first", "second"]),
+    ({"base": True}, ["base", "first", "second"]),
+    ({"base": False}, ["first", "second"]),
+])
+def test_base_selection_before_checks_and_runs(batch_inputs, fake_dssat, monkeypatch,
+                                               options, names):
+    from dssatlab import scenarios
+    checked = []
+    check = scenarios.Simulation._check_inputs
+
+    def record(sim, *args, **kwargs):
+        checked.append((sim.name, sim.treatment))
+        return check(sim, *args, **kwargs)
+
+    monkeypatch.setattr(scenarios.Simulation, "_check_inputs", record)
+    fake_dssat.outputs["Summary.OUT"] = SUMMARY.read_bytes()
+    result = lab.run_sweep(batch_inputs.filex, batch_inputs.rows, treatments=[3, 1],
+                          factors={"controls": {"first": {}, "second": {}}}, **options)
+    expected = [(name, treatment) for name in names for treatment in (3, 1)]
+    assert list(dict.fromkeys(checked)) == expected
+    assert len(fake_dssat.calls) == len(expected)
+    assert [(row["scenario"], row["treatment"]) for row in result] == [
+        key for key in expected for _ in range(2)]
+    assert [row["controls"] for row in result] == [
+        None if name == "base" else name for name, _ in expected for _ in range(2)]
+
+
+def test_base_false_allows_section_replaced_by_factors(batch_inputs, fake_dssat):
+    management = {"treatments": {1: {"planting": {}}}}
+    factors = {"planting": {"early": {"date": "1982-02-25", "method": "S",
+                                      "distribution": "R", "population": 7.2,
+                                      "row_spacing": 61, "depth": 5},
+                            "late": {"date": "1982-02-26", "method": "S",
+                                     "distribution": "R", "population": 7.2,
+                                     "row_spacing": 61, "depth": 5}}}
+    original = deepcopy((management, factors))
+    with pytest.raises(lab.DSSATCheckError, match="Scenario 'base', treatment 1"):
+        lab.run_sweep(batch_inputs.filex, batch_inputs.rows, treatments=[1],
+                      management=management, factors=factors)
+    assert fake_dssat.calls == []
+
+    fake_dssat.outputs["Summary.OUT"] = SUMMARY.read_bytes()
+    result = lab.run_sweep(batch_inputs.filex, batch_inputs.rows, treatments=[1],
+                          management=management, factors=factors, base=False)
+    assert [row["scenario"] for row in result] == ["early", "early", "late", "late"]
+    assert len(fake_dssat.calls) == 2
+    assert (management, factors) == original
+
+
+@pytest.mark.parametrize("base", [None, 0, 1, "False", [], {}])
+def test_base_requires_bool(base, monkeypatch):
+    from dssatlab import sweep
+    monkeypatch.setattr(sweep, "run_treatments", lambda **kwargs: pytest.fail("must not run"))
+    with pytest.raises(lab.DSSATCheckError) as error:
+        lab.run_sweep("unused.MZX", treatments=[1], base=base, factors={"unknown": {"x": {}}})
+    assert len(error.value.problems) == 2
+    assert f"Sweep base: found {base!r}; checked for a bool. Supply base=True or base=False." in error.value.problems
+
+
 @pytest.mark.parametrize("source_form", ["dict", "yaml", "none"])
 def test_grid_merge_and_rows(batch_inputs, fake_dssat, monkeypatch, tmp_path, source_form):
     from dssatlab import scenarios
@@ -109,7 +169,8 @@ def test_all_copied_filex_treatments(batch_inputs, fake_dssat):
     assert all(r["controls"] == 1 and type(r["controls"]) is int for r in result[6:])
 
 
-def test_all_template_treatments(data, rows, installed, tmp_path):
+@pytest.mark.parametrize("base", [True, False])
+def test_all_template_treatments(data, rows, installed, tmp_path, base):
     yaml = pytest.importorskip("yaml")
     data["treatments"] = [data.pop("treatment_name"), "Second"]
     source = tmp_path / "template.yaml"
@@ -117,9 +178,10 @@ def test_all_template_treatments(data, rows, installed, tmp_path):
     installed.outputs["Summary.OUT"] = SUMMARY.read_bytes()
     result = lab.run_sweep(filex_template=source, weather=rows[0], soil=rows[1],
                           factors={"controls": {"dry": {"water": "N"}}},
-                          executable=installed.executable)
+                          executable=installed.executable, base=base)
     assert [(r["scenario"], r["treatment"]) for r in result[::2]] == [
-        ("base", 1), ("base", 2), ("dry", 1), ("dry", 2)]
+        (name, treatment) for name in (["base", "dry"] if base else ["dry"])
+        for treatment in (1, 2)]
 
 
 @pytest.mark.parametrize("output", [None, b"bad summary"])
@@ -193,10 +255,11 @@ def test_name_errors_collected_with_shape_errors(monkeypatch):
     assert any("more than one combination" in p for p in error.value.problems)
 
 
-def test_section_and_name_checks_precede_runs(batch_inputs, fake_dssat):
+@pytest.mark.parametrize("base", [True, False])
+def test_section_and_name_checks_precede_runs(batch_inputs, fake_dssat, base):
     with pytest.raises(lab.DSSATCheckError) as error:
         lab.run_sweep(batch_inputs.filex, batch_inputs.rows, treatments=[1, 3],
-                      factors={"planting": {"x" * 40: {}, "short": {}}})
+                      factors={"planting": {"x" * 40: {}, "short": {}}}, base=base)
     for name in ("x" * 40, "short"):
         for treatment in (1, 3):
             assert any(f"Scenario {name!r}, treatment {treatment}:" in p

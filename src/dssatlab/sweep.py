@@ -15,7 +15,7 @@ _SECTIONS = ("planting", "irrigation", "fertilizer", "residues", "tillage", "har
 
 
 def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None,
-              management=None, executable=None, filex_template=None) -> list[dict]:
+              management=None, executable=None, filex_template=None, base=True) -> list[dict]:
     """Check every grid combination and treatment, then return labelled Summary rows.
 
     Supply a non-empty ``factors`` dict mapping experiment data section names to
@@ -32,7 +32,9 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
     All sweep problems raise one DSSATCheckError before run_treatments is called.
     Its Simulation checks validate section values and scenario names before any
     run; the first DSSATRunError stops the sweep and names kept run directories.
-    Base runs first. Each Summary row gains scenario, treatment, factor labels
+    ``base=True`` runs unchanged inputs first. With ``base=False``, unchanged
+    inputs are neither checked nor run, and no base rows are returned. Supply
+    a bool. Each Summary row gains scenario, treatment, factor labels
     (None for base), and run_dir (Path). Missing or malformed Summary.OUT raises
     DSSATOutputError, as for combine_summaries.
 
@@ -40,9 +42,12 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
         factors={"cultivar": {p1: {"crop": "MZ", "code": "IB0035",
                  "coefficients": {"P1": p1}} for p1 in (200, 259, 320)}}
     """
-    base, problems = _load_management(management)
+    experiment, problems = _load_management(management)
     if management is None:
-        base = {"treatments": {}}
+        experiment = {"treatments": {}}
+    if not isinstance(base, bool):
+        problems.append(f"Sweep base: found {base!r}; checked for a bool. "
+                        "Supply base=True or base=False.")
     if not isinstance(factors, dict) or not factors:
         problems.append("Sweep factors: supply a non-empty dict of experiment data sections "
                         "to labelled values, such as {'fertilizer': {0: [], 60: [...]}}.")
@@ -83,7 +88,7 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
 
     scenarios = {}
     for name, labels in labels_by_name.items():
-        merged = deepcopy(base)
+        merged = deepcopy(experiment)
         # Malformed experiment data is left for Simulation's existing checks.
         entries = merged.get("treatments") if isinstance(merged, dict) else None
         if isinstance(entries, dict):
@@ -109,7 +114,8 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
 
     results = run_treatments(filex=filex, weather=weather, treatments=treatments,
                              soil=soil, management=management, executable=executable,
-                             filex_template=filex_template, scenarios=scenarios)
+                             filex_template=filex_template, scenarios=scenarios,
+                             _include_base=base)
     rows = combine_summaries(results)
     for row in rows:
         name = row["scenario"]

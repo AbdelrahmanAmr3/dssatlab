@@ -16,15 +16,16 @@ from .climate import _select_batch_weather
 _ALLOWED = ("weather", "soil", "management")
 
 
-def _scenario_inputs(source):
-    """Return (name, overrides, problems) entries, starting with unchanged base."""
+def _scenario_inputs(source, include_base=True):
+    """Return (name, overrides, problems) entries, optionally starting with base."""
     data, problems = _load_yaml(source, "Scenario", "scenario names as keys")
-    entries = [("base", {}, problems)]
-    if source is None or problems:
-        return entries
-    if not isinstance(data, dict):
+    if source is not None and not problems and not isinstance(data, dict):
         problems.append("Scenarios must be a mapping of names to override dicts. "
                         "Supply a dict or a YAML path.")
+    entries = [("base", {}, problems)] if include_base else []
+    if source is None or problems:
+        if problems and not include_base:
+            raise DSSATCheckError(problems)
         return entries
     for name, overrides in data.items():
         found = []
@@ -44,6 +45,8 @@ def _scenario_inputs(source):
             problems.extend(found)
         else:
             entries.append((name, {k: v for k, v in overrides.items() if k in _ALLOWED}, found))
+    if problems and not include_base:
+        raise DSSATCheckError(problems)
     return entries
 
 
@@ -70,7 +73,8 @@ def _select_treatments(filex, filex_template, treatments):
 
 
 def run_treatments(filex=None, weather=None, treatments=None, soil=None, management=None,
-                   executable=None, scenarios=None, filex_template=None) -> dict[tuple[str, int], RunResult]:
+                   executable=None, scenarios=None, filex_template=None,
+                   *, _include_base=True) -> dict[tuple[str, int], RunResult]:
     """Check every scenario/treatment, then run each in its own simulation folder.
 
     Supply exactly one of ``filex`` (a FileX path) or ``filex_template`` (a YAML
@@ -107,7 +111,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
 
     base = dict(weather=weather, soil=soil, management=management)
     simulations, problems = [], []
-    for name, overrides, scenario_problems in _scenario_inputs(scenarios):
+    for name, overrides, scenario_problems in _scenario_inputs(scenarios, include_base=_include_base):
         inputs = {**base, **overrides}
         selected = [Simulation(filex, treatment, filex_template=filex_template,
                                executable=executable, name=name, **inputs)

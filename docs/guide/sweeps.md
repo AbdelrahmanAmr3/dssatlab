@@ -55,7 +55,7 @@ March 12 combinations at 0, 60 and 120.
 
 ## Base inputs and section replacement
 
-All arguments except `factors` mean the same as for
+All arguments except `factors` and `base` mean the same as for
 [`run_treatments()`](scenarios.md). Supply exactly one of `filex` or
 `filex_template`; a FileX template requires soil data. `treatments=None` selects
 all FileX treatments once in file order, or treatments 1..N for a template.
@@ -75,8 +75,26 @@ missing treatment entry is added under its integer number. No section fields
 or event lists are partially merged. Original FileX, YAML and data files are
 left untouched.
 
-The unchanged base runs first under scenario `"base"`, with every factor column
-set to `None`. Each combination then runs through `run_treatments()` as a scenario.
+By default (`base=True`), the unchanged base runs first under scenario `"base"`,
+with every factor column set to `None`. Pass `base=False` to check and run only
+the combinations: unchanged inputs are neither checked nor run, and no `"base"`
+rows are returned. This also permits a base experiment data section that only
+becomes valid when replaced by a factor. Every resulting combination must still
+pass the checks. `base` must be a bool; other values are sweep problems.
+
+For example, these two planting dates produce three rows with the base included,
+or two rows with it omitted (one season and one treatment):
+
+```python
+factors = {"planting": {d: dict(planting, date=d)
+                        for d in ("1982-02-26", "1982-03-12")}}
+with_base = dl.run_sweep("UFGA8201.MZX", "weather.csv", treatments=[1],
+                         factors=factors, base=True)
+combinations = dl.run_sweep("UFGA8201.MZX", "weather.csv", treatments=[1],
+                            factors=factors, base=False)
+```
+
+Each combination runs through `run_treatments()` as a scenario.
 Its name is the labels converted to strings and joined by one space in factor
 order, for example `"1982-03-12 60"`. This name is also written into the copied
 FileX's treatment name (`TNAME`/`TNAM`). **Keep labels short:** the joined name must
@@ -95,7 +113,7 @@ the error names the kept run directories.
 
 ## Read the rows
 
-There is one dict per Summary row, in run order (base first). Its columns are
+There is one dict per Summary row, in run order (base first when included). Its columns are
 the original Summary columns, then `scenario`, `treatment`, one key per factor
 holding its label, and `run_dir` (a `Path`). A seasonal analysis or sequence can
 produce several rows per run. Missing or malformed `Summary.OUT` raises
