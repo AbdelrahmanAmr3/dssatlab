@@ -3,11 +3,11 @@
 No blocking dssatlab friction was found on the stock Gainesville case.
 The lesson uses only public dssatlab API and unchanged stock inputs.
 
-## 1. Selecting dated observations requires a manual coverage audit — non-blocking
+## 1. Main friction: selecting dated observations requires a manual filter — non-blocking
 
 - **What the student must do:** Read Plant growth, build treatment/date pairs, select matching FileT rows, and display the excluded rows before calling `evaluate()`.
 - **Why it is awkward:** The stock FileT includes six measurements on 8 July 1982, but simulated growth ends on 4 July; `evaluate()` correctly rejects unmatched dates, while `plot_observed()` correctly displays them. A beginner must build a filtering and reporting step to understand the different requirements.
-- **Suggested change:** Add a public coverage-report helper that returns matched observations and explicit exclusions with reasons; retain strict matching in `evaluate()` and never silently drop data.
+- **Suggested change:** Let `evaluate()` report observations without a simulated day, for example by returning them as excluded rows with reasons, so students do not need the manual filter. Report every exclusion rather than silently dropping observations.
 - **Classification:** **non-blocking**; ordinary Python treatment/date membership checks select 72 of 78 dated rows without changing any measurements or DSSAT files.
 
 ## 2. Default plot labels omit meanings and units — non-blocking
@@ -30,7 +30,8 @@ The case is stock `Maize/UFGA8201.MZX`, all six Gainesville maize treatments, cu
 No additional case inputs or genotype files are bundled.
 
 All six observed treatments are simulated. Each has 13 dated measurements and 12 exact matches in Plant growth, from 26 February to 4 July 1982; the six dated rows on 8 July are excluded from Evaluation and retained in both growth plots.
-The lesson deliberately selects HWAM, ADAT and MDAT from FileA and LAID and GWAD from the matched FileT rows; other supported measurements are not part of that comparison, and the exercise evaluates CWAD.
+`evaluate()` accepts all FileA rows plus the matched FileT rows directly, including their other supported measurement columns; no column-filtering dictionaries are needed.
+The lesson displays statistics for HWAM, ADAT, MDAT, LAID and GWAD, and the exercise displays CWAD by default.
 The reader omits unsupported stock columns and unmeasured `-99` values.
 
 Simulated HWAM for treatments 1–6 is 2293, 2293, 8207, 11854, 7718 and 10293 kg/ha, versus observed 2929, 3130, 6850, 11881, 6375 and 9344 kg/ha.
@@ -47,4 +48,5 @@ The executable identifies itself in the run output as DSSAT 4.8.5.017 pre-releas
 Both final consecutive `python course/execute.py 07_simulated_vs_observed` runs printed `07_simulated_vs_observed: ok`.
 All 15 tests in `tests/test_course.py` passed with `--basetemp` outside the worktree and `-p no:cacheprovider`; no test temporary folders were created in the worktree.
 The exercise also passed in a fresh kernel with only LESSON, setup and tools cells before it; its default CWAD result does not depend on earlier lesson cells.
-All four inline plots were visually inspected for readable labels and dates. The setup cell is exact, the five stock input copies are byte-identical, and notebook encoding searches for `??`, `m?` and ` ? ` found no corruption.
+The lesson shows three inline plots for LAID, GWAD and HWAM; the shorter exercise shows a statistics table.
+The setup cell remains byte-identical to `tests/test_course.py`'s `SETUP_CELL`, and stock inputs are unchanged.
