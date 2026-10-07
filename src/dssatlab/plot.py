@@ -13,6 +13,41 @@ from .runner import RunResult
 
 _EXCLUDED_COLUMNS = {"YEAR", "DOY", "DATE", "RUNNO", "TRNO"}
 
+# Meanings and native units from DSSAT DATA.CDE; weights are dry matter.
+# Leaf area index is leaf area per ground area; Summary dates use YrDoy.
+_VARIABLE_LABELS = {
+    "LAID": ("leaf area index", "m²/m²"),
+    "CWAD": ("total crop weight minus roots", "kg/ha"),
+    "GWAD": ("grain weight", "kg/ha"),
+    "HWAD": ("harvest product weight", "kg/ha"),
+    "HWAM": ("yield at harvest maturity", "kg/ha"),
+    "CWAM": ("biomass at maturity (total crop minus roots)", "kg/ha"),
+    "SWXD": ("extractable water", "mm"),
+    "LWAD": ("leaf weight", "kg/ha"),
+    "SWAD": ("stem weight", "kg/ha"),
+    "RWAD": ("root weight", "kg/ha"),
+    "PWAD": ("pod weight", "kg/ha"),
+    "NWAD": ("nodule weight", "kg/ha"),
+    "ADAT": ("anthesis date", "YrDoy"),
+    "MDAT": ("physiological maturity date", "YrDoy"),
+}
+
+
+def _variable_label(variable, *, include_meaning=True):
+    if variable not in _VARIABLE_LABELS:
+        return variable
+    meaning, unit = _VARIABLE_LABELS[variable]
+    label = f"{variable}: {meaning}" if include_meaning else variable
+    return f"{label} ({unit})"
+
+
+def _format_date_axis(axis):
+    from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
+
+    locator = AutoDateLocator()
+    axis.set_major_locator(locator)
+    axis.set_major_formatter(ConciseDateFormatter(locator))
+
 
 def plot_observed(results: RunResult | dict[tuple[str, int], RunResult], observed, variable: str):
     """Draw Plant growth curves and observed points (v0.9 stories 18–23).
@@ -21,6 +56,9 @@ def plot_observed(results: RunResult | dict[tuple[str, int], RunResult], observe
     A single run uses scenario 'base' and its Summary treatments. Each observed
     scenario/treatment gets one line and matching-colour markers, including
     measurements outside the simulated season; dates are never paired.
+    Known variables show meaning and unit on the y axis; others show the code.
+    Dates use ConciseDateFormatter; legends over four entries use two columns
+    and small text.
 
     Return the matplotlib Axes. Input and output problems raise one
     DSSATCheckError before drawing. Summary variables, variables without dated
@@ -93,8 +131,12 @@ def plot_observed(results: RunResult | dict[tuple[str, int], RunResult], observe
                    [row[variable] for row in measurements], color=line.get_color())
     ax.set_title(f"{variable}: simulated and observed")
     ax.set_xlabel("Date")
-    ax.set_ylabel(variable)
-    ax.legend()
+    ax.set_ylabel(_variable_label(variable))
+    _format_date_axis(ax.xaxis)
+    if len(simulations) > 4:
+        ax.legend(ncol=2, fontsize="small")
+    else:
+        ax.legend()
     return ax
 
 
@@ -103,6 +145,9 @@ def plot_plant_growth(run_dirs: str | Path | Sequence[str | Path], variable: str
 
     One line is drawn per simulation (each distinct RUNNO/TRNO pair in each
     run directory), labelled by the treatment name from Summary.OUT.
+    Known variables show meaning and unit on the y axis; others show the code.
+    Dates use ConciseDateFormatter; legends over four entries use two columns
+    and small text.
 
     Parameters:
         run_dirs: A run directory path or sequence of run directory paths.
@@ -165,8 +210,12 @@ def plot_plant_growth(run_dirs: str | Path | Sequence[str | Path], variable: str
 
     ax.set_title(f"Plant growth: {variable}")
     ax.set_xlabel("Date")
-    ax.set_ylabel(variable)
-    ax.legend()
+    ax.set_ylabel(_variable_label(variable))
+    _format_date_axis(ax.xaxis)
+    if len(simulations) > 4:
+        ax.legend(ncol=2, fontsize="small")
+    else:
+        ax.legend()
     return ax
 
 
@@ -179,6 +228,8 @@ def plot_evaluation(evaluation: Evaluation, variable: str | None = None):
 
     Values retain their original units; date variables use calendar axes. Statistics
     are not required, so a variable with only one pair can also be plotted.
+    Axis labels include the variable code and its known DSSAT unit. Date axes use
+    ConciseDateFormatter.
 
     Returns:
         The matplotlib Axes containing the scatter plot.
@@ -231,7 +282,11 @@ def plot_evaluation(evaluation: Evaluation, variable: str | None = None):
     ax.scatter(observed, simulated, label=variable)
     ax.plot([low, high], [low, high], linestyle="--", color="gray")
     ax.set_title(f"Evaluation: {variable}")
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Simulated")
+    label = _variable_label(variable, include_meaning=False)
+    ax.set_xlabel(f"Observed {label}")
+    ax.set_ylabel(f"Simulated {label}")
+    if variable in _SUMMARY_DATES:
+        _format_date_axis(ax.xaxis)
+        _format_date_axis(ax.yaxis)
     ax.legend()
     return ax

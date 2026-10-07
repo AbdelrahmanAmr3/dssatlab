@@ -119,4 +119,37 @@ def test_plot_has_title_and_axis_labels(tmp_path):
     ax = plot_plant_growth(tmp_path / "maize", "LAID")
     assert ax.get_title() == "Plant growth: LAID"
     assert ax.get_xlabel() == "Date"
-    assert ax.get_ylabel() == "LAID"
+    assert ax.get_ylabel() == "LAID: leaf area index (m²/m²)"
+
+
+@pytest.mark.parametrize("variable,label", [
+    ("GWAD", "GWAD: grain weight (kg/ha)"),
+    ("CWAD", "CWAD: total crop weight minus roots (kg/ha)"),
+    ("CHTD", "CHTD"),
+])
+def test_variable_labels_keep_unlisted_output_codes(tmp_path, variable, label):
+    ax = plot_plant_growth(make_run_dir(tmp_path), variable)
+    assert ax.get_ylabel() == label
+
+
+def test_dates_use_concise_formatter(tmp_path):
+    from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
+
+    ax = plot_plant_growth(make_run_dir(tmp_path), "LAID")
+    assert isinstance(ax.xaxis.get_major_locator(), AutoDateLocator)
+    assert isinstance(ax.xaxis.get_major_formatter(), ConciseDateFormatter)
+    ax.figure.canvas.draw()
+
+
+@pytest.mark.parametrize("count,columns", [(4, 1), (5, 2)])
+def test_legend_columns_and_text_above_four_entries(tmp_path, count, columns):
+    from matplotlib.font_manager import FontProperties
+
+    dirs = [make_run_dir(tmp_path, name=f"run{i}") for i in range(count)]
+    ax = plot_plant_growth(dirs, "LAID")
+    legend = ax.get_legend()
+    assert len(legend.get_texts()) == count
+    assert legend._ncols == columns
+    size = "small" if count > 4 else matplotlib.rcParams["legend.fontsize"]
+    assert all(text.get_fontsize() == FontProperties(size=size).get_size_in_points()
+               for text in legend.get_texts())

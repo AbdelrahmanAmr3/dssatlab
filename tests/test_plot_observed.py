@@ -57,9 +57,44 @@ def test_single_run_inputs_and_out_of_season_points(pyplot, result, tmp_path, so
     assert ax.collections[0].get_facecolors()[0] == pytest.approx(to_rgba(ax.lines[0].get_color()))
     assert ax.get_title() == "LAID: simulated and observed"
     assert ax.get_xlabel() == "Date"
-    assert ax.get_ylabel() == "LAID"
+    assert ax.get_ylabel() == "LAID: leaf area index (m²/m²)"
     assert [text.get_text() for text in ax.get_legend().get_texts()] == ["base, treatment 7"]
     assert rows == before
+
+
+def test_observed_dates_use_concise_formatter(pyplot, result):
+    from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
+
+    ax = dl.plot_observed(result, [measurement()], "LAID")
+    assert isinstance(ax.xaxis.get_major_locator(), AutoDateLocator)
+    assert isinstance(ax.xaxis.get_major_formatter(), ConciseDateFormatter)
+    ax.figure.canvas.draw()
+
+
+@pytest.mark.parametrize("variable,label", [
+    ("GWAD", "GWAD: grain weight (kg/ha)"), ("CHTD", "CHTD"),
+])
+def test_observed_known_and_unlisted_labels(pyplot, tmp_path, variable, label):
+    result = run_result(tmp_path, summary=dict(HWAM=5), growth=[
+        dict(YEAR=2025, DOY=1, **{variable: 2})])
+    ax = dl.plot_observed(result, [measurement(**{variable: 1})], variable)
+    assert ax.get_ylabel() == label
+
+
+@pytest.mark.parametrize("count,columns", [(4, 1), (5, 2)])
+def test_observed_legend_above_four_entries(pyplot, result, count, columns):
+    from matplotlib import rcParams
+    from matplotlib.font_manager import FontProperties
+
+    results = {(f"scenario{i}", 7): result for i in range(count)}
+    rows = [measurement(f"scenario{i}") for i in range(count)]
+    ax = dl.plot_observed(results, rows, "LAID")
+    legend = ax.get_legend()
+    assert len(legend.get_texts()) == count
+    assert legend._ncols == columns
+    size = "small" if count > 4 else rcParams["legend.fontsize"]
+    assert all(text.get_fontsize() == FontProperties(size=size).get_size_in_points()
+               for text in legend.get_texts())
 
 
 def test_scenarios_and_treatments_select_only_observed_curves(pyplot, result):

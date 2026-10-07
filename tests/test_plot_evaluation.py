@@ -38,8 +38,8 @@ def test_plot_evaluation_scatter_labels_and_identity_line(pyplot, evaluation):
     assert ax.figure.axes == [ax]
     assert len(ax.collections) == 1
     assert ax.collections[0].get_offsets().tolist() == [[4, 2], [6, 8]]
-    assert ax.get_xlabel() == "Observed"
-    assert ax.get_ylabel() == "Simulated"
+    assert ax.get_xlabel() == "Observed HWAM (kg/ha)"
+    assert ax.get_ylabel() == "Simulated HWAM (kg/ha)"
     assert [text.get_text() for text in ax.get_legend().get_texts()] == ["HWAM"]
     assert len(ax.lines) == 1
     line = ax.lines[0]
@@ -110,6 +110,7 @@ def test_plot_evaluation_single_pair_without_statistics(pyplot, value):
 
 def test_plot_evaluation_dates_use_calendar_axes(pyplot):
     from datetime import date
+    from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
 
     evaluation = Evaluation([
         dict(scenario="base", treatment=1, date=None, variable="ADAT",
@@ -121,6 +122,29 @@ def test_plot_evaluation_dates_use_calendar_axes(pyplot):
     assert simulated - observed == 1
     assert list(ax.lines[0].get_xdata()) == [date(2021, 12, 31), date(2022, 1, 1)]
     assert list(ax.lines[0].get_ydata()) == [date(2021, 12, 31), date(2022, 1, 1)]
+    for axis in (ax.xaxis, ax.yaxis):
+        assert isinstance(axis.get_major_locator(), AutoDateLocator)
+        assert isinstance(axis.get_major_formatter(), ConciseDateFormatter)
+    ax.figure.canvas.draw()
+
+
+@pytest.mark.parametrize("variable,unit", [
+    ("LAID", "m²/m²"), ("CWAD", "kg/ha"), ("GWAD", "kg/ha"),
+    ("HWAD", "kg/ha"), ("HWAM", "kg/ha"), ("CWAM", "kg/ha"),
+    ("SWXD", "mm"), ("LWAD", "kg/ha"), ("SWAD", "kg/ha"),
+    ("RWAD", "kg/ha"), ("PWAD", "kg/ha"), ("NWAD", "kg/ha"),
+    ("ADAT", "YrDoy"), ("MDAT", "YrDoy"), ("CHTD", None),
+])
+def test_plot_evaluation_native_units_and_unlisted_codes(pyplot, variable, unit):
+    value = 2025001 if variable in {"ADAT", "MDAT"} else 1
+    evaluation = Evaluation([
+        dict(scenario="base", treatment=1, date=None, variable=variable,
+             observed=value, simulated=value, error=0),
+    ], {})
+    ax = dl.plot_evaluation(evaluation)
+    label = f"{variable} ({unit})" if unit else variable
+    assert ax.get_xlabel() == f"Observed {label}"
+    assert ax.get_ylabel() == f"Simulated {label}"
 
 
 def test_plot_evaluation_missing_matplotlib(monkeypatch, evaluation):
