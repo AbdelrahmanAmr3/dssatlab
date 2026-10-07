@@ -28,4 +28,4 @@ The 14-day sweep's HWAM values, in date order, are 11859, 9254, 12321, 9958, 116
 
 The 21-day exercise plants on 26 February, 19 March, 9 April, 30 April, 21 May, 11 June and 2 July 1982. Its HWAM values, in date order, are 11859, 12521, 9958, 9962, 7775, 9657 and 9589 kg/ha.
 
-The 14-day yield curve zig-zags rather than declining smoothly: each sowing meets different 1982 weather during its season, while water and nitrogen simulation remain off. The course's own DSSAT reference run of this exercise shows the same pattern; the lesson names no specific weather cause without showing supporting weather data.
+The 14-day yield curve zig-zags rather than declining smoothly: each sowing meets different 1982 weather during its season, while water and nitrogen simulation remain off. the lesson names no specific weather cause without showing supporting weather data.
