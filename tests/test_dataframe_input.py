@@ -52,17 +52,18 @@ def test_plain_rows_and_fake_dataframe_do_not_import_pandas(tmp_path, rows):
         assert "pandas" not in sys.modules
 
 
-def test_dataframe_columns_and_row_numbers_match_csv(tmp_path, rows):
+def test_dataframe_columns_match_csv_and_positions_differ(tmp_path, rows):
     for row in rows:
         row["Rain"] = row.pop("rain")
     rows[0]["srad"] = "oops"
     rows[1]["date"] = "bad-date"
     problems = check(FakeDataFrame(rows))
-    assert problems == check(write_csv(tmp_path / "weather.csv", rows))
+    assert [p.replace("index 0", "row 2").replace("index 1", "row 3")
+            for p in problems] == check(write_csv(tmp_path / "weather.csv", rows))
     assert any("missing" in p and "'rain'" in p and "line 1" in p for p in problems)
     assert any("unknown" in p and "'Rain'" in p and "line 1" in p for p in problems)
-    assert any("'srad'" in p and "row 2" in p and "finite number" in p for p in problems)
-    assert any("'date'" in p and "row 3" in p and "YYYY-MM-DD" in p for p in problems)
+    assert any("'srad'" in p and "index 0" in p and "finite number" in p for p in problems)
+    assert any("'date'" in p and "index 1" in p and "YYYY-MM-DD" in p for p in problems)
 
 
 def test_empty_dataframe_uses_declared_columns(tmp_path, rows):
@@ -118,7 +119,7 @@ def test_plain_rows_accept_calendar_dates_and_midnight(rows, day):
                                   datetime(2021, 3, 2, microsecond=1)])
 def test_plain_rows_reject_time_parts(rows, day):
     rows[1]["date"] = day
-    assert any("row 3" in p and "'date'" in p and
+    assert any("index 1" in p and "'date'" in p and
                "date has a time part; use a whole date" in p for p in check(rows))
 
 
@@ -134,10 +135,11 @@ def test_real_dataframe_matches_csv_with_datetime64_and_numpy(tmp_path, rows, ba
         frame.loc[20, "srad"] = np.nan
         rows[1]["srad"] = float("nan")
     problems = check(frame)
-    assert problems == check(write_csv(tmp_path / "weather.csv", rows))
+    assert [p.replace("index 0", "row 2").replace("index 1", "row 3")
+            for p in problems] == check(write_csv(tmp_path / "weather.csv", rows))
     if bad_cell:
         assert len(problems) == 1
-        assert "row 3" in problems[0] and "'srad'" in problems[0]
+        assert "index 1 (2021-03-02)" in problems[0] and "'srad'" in problems[0]
         assert "finite number" in problems[0]
     else:
         assert problems == []
@@ -148,7 +150,7 @@ def test_real_dataframe_rejects_submicrosecond_time_part(rows):
     frame = pd.DataFrame(rows)
     frame["date"] = pd.to_datetime(frame["date"]).astype("datetime64[ns]")
     frame.loc[1, "date"] += pd.Timedelta(nanoseconds=1)
-    assert any("row 3" in p and "date has a time part; use a whole date" in p
+    assert any("index 1" in p and "date has a time part; use a whole date" in p
                for p in check(frame))
 
 
@@ -180,5 +182,6 @@ def test_dataframe_invalid_par_matches_csv(tmp_path, rows, value):
     for source in (FakeDataFrame(rows), write_csv(tmp_path / "weather.csv", rows)):
         problems = check(source)
         assert len(problems) == 1 and "'par'" in problems[0]
-        assert "row 3" in problems[0] and "mol/m2 per day" in problems[0]
+        assert ("index 1" if isinstance(source, FakeDataFrame) else "row 3") in problems[0]
+        assert "(2021-03-02)" in problems[0] and "mol/m2 per day" in problems[0]
         assert ("0 to 100" if value in (100.1, -0.1) else "finite number") in problems[0]

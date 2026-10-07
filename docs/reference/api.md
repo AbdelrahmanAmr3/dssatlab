@@ -51,6 +51,14 @@ DSSAT reads the stock values itself; `run()` still raises `DSSATRunError` when
 `WARNING.OUT` reports missing weather. Stock forecasts keep their existing
 coverage exemption. See [stock weather files](../guide/simulation.md#use-stock-weather-files).
 
+Weather template daily-row problems from `Simulation.check()`, `Simulation.run()`
+and `summarize_weather()` include the calendar date when valid, for example
+`Weather data index 10 (1982-01-11): ...`. CSV inputs use `row N` for the file
+line (header on line 1); DataFrames and lists of dicts use `index N` for the
+zero-based row position, independent of DataFrame index labels. Missing or
+invalid dates leave the calendar date out of the row location. Soil and
+observed data messages retain their existing numbering.
+
 ::: dssatlab.write_weather_template
 
 Weather template columns are `station`, `latitude`, `longitude`, `elevation`,

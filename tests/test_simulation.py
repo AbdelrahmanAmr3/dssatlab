@@ -1,8 +1,10 @@
 """Weather checks through the public Simulation and weather template."""
 import csv
 from copy import deepcopy
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -71,7 +73,8 @@ def test_invalid_par_is_rejected(tmp_path, rows, value, reason):
     for source in (rows, write_csv(tmp_path / "weather.csv", rows)):
         problems = check(source)
         assert len(problems) == 1
-        assert "row 3" in problems[0] and "'par'" in problems[0]
+        assert ("index 1" if isinstance(source, list) else "row 3") in problems[0]
+        assert "(2021-03-02)" in problems[0] and "'par'" in problems[0]
         assert reason in problems[0] and "mol/m2 per day" in problems[0]
 
 
@@ -138,7 +141,7 @@ def test_unknown_and_wrong_case_columns_named(tmp_path, rows):
 @pytest.mark.parametrize("value", ["", None, "oops", "nan", float("inf"), "-inf"])
 def test_invalid_numbers_report_column_row_and_action(rows, column, value):
     rows[1][column] = value
-    assert any(column in p and "row 3" in p and "finite number" in p
+    assert any(column in p and "index 1" in p and "finite number" in p
                for p in check(rows))
 
 
@@ -152,7 +155,7 @@ def test_ranges_reject_outside_and_accept_boundaries(rows, column, low, high, un
     for value in (low - 1, high + 1):
         bad = deepcopy(rows[:1])
         bad[0][column] = value
-        assert any(column in p and "row 2" in p and str(value) in p
+        assert any(column in p and "index 0" in p and str(value) in p
                    and f"{low} to {high}" in p and unit in p for p in check(bad))
     for value in (low, high):
         good = deepcopy(rows[:1])
@@ -167,7 +170,7 @@ def test_ranges_reject_outside_and_accept_boundaries(rows, column, low, high, un
                                    "2021-03-02T00:00:00", " 2021-03-02", 20210302])
 def test_invalid_dates(rows, value):
     rows[1]["date"] = value
-    assert any("date" in p and "row 3" in p and "YYYY-MM-DD" in p for p in check(rows))
+    assert any("date" in p and "index 1" in p and "YYYY-MM-DD" in p for p in check(rows))
 
 
 @pytest.mark.parametrize("days", [("2020-02-28", "2020-02-29", "2020-03-01"),
@@ -183,9 +186,9 @@ def test_date_order_duplicates_and_missing_ranges(rows):
     weather = [dict(rows[0], date=day) for day in days]
     problems = check(weather)
     assert sum("ascending" in p for p in problems) == 1
-    assert any("row 3" in p and "ascending" in p for p in problems)
+    assert any("index 1" in p and "ascending" in p for p in problems)
     assert any("duplicate" in p.lower() and "2021-03-04" in p
-               and "rows 3 and 4" in p for p in problems)
+               and "indices 1 and 2" in p for p in problems)
     assert any("missing dates 2021-03-05 to 2021-03-09" in p for p in problems)
     assert any("missing date 2021-03-03" in p for p in problems)
     assert [row["date"] for row in weather] == days
@@ -193,7 +196,7 @@ def test_date_order_duplicates_and_missing_ranges(rows):
 
 def test_tmax_below_tmin(rows):
     rows[1]["tmax"] = 9
-    assert any("row 3" in p and "tmax" in p and "tmin" in p for p in check(rows))
+    assert any("index 1" in p and "tmax" in p and "tmin" in p for p in check(rows))
     rows[1]["tmax"] = 10
     assert check(rows) == []
 
@@ -201,14 +204,14 @@ def test_tmax_below_tmin(rows):
 @pytest.mark.parametrize("station", ["ABC", "ABCDE", "AB/C", "AB C", "éBCD", 1234, None])
 def test_station_characters(rows, station):
     rows[0]["station"] = station
-    assert any("station" in p and "row 2" in p and "four" in p for p in check(rows))
+    assert any("station" in p and "index 0" in p and "four" in p for p in check(rows))
 
 
 @pytest.mark.parametrize("column,value", [("station", "XY99"), ("latitude", 46),
                                           ("longitude", -99), ("elevation", 201)])
 def test_station_metadata_must_be_identical(rows, column, value):
     rows[1][column] = value
-    assert any(column in p and "row 3" in p and "identical" in p for p in check(rows))
+    assert any(column in p and "index 1" in p and "identical" in p for p in check(rows))
 
 
 @pytest.mark.parametrize("column", ["tav", "amp", "refht", "wndht"])
@@ -219,7 +222,7 @@ def test_optional_numbers_and_defaults(rows, column):
         assert check(rows) == []
     for value in ("oops", "nan", "inf"):
         rows[1][column] = value
-        assert any(column in p and "row 3" in p and "finite number" in p
+        assert any(column in p and "index 1" in p and "finite number" in p
                    for p in check(rows))
 
 
@@ -243,8 +246,8 @@ def test_bad_rows_and_csv_column_counts(tmp_path, rows):
     broken = deepcopy(rows)
     del broken[1]["rain"]
     broken[2]["extra"] = 1
-    assert any("rain" in p and "row 3" in p for p in check(broken))
-    assert any("extra" in p and "row 4" in p for p in check(broken))
+    assert any("rain" in p and "index 1" in p for p in check(broken))
+    assert any("extra" in p and "index 2" in p for p in check(broken))
     path = write_csv(tmp_path / "weather.csv", rows)
     with path.open("a", encoding="utf-8") as stream:
         stream.write("too,many,fields,1,2,3,4,5,6,7\n")
@@ -255,8 +258,8 @@ def test_multiple_kinds_report_every_problem(rows):
     weather = [dict(rows[0], date=(date(2021, 1, 1) + timedelta(days=i)).isoformat(),
                     rain=-1, srad="bad") for i in range(47)]
     problems = check(weather)
-    assert sum("rain" in p and "row " in p for p in problems) == 47
-    assert sum("srad" in p and "row " in p for p in problems) == 47
+    assert sum("rain" in p and "index " in p for p in problems) == 47
+    assert sum("srad" in p and "index " in p for p in problems) == 47
     assert len(problems) == 94
 
 
@@ -330,7 +333,7 @@ def test_unrepresentable_integer_returns_problem(rows, column):
         rows[0][value] = 1
     else:
         rows[0][column] = value
-    assert any("row 2" in p and column in p for p in check(rows))
+    assert any("index 0" in p and column in p for p in check(rows))
 
 
 def test_parse_sdate_and_simulation_start_date():
@@ -352,3 +355,72 @@ def test_parse_sdate_and_simulation_start_date():
     d, reason = _simulation_start_date(None)
     assert d is None
     assert "START is not S" in reason
+
+
+@pytest.mark.parametrize("form", ["rows", "csv", "dataframe"])
+@pytest.mark.parametrize("column,value,reason", [
+    ("srad", "oops", "finite number"),
+    ("tmax", float("nan"), "finite number"),
+    ("tmin", "", "finite number"),
+    ("rain", -99, "allowed range"),
+    ("par", 101, "allowed range"),
+    ("tmax", 9, "is below tmin"),
+    ("station", "bad", "four ASCII"),
+    ("latitude", "oops", "finite number"),
+    ("longitude", 181, "allowed range"),
+    ("elevation", 201, "identical"),
+    ("tav", "oops", "finite number"),
+])
+def test_daily_problems_name_date_and_source_position(
+        tmp_path, monkeypatch, rows, form, column, value, reason):
+    if column == "par":
+        for row in rows:
+            row["par"] = 50
+    elif column == "tav":
+        for row in rows:
+            row["tav"] = -99
+    rows[1][column] = value
+    source = rows
+    if form == "csv":
+        source = write_csv(tmp_path / "weather.csv", rows)
+    elif form == "dataframe":
+        monkeypatch.setitem(sys.modules, "pandas", None)
+        source = SimpleNamespace(columns=list(rows[0]), index=[10, 20, 30],
+                                 to_dict=lambda orient: deepcopy(rows))
+    location = "row 3" if form == "csv" else "index 1"
+    assert any(p.startswith(f"Weather data {location} (2021-03-02)")
+               and reason in p for p in check(source))
+
+
+@pytest.mark.parametrize("day", ["bad-date", None, datetime(2021, 3, 2, 1)])
+def test_invalid_date_still_reports_other_daily_problems(rows, day):
+    rows[1].update(date=day, srad="oops", tmax=9)
+    problems = check(rows)
+    assert any(p.startswith("Weather data index 1, column 'date'") for p in problems)
+    assert any(p.startswith("Weather data index 1, column 'srad'") for p in problems)
+    assert any(p.startswith("Weather data index 1: tmax") for p in problems)
+    assert not any("(2021-03-02)" in p for p in problems)
+
+
+def test_csv_shape_problem_includes_valid_date(tmp_path, rows):
+    path = write_csv(tmp_path / "weather.csv", rows)
+    lines = path.read_text(encoding="utf-8").splitlines()
+    lines[2] = lines[2].rsplit(",", 1)[0]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    problems = check(path)
+    assert any(p.startswith("Weather data row 3 (2021-03-02): found 8 values")
+               for p in problems)
+    assert any(p.startswith("Weather data row 3 (2021-03-02): missing value for 'rain'")
+               for p in problems)
+
+
+@pytest.mark.parametrize("label", ["Soil data", "Observed data"])
+def test_shared_reader_retains_nonweather_row_numbers(tmp_path, rows, label):
+    from dssatlab.weather import _read_table
+
+    assert _read_table([rows[0]], label)[0] == [(2, rows[0])]
+    path = tmp_path / "table.csv"
+    path.write_text("a,b\n1\n", encoding="utf-8")
+    assert _read_table(path, label)[2] == [
+        ("row shape", f"{label} row 2 has 1 values for 2 columns. Supply one value per column.")
+    ]
