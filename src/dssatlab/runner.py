@@ -73,7 +73,7 @@ def _resolve_directory(directory) -> Path | None:
         return None
     try:
         return Path(directory).resolve()
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, RuntimeError) as error:  # RuntimeError: symlink loop (3.10-3.12)
         raise DSSATRunError(
             f"Cannot resolve directory {directory}: "
             f"tried to resolve it against the current directory ({error}). "

@@ -104,7 +104,7 @@ def test_batches_use_one_directory_for_every_simulation(
 
 @pytest.mark.parametrize("api", ["run", "simulation", "treatments", "sweep"])
 @pytest.mark.parametrize("failure", ["file", "parent-file", "permission", "dated-folder",
-                                     "null", "resolve-oserror", "resolve-valueerror",
+                                     "null", "resolve-oserror", "resolve-valueerror", "resolve-loop",
                                      "mkdir-valueerror", "dated-folder-valueerror"])
 def test_unusable_directory_names_path_and_remedy(
         inputs, fake_dssat, tmp_path, monkeypatch, api, failure):
@@ -116,13 +116,15 @@ def test_unusable_directory_names_path_and_remedy(
         parent = parent / "nested"
     elif failure == "null":
         parent = "bad\0path"
-    elif failure in ("resolve-oserror", "resolve-valueerror"):
+    elif failure in ("resolve-oserror", "resolve-valueerror", "resolve-loop"):
         resolve = Path.resolve
 
         def invalid(path, *args, **kwargs):
             if path == parent:
                 if failure == "resolve-oserror":
                     raise OSError("cannot resolve path")
+                if failure == "resolve-loop":
+                    raise RuntimeError("Symlink loop from 'loop'")
                 raise ValueError("invalid path")
             return resolve(path, *args, **kwargs)
 
