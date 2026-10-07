@@ -66,11 +66,12 @@ def write_observed_template(path: str | Path) -> None:
         raise DSSATError(message) from error
 
 
-def _load_observed(source):
+def _load_observed(source, *, check_measurements=True):
     """Return checked rows and problems, retaining dates for matching/statistics.
 
     Only unreadable sources, empty tables and missing key headers stop early.
     Invalid cells are omitted so valid keys/measurements can still be matched.
+    Evaluation defers measurement checks until it knows whether a row is excluded.
     """
     rows, columns, issues = _read_table(source, "Observed data", comments=True)
     problems = [message for _, message in issues]
@@ -87,14 +88,14 @@ def _load_observed(source):
     for name in dict.fromkeys(columns):
         if columns.count(name) > 1:
             problems.append(f"Observed data: repeated column {name!r}. Keep one column per name.")
-        if name not in _KEYS | _SUMMARY_COLUMNS | _PLANT_COLUMNS:
+        if check_measurements and name not in _KEYS | _SUMMARY_COLUMNS | _PLANT_COLUMNS:
             problems.append(_unknown(name))
     if not isinstance(source, (str, Path, list)):
         import pandas as pd
 
         rows = [(number, {name: None if pd.api.types.is_scalar(value) and pd.isna(value) else value
                           for name, value in row.items()}) for number, row in rows]
-    parsed, found = _check_rows(rows)
+    parsed, found = _check_rows(rows, check_measurements=check_measurements)
     return parsed, problems + found
 
 
@@ -148,7 +149,7 @@ def _check_measurements(row, daily, where, problems):
     return result
 
 
-def _check_rows(rows):
+def _check_rows(rows, *, check_measurements=True):
     parsed, problems, seen = [], [], {}
     for number, row in rows:
         where = f"Observed data row {number}"
@@ -176,7 +177,10 @@ def _check_rows(rows):
             except ValueError:
                 result.pop("date")
                 problems.append(f"{where}: bad date {row['date']!r}. Use yyyy-mm-dd.")
-        result.update(_check_measurements(row, daily, where, problems))
+        if check_measurements or not _KEYS.issubset(result):
+            result.update(_check_measurements(row, daily, where, problems))
+        else:
+            result.update({name: value for name, value in row.items() if name not in _KEYS})
         if not _KEYS.issubset(result):
             continue
         key = (result["scenario"], result["treatment"], result["date"])

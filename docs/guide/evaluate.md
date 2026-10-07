@@ -12,6 +12,7 @@ evaluation = dl.evaluate(result, "observed.csv")
 print(evaluation)
 print(evaluation.pairs)
 print(evaluation.statistics)
+print(evaluation.excluded)
 ```
 
 `evaluate(results, observed)` accepts one `RunResult` or the dictionary returned by
@@ -39,6 +40,16 @@ The frozen `Evaluation` dataclass contains:
   across scenarios, treatments and dates.
   Variables with fewer than two pairs are omitted. Date statistics use calendar
   days, including across year boundaries.
+- `excluded`: one dictionary per observed row dated before the first or after
+  the last Plant growth day for its scenario and treatment, with `scenario`,
+  `treatment`, `date` as a `yyyyddd` integer, and `reason`, for example
+  `"after the last simulated day 1982-07-04 (1982185)"`. Measurement columns in
+  these rows are not checked. They contribute no pairs or statistics.
+
+`Evaluation(pairs, statistics)` still works; `excluded` defaults to a separate
+empty list for each instance. The representation includes the excluded count
+only when nonzero, for example
+`Evaluation(456 pairs, 6 excluded, variables=['LAID', ...])`.
 
 `evaluation.to_dataframe()` converts the pairs using optional pandas, imported
 only when needed. Evaluation itself needs no extra dependencies.
@@ -61,9 +72,12 @@ absent variables, and missing simulated values (`-99`) are collected in one
 table, or missing key headers stops loading before matching can begin. Unknown
 columns are reported once per name, with the closest valid names and the lists
 of Summary and Plant growth columns. An observed `-99` is also a problem; leave
-unmeasured cells blank instead.
+unmeasured cells blank instead. Daily observations outside the simulated range
+are listed in `excluded`. A missing day inside the range (for example when
+the output interval is greater than one), empty Plant growth, and an evaluation
+with every observed row excluded still raise `DSSATCheckError`.
 
-No pair is silently dropped. Results without observations are fine. Loading and
+Excluded rows are reported explicitly. Results without observations are fine. Loading and
 checking observed data are internal to
 `evaluate()`; there are no public `load_observed()` or `check_observed()` functions.
 
@@ -85,6 +99,11 @@ evaluation = dl.evaluate(result, observed_a)  # end-of-season values
 print(evaluation.pairs)
 print(evaluation.statistics)
 ax = dl.plot_observed(result, observed_t, "LAID")
+
+daily_evaluation = dl.evaluate(result, observed_t)
+print(daily_evaluation.excluded)
+# Stock UFGA8201: 72 kept observation rows, 456 pairs, 6 excluded rows.
+# All six excluded rows are dated 1982-07-08 (1982189).
 ```
 
 `read_dssat_observed()` accepts any header line whose stripped text starts with
@@ -118,10 +137,10 @@ weather date, which dssatlab does not read here). Seven-digit `yyyyddd` dates ne
 `plot_observed()` returns a matplotlib Axes, using the optional `plot` extra.
 It draws one Plant growth line per observed scenario and treatment, with measured
 points in the same colour. Points outside the simulated season are still drawn;
-`evaluate()` requires a simulated row on every observed date, so shipped FileT
-files usually hold dates outside the season (before planting or after maturity)
-that it reports as problems; plot them, or keep only the dates inside the season
-before evaluating. For Summary variables, use `plot_evaluation()` instead.
+`evaluate()` lists observations before the first or after the last simulated
+day in `excluded`, so you can evaluate a shipped FileT without filtering those
+rows by hand. Missing simulated dates inside the range remain check problems.
+For Summary variables, use `plot_evaluation()` instead.
 
 ### Compare with the DSSAT evaluation
 

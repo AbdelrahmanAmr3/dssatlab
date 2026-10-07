@@ -8,6 +8,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 - `RunResult.warnings` contains distinct DSSAT `WARNING.OUT` blocks, including their module and date, in file order. Its short repr shows the run directory name and counts of output files and warnings ([#374](https://github.com/AbdelrahmanAmr3/dssatlab/issues/374)).
 
 ### Fixed
+- `evaluate()` lists observed rows before the first or after the last Plant growth day in `Evaluation.excluded`, with their scenario, treatment, YYYYDDD date and simulated boundary. Their measurements are not checked; pairs and statistics use only observations in the simulated range. Missing interior days and an evaluation with every row excluded still raise `DSSATCheckError` ([#370](https://github.com/AbdelrahmanAmr3/dssatlab/issues/370)).
 - Cultivar checks for a copied FileX use the installed DSSAT Genotype `.CUL` when no sibling file exists, matching `list_cultivars()`. Sibling files still take precedence; new cultivars and coefficient changes require a sibling `.CUL` and explain which stock file to copy ([#353](https://github.com/AbdelrahmanAmr3/dssatlab/issues/353)).
 
 ## [0.22.0] - 2026-10-05
