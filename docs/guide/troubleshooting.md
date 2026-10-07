@@ -37,10 +37,10 @@ DSSAT executable.
 `DSSATInstallError`:
 
 ```text
-DSSAT installation is only supported on Linux/Colab in v0.1. Pass connect(path=...) to use an existing installation.
+DSSAT installation is only supported on Linux/Colab. Checked platform: Windows. On Windows, install DSSAT 4.8 from https://dssat.net, then call connect(path=...) with the DSSAT executable or directory. On other non-Linux platforms, call connect(path=...) with an existing installation.
 ```
 
-The message still says `v0.1` in the current source. `install()` requires Linux.
+`install()` requires Linux.
 On Windows or another platform, point `connect(path=...)` at an existing DSSAT
 executable.
 
