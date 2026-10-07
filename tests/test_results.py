@@ -44,10 +44,10 @@ def test_result_daily_readers_and_missing_files(result, kind, filename, column, 
         getattr(result, kind)()
 
 
-@pytest.mark.parametrize("name", ["returncode", "run_dir", "outputs", "stdout_tail"])
-def test_result_still_frozen_with_original_fields(result, name):
+@pytest.mark.parametrize("name", ["returncode", "run_dir", "outputs", "stdout_tail", "warnings"])
+def test_result_still_frozen_with_trailing_warnings(result, name):
     assert [field.name for field in fields(result)] == [
-        "returncode", "run_dir", "outputs", "stdout_tail"]
+        "returncode", "run_dir", "outputs", "stdout_tail", "warnings"]
     with pytest.raises(FrozenInstanceError):
         setattr(result, name, None)
 

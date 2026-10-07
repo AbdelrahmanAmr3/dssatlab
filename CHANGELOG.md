@@ -4,6 +4,9 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- `RunResult.warnings` contains distinct DSSAT `WARNING.OUT` blocks, including their module and date, in file order. Its short repr shows the run directory name and counts of output files and warnings ([#374](https://github.com/AbdelrahmanAmr3/dssatlab/issues/374)).
+
 ### Fixed
 - Cultivar checks for a copied FileX use the installed DSSAT Genotype `.CUL` when no sibling file exists, matching `list_cultivars()`. Sibling files still take precedence; new cultivars and coefficient changes require a sibling `.CUL` and explain which stock file to copy ([#353](https://github.com/AbdelrahmanAmr3/dssatlab/issues/353)).
 
