@@ -22,6 +22,7 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 
 ### Fixed
 - The non-Linux `install()` error drops the obsolete v0.1 restriction, reports the checked platform, and tells Windows users to install DSSAT 4.8 from dssat.net and call `connect(path=...)`.
+- Weather template daily-row problems include valid calendar dates; CSV inputs retain file line numbers, while DataFrames and lists of dicts use zero-based positions independent of index labels ([#375](https://github.com/AbdelrahmanAmr3/dssatlab/issues/375)).
 - Cultivar checks for a copied FileX use the installed DSSAT Genotype `.CUL` when no sibling file exists, matching `list_cultivars()`. Sibling files still take precedence; new cultivars and coefficient changes require a sibling `.CUL` and explain which stock file to copy ([#353](https://github.com/AbdelrahmanAmr3/dssatlab/issues/353)).
 
 ## [0.22.0] - 2026-10-05

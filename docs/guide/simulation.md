@@ -545,6 +545,19 @@ and finite. Supply one row per calendar day in ascending order, without gaps or
 duplicates. `station`, `latitude`, `longitude`, and `elevation` must be identical
 on every row.
 
+Daily-row problems include the calendar date when it is valid. CSV inputs use
+file line numbers, counting the header as row 1; DataFrames and lists of dicts
+use zero-based positions (`index 0` is the first row), regardless of DataFrame
+index labels. For example:
+
+```text
+Weather data row 12 (1982-01-11): tmax 14.6 is below tmin 15.6 degrees C. Correct tmax or tmin so tmax >= tmin.
+Weather data index 10 (1982-01-11): tmax 14.6 is below tmin 15.6 degrees C. Correct tmax or tmin so tmax >= tmin.
+```
+
+If the date is missing or invalid, the problem names the row or index without
+a calendar date. Correct the supplied data before running again.
+
 Optional station columns (`tav`, `amp`, `refht`, `wndht`) may be omitted or left
 empty; they are written as `-99` (not given). Supplied values must be finite
 numbers. The weather file uses their values from the first row, so put station
@@ -560,8 +573,8 @@ empty column, a non-finite value and an out-of-range value, the messages are:
 
 ```text
 Weather column 'par' is empty on {n} rows. Supply par on every row or drop the column.
-Weather data row {line}, column 'par': found {value}. Supply a non-empty finite number in mol/m2 per day.
-Weather data row {line}, column 'par': found {value}; allowed range is 0 to 100 mol/m2 per day. Correct the value using DSSAT's units.
+Weather data row {line} ({date}), column 'par': found {value}. Supply a non-empty finite number in mol/m2 per day.
+Weather data row {line} ({date}), column 'par': found {value}; allowed range is 0 to 100 mol/m2 per day. Correct the value using DSSAT's units.
 ```
 
 ### Import a NASA POWER file

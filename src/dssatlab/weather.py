@@ -151,16 +151,17 @@ def _check_columns(columns, where, problems):
                              f"columns are {', '.join(REQUIRED + OPTIONAL)}."))
 
 
-def _check_dates(dated_rows, problems):
+def _check_dates(dated_rows, problems, row_label):
     seen, previous, out_of_order = {}, None, False
     for line, day in dated_rows:
         if previous is not None and day < previous and not out_of_order:
-            problems.append(("order", f"Weather data row {line}, date {day}, is not "
+            problems.append(("order", f"Weather data {row_label} {line} ({day}): date is not "
                              "in ascending order. Sort rows by date ascending."))
             out_of_order = True
         if day in seen:
             problems.append(("duplicates", f"Weather data duplicate date {day} in "
-                             f"rows {seen[day]} and {line}. Keep one row per day."))
+                             f"{'rows' if row_label == 'row' else 'indices'} {seen[day]} "
+                             f"and {line}. Keep one row per day."))
         else:
             seen[day] = line
         previous = day
@@ -182,13 +183,19 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
 
     CSV paths, plain rows and DataFrames share the same checks. Dates may be
     YYYY-MM-DD text, date objects or midnight datetimes; they become date objects.
+    Row problems name a valid calendar date; CSV uses file lines, in-memory
+    data uses zero-based positions, regardless of DataFrame index labels.
     Numbers become floats, absent optional station values -99; par stays absent.
     Invalid fields are omitted; consumers must require no problems before using
     parsed rows. The source is never mutated, sorted, repaired or written.
     """
     rows, columns, problems = _read_table(source)
+    row_label = "row" if isinstance(source, (str, Path)) else "index"
     if problems and problems[0][0] == "source":
         return [], _all_messages(problems)
+    row_shape_problems = {message.split(" has ", 1)[0]: (i, message)
+                          for i, (kind, message) in enumerate(problems)
+                          if kind == "row shape"}
     if columns is not None:
         for column in dict.fromkeys(columns):
             if columns.count(column) > 1:
@@ -211,55 +218,66 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
         isinstance(row, dict) and "par" in row for _, row in rows)
     empty_par = 0
     for line, row in rows:
+        if row_label == "index":
+            line -= 2  # _read_table keeps CSV numbering for soil and observed data.
+        location = f"{row_label} {line}"
         if not isinstance(row, dict):
-            problems.append(("row shape", f"Weather data row {line} is not a dict. "
+            problems.append(("row shape", f"Weather data {location}: row is not a dict. "
                              "Supply a dict of weather template column values."))
             continue
+        result = {}
+        if "date" in row:
+            value = row["date"]
+            where = f"Weather data {location}, column 'date'"
+            try:
+                if isinstance(value, datetime) and any((
+                        value.hour, value.minute, value.second, value.microsecond,
+                        getattr(value, "nanosecond", 0))):
+                    problems.append(("date", f"{where}: found {_show_value(value)}; "
+                                     "date has a time part; use a whole date."))
+                else:
+                    if isinstance(value, date):
+                        result["date"] = date(value.year, value.month, value.day)
+                    elif isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+                        result["date"] = date.fromisoformat(value)
+                    else:
+                        raise ValueError
+                    dated_rows.append((line, result["date"]))
+            except (TypeError, ValueError):
+                problems.append(("date", f"{where}: found {_show_value(value)}. "
+                                 "Use a valid calendar date: YYYY-MM-DD text, "
+                                 "a date object or a midnight datetime."))
+        if "date" in result:
+            location += f" ({result['date']})"
+            if row_label == "row":
+                prefix = f"Weather data row {line}"
+                if prefix in row_shape_problems:
+                    i, message = row_shape_problems[prefix]
+                    problems[i] = ("row shape", message.replace(
+                        prefix + " has", f"Weather data {location}: found", 1))
         if columns is None:  # rows without a header: report each column problem once
             found = []
-            _check_columns(row, f"row {line}", found)
+            _check_columns(row, location, found)
             problems.extend(item for item in found if item[0] not in
                             {kind for kind, _ in problems})
-        result = {}
         for name in REQUIRED + OPTIONAL:
+            if name == "date" and name in row:
+                continue
             if name == "par" and not has_par:
                 continue
             if name not in row and name not in OPTIONAL:
                 if columns is not None and name in columns:
-                    day = f" ({result['date']})" if "date" in result else ""
-                    problems.append((f"missing {name}", f"Weather data row {line}{day}: "
+                    problems.append((f"missing {name}", f"Weather data {location}: "
                                      f"missing value for {name!r}. Supply a value."))
                 continue
             value = row.get(name)
-            where = f"Weather data row {line}, column {name!r}"
-            if name in REQUIRED and "date" in result and (value is None or
-                    isinstance(value, str) and not value.strip()):
-                where += f" ({result['date']})"
+            where = f"Weather data {location}, column {name!r}"
             if name == "station":
                 if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9]{4}", value):
                     problems.append(("station", f"{where}: found {_show_value(value)}. "
                                      "Use exactly four ASCII letters or digits."))
                     continue
                 result[name] = value
-            elif name == "date":
-                try:
-                    if isinstance(value, datetime) and any((
-                            value.hour, value.minute, value.second, value.microsecond,
-                            getattr(value, "nanosecond", 0))):
-                        problems.append(("date", f"{where}: found {_show_value(value)}; "
-                                         "date has a time part; use a whole date."))
-                        continue
-                    if isinstance(value, date):
-                        result[name] = date(value.year, value.month, value.day)
-                    elif isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
-                        result[name] = date.fromisoformat(value)
-                    else:
-                        raise ValueError
-                    dated_rows.append((line, result[name]))
-                except (TypeError, ValueError):
-                    problems.append(("date", f"{where}: found {_show_value(value)}. "
-                                     "Use a valid calendar date: YYYY-MM-DD text, "
-                                     "a date object or a midnight datetime."))
             else:
                 if name in OPTIONAL and (value is None or
                                          isinstance(value, str) and not value.strip()):
@@ -280,29 +298,27 @@ def _parse_weather(source) -> tuple[list[dict], list[str]]:
                 if name in ranges:
                     low, high, unit = ranges[name]
                     if not low <= number <= high:
-                        if number == -99 and name in REQUIRED and "date" in result:
-                            where += f" ({result['date']})"
                         problems.append((f"range {name}", f"{where}: found {_show_value(value)}; "
                                          f"allowed range is {low} to {high} {unit}. "
                                          "Correct the value using DSSAT's units."))
         if "tmax" in result and "tmin" in result and result["tmax"] < result["tmin"]:
-            problems.append(("temperature order", f"Weather data row {line}: "
+            problems.append(("temperature order", f"Weather data {location}: "
                              f"tmax {result['tmax']} is below tmin {result['tmin']} "
                              "degrees C. Correct tmax or tmin so tmax >= tmin."))
         for name in ("station", "latitude", "longitude", "elevation"):
             if name not in result:
                 continue
             if name not in station_values:
-                station_values[name] = (line, result[name])
-            first_line, first_value = station_values[name]
+                station_values[name] = (location, result[name])
+            first_location, first_value = station_values[name]
             if result[name] != first_value:
-                problems.append((f"identical {name}", f"Weather data row {line}, "
-                                 f"column {name!r}: found {result[name]!r}, but row "
-                                 f"{first_line} has {first_value!r}. Use identical "
+                problems.append((f"identical {name}", f"Weather data {location}, "
+                                 f"column {name!r}: found {result[name]!r}, but "
+                                 f"{first_location} has {first_value!r}. Use identical "
                                  f"{name} values on every row."))
         parsed.append(result)
     if empty_par:
         problems.append(("empty par", f"Weather column 'par' is empty on {empty_par} rows. "
                          "Supply par on every row or drop the column."))
-    _check_dates(dated_rows, problems)
+    _check_dates(dated_rows, problems, row_label)
     return parsed, _all_messages(problems)
