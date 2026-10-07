@@ -164,6 +164,23 @@ See [Summarise your weather and soil before a run](../guide/simulation.md#summar
 
 ::: dssatlab.write_experiment_template
 
+::: dssatlab.read_experiment
+
+Returns one treatment entry containing `planting`, `fertilizer` and `irrigation`
+when their FileX levels are nonzero. Wrap it as
+`management={"treatments": {1: entry}}` for treatment 1. Values use DSSAT units;
+dates are ISO strings. Irrigation is `{"efficiency": EFIR, "events": [...]}`;
+IRRIG D events use integer `days_after_planting`, and R/P/W events use `date`.
+Other experiment sections remain inherited from the FileX. No executable is
+needed, and the source FileX is unchanged.
+
+Raises `DSSATCheckError` for unreadable or malformed referenced sections,
+sequences, forecasts, invalid values, repeated event dates or unsupported timing.
+PLNAME, FERNAME and IRNAME are ignored. Unrepresentable columns must contain
+`-99` or the writer's constant (`0` for FAMC/FAMO); other values raise an error
+naming the column, level and FileX. See
+[read an inherited section](../guide/sweeps.md#read-an-inherited-section).
+
 ::: dssatlab.write_filex_template
 
 ::: dssatlab.list_crops
