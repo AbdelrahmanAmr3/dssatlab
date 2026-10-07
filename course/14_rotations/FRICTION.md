@@ -12,9 +12,9 @@ No DSSAT input was edited, and no private dssatlab API was used.
 
 ## 2. Successful runs still need warning inspection - non-blocking
 
-- **Student action:** Read `WARNING.OUT` separately and distinguish warnings from a missing-weather failure; the notebook displays three distinct warning messages and reports whether weather ran out.
-- **Why awkward:** Exit status 0 does not surface the stock warnings: zero saturated hydraulic conductivity is treated as missing, tillage depths are capped at implement limits, and some solar radiation values are below 1 MJ/m2/day. The 2008 maize component also has a slowed-grain-filling maturity warning, but that warning and a zero yield do not establish the cause of the zero.
-- **Suggested change:** Expose a public warning summary on the run result, with compact distinct messages and a clear indication of missing-weather warnings.
+- **Student action:** Read `WARNING.OUT` separately and distinguish warnings from a missing-weather failure; the notebook labels its compact display "Selected warnings," includes DSSAT's action lines, and reports whether weather ran out. The display deduplicates selected lines and omits dates, component context and other details, so it is not a complete warning report.
+- **Why awkward:** Exit status 0 does not surface the stock warnings: zero saturated hydraulic conductivity is treated as missing, tillage depths are capped at implement limits, duplicate weather records are ignored, and fertilizer placement is forced into the second soil layer. DSSAT also reports low solar radiation, freezes and crop maturity due to slowed grain filling; the original three-message filter hid duplicate-weather, fertilizer-placement, freeze and slowed-grain-filling warnings, along with DSSAT's action lines. The expanded display still omits context, and the 2008 maize maturity warning and zero yield do not establish the cause of the zero.
+- **Suggested change:** Expose a public warning summary on the run result, with compact distinct messages, their action lines, access to the full warning context and a clear indication of missing-weather warnings.
 - **Classification:** **non-blocking**; all requested yield and soil carbon results are available without changing the stock inputs.
 
 ## 3. Direct run-result display exposes machine paths - non-blocking
@@ -34,7 +34,7 @@ The FileX holds 56 rotation components and NYERS 27, starting on 1 March 1989.
 DSSAT completes 55 components (28 crops and 27 fallows), stopping after wheat component 55 ends on 12 July 2016; component 56 is not run.
 Weather through 2016 is sufficient, and `WARNING.OUT` contains no `Weather record not found` message.
 
-Maize has 10 cropped components with HWAM mean 6,400.3 kg/ha and range 0-10,947 kg/ha; soybean has 10 with mean 2,901.8 and range 704-4,518; wheat has 8 with mean 3,923.6 and range 2,604-5,568.
+Maize has 10 cropped components with HWAM grain dry-matter yield mean 6,400.3 kg dry matter/ha and range 0-10,947 kg dry matter/ha; soybean has 10 with mean 2,901.8 and range 704-4,518; wheat has 8 with mean 3,923.6 and range 2,604-5,568 (all HWAM values in kg dry matter/ha).
 The notebook retains the surprising 2008 maize zero (R# 39) and makes no unsupported claim about its cause.
 Summary `OCAM` is organic carbon in soil, excluding the surface carbon included in `OCTAM` (the installed DSSAT `DATA.CDE` definitions were checked during authoring).
 
