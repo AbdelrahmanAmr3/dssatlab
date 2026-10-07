@@ -1,4 +1,4 @@
-"""Check cultivar identifiers against the sibling .CUL copied into a simulation."""
+"""Check cultivar identifiers against sibling or installed .CUL files."""
 
 from difflib import get_close_matches
 from pathlib import Path
@@ -27,15 +27,34 @@ _CROPS = {
     "dry bean": ("BN", "CRGRO048", "BNGRO048", ("CUL", "ECO", "SPE"), "Y"),
 }
 
-def _cultivar_codes(filex, crop):
+def _cultivar_codes(filex, crop, executable=None, *, sibling_only=False):
     """Read only VAR# from one crop's .CUL; never inspect model coefficients."""
     folder = Path(filex).parent
     paths = sorted(path for path in folder.iterdir()
                    if path.is_file() and path.suffix.upper() == ".CUL"
                    and path.name[:2].upper() == crop)
     if not paths:
-        raise ValueError(f"no .CUL file for crop {crop!r} beside FileX {filex}. "
-                         f"Supply the {crop}*.CUL file to copy into the simulation folder.")
+        prefix = next((prefix for code, _, prefix, _, _ in _CROPS.values() if code == crop), None)
+        stock = f"Genotype/{prefix or crop + '*'}.CUL"
+        checked = f"Checked {crop}*.CUL beside FileX {filex} in {folder}"
+        if sibling_only:
+            raise ValueError(f"no sibling .CUL file for crop {crop!r}. {checked}. "
+                             f"Copy the stock {stock} from the DSSAT data directory "
+                             "beside the FileX to write cultivar coefficients into the simulation copy.")
+        if prefix is None:
+            raise ValueError(f"no .CUL file for crop {crop!r}. {checked}; "
+                             "no fixed installed genotype prefix is known for this crop. "
+                             f"Supply its {crop}*.CUL beside the FileX.")
+        try:
+            path = _listing_data_dir(executable) / stock
+        except DSSATNotFoundError as error:
+            raise ValueError(f"no .CUL file for crop {crop!r}. {checked}; "
+                             f"could not locate the installed {stock}. {error}") from None
+        if not path.is_file():
+            raise ValueError(f"no .CUL file for crop {crop!r}. {checked} and {path}. "
+                             f"Copy the stock {stock} beside the FileX or supply it "
+                             "in the DSSAT data directory's Genotype folder.")
+        paths = [path]
     if len(paths) != 1:
         raise ValueError(f"multiple .CUL files for crop {crop!r}: "
                          f"{', '.join(path.name for path in paths)}. Keep one matching "
@@ -83,8 +102,9 @@ def _unknown_cultivar(code, codes, path, crop, where):
             f" ({len(codes)} codes in the file; open it to see all).")
 
 
-def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None, new_cultivars=None):
-    """Check fields, local cultivar availability and the edit before any write."""
+def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None, new_cultivars=None,
+                    executable=None):
+    """Check fields, cultivar availability and the edit before any write."""
     where = f"{where}, cultivar"
     if not isinstance(data, dict):
         return [f"{where}: expected a dict. Supply crop and code from the "
@@ -112,7 +132,8 @@ def _check_cultivar(data, where, filex, text, treatment, *, cultivar_path=None, 
                                     "and choose a cultivar from its fixed model.")
                 codes = _read_cultivar_codes(path)
             else:
-                path, codes = _cultivar_codes(filex, data["crop"])
+                path, codes = _cultivar_codes(filex, data["crop"], executable,
+                                              sibling_only="coefficients" in data or "ecotype" in data)
             from .cultivar_coefficients import _check_cultivar_definition
             problems.extend(_check_cultivar_definition(path, data, codes, where,
                                                        new_cultivars=new_cultivars))

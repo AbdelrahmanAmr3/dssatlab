@@ -2,6 +2,11 @@
 
 All notable changes to dssatlab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The entries for 0.1.0 to 0.3.0 were backfilled from the GitHub release notes; from now on new entries are written here first and the release notes copy from them.
 
+## [Unreleased]
+
+### Fixed
+- Cultivar checks for a copied FileX use the installed DSSAT Genotype `.CUL` when no sibling file exists, matching `list_cultivars()`. Sibling files still take precedence; new cultivars and coefficient changes require a sibling `.CUL` and explain which stock file to copy ([#353](https://github.com/AbdelrahmanAmr3/dssatlab/issues/353)).
+
 ## [0.22.0] - 2026-10-05
 
 ### Added

@@ -146,7 +146,7 @@ def _check_events(events, section, where, weather_range=None):
 
 
 def _check_entry(entry, number, where, entry_problems, text, filex, start_date, weather_range,
-                 cultivar_path, *, start_date_note=None, new_cultivars=None):
+                 cultivar_path, *, start_date_note=None, new_cultivars=None, executable=None):
     from .irrigation import _check_irrigation
     from .operations import _OPERATION_FIELDS, _check_operation
 
@@ -205,7 +205,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
         report.extend(lines)
     if "cultivar" in entry:
         section_problems = _check_cultivar(entry["cultivar"], where, filex, text, number,
-                                          cultivar_path=cultivar_path, new_cultivars=new_cultivars)
+                                          cultivar_path=cultivar_path, new_cultivars=new_cultivars,
+                                          executable=executable)
         problems.extend(section_problems)
         report.extend(_report_lines("    cultivar", section_problems))
     else:
@@ -247,7 +248,8 @@ def _check_entry(entry, number, where, entry_problems, text, filex, start_date, 
 
 def _check_management(source, filex, selected_treatment=None, weather_rows=None, start_date=None,
                       *, text=None, cultivar_path=None, start_date_note=None,
-                      rotation_template=None, filex_template=None, data_dir=None, check_harvest=True):
+                      rotation_template=None, filex_template=None, data_dir=None, check_harvest=True,
+                      executable=None):
     """Check treatments without mutation; unreadable FileX still permits shape checks."""
     from .rotation_data import _check_rotation_data
     from .operations import _check_harvest
@@ -305,12 +307,13 @@ def _check_management(source, filex, selected_treatment=None, weather_rows=None,
         entry, rotation_problems, rotation_report = _check_rotation_data(
             entry, number, filex, text, start_date if is_selected else None,
             weather_range if is_selected else None, rotation_template, data_dir,
-            inherited_harvest_checked=True)
+            inherited_harvest_checked=True, executable=executable)
         treatment_problems, lines = _check_entry(
             entry, number, where, entry_problems, text, filex,
             start_date if is_selected else None, weather_range if is_selected else None,
             treatment_cultivar_path,
             new_cultivars=new_cultivars,
+            executable=executable,
             start_date_note=start_date_note if is_selected else
             "only the selected treatment has a resolved simulation start date")
         treatment_problems.extend(rotation_problems)

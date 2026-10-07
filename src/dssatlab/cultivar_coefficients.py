@@ -169,7 +169,7 @@ def _new_cultivar(filex, cultivar):
     """Append a checked new cultivar to the first table in the folder copy."""
     from .cultivar import _cultivar_codes
 
-    path, codes = _cultivar_codes(filex, cultivar["crop"])
+    path, codes = _cultivar_codes(filex, cultivar["crop"], sibling_only=True)
     if cultivar["code"] in codes:
         return cultivar  # Identical definitions across template treatments share one line.
     lines, index, spans = _coefficient_line(path)
@@ -199,7 +199,7 @@ def _changed_cultivar(filex, cultivar):
     if "coefficients" not in cultivar:
         return cultivar
     from .cultivar import _cultivar_codes
-    path, codes = _cultivar_codes(filex, cultivar["crop"])
+    path, codes = _cultivar_codes(filex, cultivar["crop"], sibling_only=True)
     lines, index, spans = _coefficient_line(path, cultivar["code"])
     code = next(f"DL{i:04d}" for i in range(1, 10000) if f"DL{i:04d}" not in codes)
     source = lines[index]

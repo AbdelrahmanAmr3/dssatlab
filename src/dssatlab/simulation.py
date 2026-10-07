@@ -212,7 +212,7 @@ class Simulation:
             else:
                 management_problems, management_report = _check_management(
                     checked_data, self.filex, self.treatment, None if forecast else coverage_rows, start_date,
-                    start_date_note=skip_reason, check_harvest=False,
+                    start_date_note=skip_reason, check_harvest=False, executable=self.executable,
                 )
                 problems.extend(management_problems)
                 report.extend(management_report)
