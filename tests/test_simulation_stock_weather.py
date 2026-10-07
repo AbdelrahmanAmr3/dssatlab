@@ -1,4 +1,4 @@
-"""Stock weather uses the usual checks and reaches DSSAT without rewriting."""
+"""Stock weather checks placement and reaches DSSAT without rewriting."""
 
 from datetime import date
 from pathlib import Path
@@ -148,7 +148,8 @@ def test_stock_par_is_ignored_by_checks_and_copied(inputs, fake_dssat, tmp_path,
 @pytest.mark.parametrize("column", ["srad", "tmax", "tmin", "rain"])
 @pytest.mark.parametrize("missing", [-99, "", None])
 @pytest.mark.parametrize("stock", [False, True])
-def test_required_weather_missing_value_reports_date(inputs, tmp_path, column, missing, stock):
+def test_missing_weather_values_are_checked_only_for_template_data(
+        inputs, tmp_path, column, missing, stock):
     if stock:
         source = stock_file(tmp_path)
         spans = {"srad": b"  20.0N", "tmax": b"   25.0", "tmin": b"   15.0", "rain": b"    0.0"}
@@ -158,8 +159,11 @@ def test_required_weather_missing_value_reports_date(inputs, tmp_path, column, m
         source = [dict(row) for row in inputs.rows]
         source[0][column] = missing
     problems = lab.Simulation(inputs.filex, 2, source).check(False)
-    message = next(problem for problem in problems if f"column {column!r}" in problem)
-    assert "1982-02-24" in message
+    if stock:
+        assert problems == []
+    else:
+        message = next(problem for problem in problems if f"column {column!r}" in problem)
+        assert "1982-02-24" in message
 
 
 @pytest.mark.parametrize("ending", [b"\r\n\x1a", b"\x1a", b"\x1a\r\n"])
@@ -179,26 +183,11 @@ def test_stock_weather_rejects_dos_eof_in_middle(inputs, tmp_path, marker):
     assert any("invalid date" in problem and "\\x1a" in problem for problem in problems)
 
 
-@pytest.mark.parametrize("problem", ["station", "gap", "duplicate", "srad"])
-def test_stock_weather_has_one_usual_weather_problem(inputs, tmp_path, problem):
-    source = stock_file(tmp_path, name="xyzz8201.wth" if problem == "station" else "ufga8201.wth")
-    if problem == "gap":
-        source = stock_file(tmp_path, days=[date(1982, 2, 25), date(1982, 2, 27)])
-        expected = ("Weather data: missing date 1982-02-26. "
-                    "Supply one row for each missing calendar day.")
-    elif problem == "duplicate":
-        source = stock_file(tmp_path, days=[date(1982, 2, 24), date(1982, 2, 25),
-                                           date(1982, 2, 25), date(1982, 2, 26)])
-        expected = ("Weather data duplicate date 1982-02-25 in rows 3 and 4. "
-                    "Keep one row per day.")
-    elif problem == "srad":
-        source.write_bytes(source.read_bytes().replace(b"  20.0N", b"  -99.0", 1))
-        expected = ("Weather data row 2, column 'srad' (1982-02-24): found -99.0; "
-                    "allowed range is 0 to 45 MJ/m2 per day. Correct the value using DSSAT's units.")
-    else:
-        expected = ("FileX WSTA 'UFGA' expects station 'UFGA', but stock weather file xyzz8201.wth has "
-                    "station 'XYZZ'. Make the station codes exactly equal; "
-                    "filenames are case-sensitive on Linux.")
+def test_stock_weather_station_mismatch_still_rejects_run(inputs, tmp_path):
+    source = stock_file(tmp_path, name="xyzz8201.wth")
+    expected = ("FileX WSTA 'UFGA' expects station 'UFGA', but stock weather file xyzz8201.wth has "
+                "station 'XYZZ'. Make the station codes exactly equal; "
+                "filenames are case-sensitive on Linux.")
     before = snapshot(tmp_path)
     sim = lab.Simulation(inputs.filex, 2, source)
     assert sim.check(verbose=False) == [expected]
@@ -206,6 +195,33 @@ def test_stock_weather_has_one_usual_weather_problem(inputs, tmp_path, problem):
         sim.run()
     assert error.value.problems == [expected]
     assert snapshot(tmp_path) == before
+
+
+@pytest.mark.parametrize("codes", [
+    ("82055", "82056", "82056", "82057"),
+    ("82055", "82057", "82056"),
+])
+def test_stock_repeated_and_unordered_dates_are_copied(inputs, fake_dssat, tmp_path, codes):
+    source = weather_file(tmp_path, "ufga8201.wth", codes)
+    source.write_bytes(source.read_bytes().replace(b"  20.0N", b"   58.3"))
+    sim = lab.Simulation(inputs.filex, 2, source)
+    before = source.read_bytes()
+    assert sim.check(False) == []
+    assert_copied(sim.run(), [source])
+    assert source.read_bytes() == before
+
+
+def test_stock_missing_weather_warning_still_raises(inputs, fake_dssat, tmp_path):
+    source = stock_file(tmp_path)
+    source.write_bytes(source.read_bytes().replace(b"  20.0N", b"  -99.0"))
+    fake_dssat.outputs["WARNING.OUT"] = b"Weather record not found for YR DOY: 1982 058\n"
+    sim = lab.Simulation(inputs.filex, 2, source)
+    assert sim.check(False) == []
+    with pytest.raises(lab.DSSATRunError, match="1982-02-27"):
+        sim.run()
+    folders = list(inputs.filex.parent.glob("dssat_sim_*"))
+    assert len(folders) == 1
+    assert (folders[0] / source.name.upper()).read_bytes() == source.read_bytes()
 
 
 @pytest.mark.parametrize("form", ["path", "str", "list"])

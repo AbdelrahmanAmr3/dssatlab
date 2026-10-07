@@ -420,8 +420,11 @@ FileX templates, including per-field sources, require weather data rows instead,
 and latitude, longitude and elevation by the `@ INSI` header. It reads daily
 DATE, SRAD, TMAX, TMIN and RAIN by their fixed header spans.
 One trailing letter flag on a number is accepted. Other daily columns, including PAR, are ignored
-by the checks and reach DSSAT unchanged. Required weather values of `-99` fail
-the usual range checks; nothing is filled or repaired.
+by the checks and reach DSSAT unchanged. DSSAT reads stock values itself: template
+value ranges, identical station values and duplicate-date checks do not apply.
+For example, stock MSKB files change elevation from 285 m to 200 m, repeat dates
+and contain SRAD 58.3; these are accepted unchanged, including missing values
+such as `-99`. Nothing is filled or repaired.
 
 Dates may be YYDDD (`@DATE`, without `$WEATHER`) or YYYYDDD (`@  DATE`, with a
 `$WEATHER` format marker). A `*WEATHER DATA` file uses five-digit dates; seven-digit
@@ -431,9 +434,12 @@ DSSAT's weather century rule, anchored to the simulation start, including a
 first-record adjustment back one century when the record falls after that start,
 and a 99-to-00 rollover. Checks follow the files DSSAT selects, rather than the
 order of the supplied paths. The preliminary read checks structure without
-decoding unselected dates. Daily dates must be ascending, unique and continuous
-across selected file boundaries. Coordinates and
-daily ranges use the [weather template checks](#prepare-the-weather-template).
+decoding unselected dates. Coverage uses the **set of dates present** in selected
+files: repeated dates do not add coverage or cause a problem. Missing days inside
+the required period, including gaps across selected file boundaries, are rejected.
+Gaps before the simulation start or after a fixed harvest do not affect coverage.
+The [weather template checks](#prepare-the-weather-template) still apply in full
+to weather supplied as template data.
 Start coverage, the last seasonal start and scheduled sequence ends use the same
 FileX checks as template weather. Stock weather must also cover a fixed harvest
 (HARVS R), including the last season's inherited HDATE. Supplied experiment-data event dates are
@@ -466,7 +472,7 @@ counts as supplied coverage. Supply the requested yearly file to take priority.
 
 These are the stock-specific messages, with `{...}` standing for the reported
 path, value or list. `{error}` is the operating-system read error; quoted values
-use Python's representation. Usual weather and FileX problems are reported too.
+use Python's representation. FileX placement and coverage problems are reported too.
 
 ```text
 Weather data mixes file paths and data rows. Supply only stock weather file paths, or only weather data rows or a DataFrame.
@@ -480,6 +486,7 @@ DSSAT requests {name}, but no supplied file meets this lookup{reason}. Checked s
 DSSAT requests {name} at rollover on {date}. Checked supplied weather in the selected simulation folder; rollover does not search WED or use the four-character fallback. Supply {name} beside the FileX.
 Installed weather file {installed_path} shadows supplied {fallback}. Checked supplied names: {names} and DSSATPRO WED {wed}. Supply {name} in the simulation folder to take priority.
 Stock weather file {path}, line {line}: invalid date {value!r}. Supply a valid YYDDD or YYYYDDD calendar date matching the DATE header width.
+Stock weather: missing date {date}. Checked dates present in the selected files from {start} through {end}. Supply stock weather covering every day in that period.
 ```
 
 `{label}` is LAT, LONG, ELEV, DATE, SRAD, TMAX, TMIN or RAIN. A station mismatch

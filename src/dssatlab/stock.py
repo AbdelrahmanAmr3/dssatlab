@@ -17,7 +17,7 @@ from .sequence import _sequence_end, _sequence_shift, _sequence_stop
 from .soil import _parse_soil, write_soil_file
 from .weather import _parse_weather, write_weather_file
 from .weather_files import (_read_stock_weather, _walk_weather_files, _weather_directory,
-                            _weather_anchor_problems)
+                            _weather_anchor_problems, _stock_weather_gaps)
 
 
 def _stock_weather_paths(source):
@@ -193,13 +193,16 @@ def _simulation_weather(sim, values, experiment_data, components):
         problems.extend(_weather_anchor_problems(anchor, dates))
     if not rows and problems:
         return [], problems  # Do not add "no daily rows" for unreadable stock files.
-    rows, checks = _parse_weather(rows)
+    # DSSAT reads stock values itself; template value and duplicate checks do not apply.
+    if rows and not is_forecast:
+        coverage_end = walk_end if walk_end is not None else max(row["date"] for row in rows)
+        problems.extend(_stock_weather_gaps(rows, start, coverage_end))
     if harvest is not None and not is_forecast and rows and harvest > max(row["date"] for row in rows if "date" in row):
         label = "Controls years" if "years" in _selected_controls(experiment_data, sim.treatment) else "FileX NYERS"
         problems.append(f"{label} {years}: the fixed harvest is on {harvest}, "
                         f"after the weather data ends ({max(row['date'] for row in rows)}). "
                         f"Supply weather through {harvest}, or fewer years.")
-    return rows, problems + checks
+    return rows, problems
 
 
 def _write_simulation_weather(source, rows, folder, values):
