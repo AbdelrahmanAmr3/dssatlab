@@ -29,7 +29,7 @@ The lesson uses only public dssatlab API and unchanged stock inputs.
 The case is stock `Maize/UFGA8201.MZX`, all six Gainesville maize treatments, cultivar McCurdy 84aa (`IB0035`), with `Weather/UFGA8201.WTH`, `Soil/SOIL.SOL` (profile `IBMZ910014`), and the matching `Maize/UFGA8201.MZA` and `.MZT`.
 No additional case inputs or genotype files are bundled.
 
-All six observed treatments are simulated. Each has 13 dated measurements and 12 exact matches in Plant growth, from 26 February to 4 July 1982; the six dated rows on 8 July are excluded from Evaluation and retained in both growth plots.
+All six observed treatments are simulated. Each treatment has 13 retained dated observations; 12 match Plant growth between 26 February and 28 June 1982. Simulated growth continues through 4 July; the six observations on 8 July are excluded from Evaluation and retained in both growth plots.
 `evaluate()` accepts all FileA rows plus the matched FileT rows directly, including their other supported measurement columns; no column-filtering dictionaries are needed.
 The lesson displays statistics for HWAM, ADAT, MDAT, LAID and GWAD, and the exercise displays CWAD by default.
 The reader omits unsupported stock columns and unmeasured `-99` values.
