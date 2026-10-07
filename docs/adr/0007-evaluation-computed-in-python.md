@@ -25,3 +25,16 @@ Observed data uses DSSAT's own column names and units, so the comparison needs n
 - No new DSSAT file writer; the comparison is testable without DSSAT.
 - A pair that cannot be compared (no simulated row, `-99`) is a check problem, never dropped.
 - A user who needs DSSAT's own `Evaluate.OUT` statistics must run DSSAT by hand.
+
+## Amendment: observations outside the simulated range (#370)
+
+Daily observed rows before the first or after the last Plant growth day of their
+scenario and treatment are listed in `Evaluation.excluded`, rather than raised
+as check problems. Each excluded row records its scenario, treatment, YYYYDDD
+date and a reason naming the simulated boundary; its measurements are not
+checked and contribute no pairs or statistics. Missing dates inside the range,
+empty Plant growth, unmatched results, absent variables, missing simulated
+values and bad observed data remain check problems. If every observed row is
+excluded, evaluation raises because there is nothing to compare. The trailing
+list defaults independently for each instance, preserving
+`Evaluation(pairs, statistics)`; plotting is unchanged.

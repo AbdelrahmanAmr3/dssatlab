@@ -202,7 +202,18 @@ for the required quantities and missing-value limits.
 
 ::: dssatlab.write_observed_template
 
+`evaluate()` lists daily observed rows outside their scenario and treatment's
+Plant growth date range in `Evaluation.excluded`. Each row has `scenario`,
+`treatment`, a YYYYDDD `date` and a `reason` naming the simulated boundary.
+Excluded measurements are not checked and contribute no pairs or statistics.
+Missing interior days, empty Plant growth and every observed row being excluded
+still raise `DSSATCheckError`.
+
 ::: dssatlab.evaluate
+
+`Evaluation(pairs, statistics, excluded=...)` accepts the trailing list;
+omitting it creates an independent empty list. Its representation includes the
+excluded count only when nonzero. `to_dataframe()` continues to return pairs.
 
 ::: dssatlab.evaluate.Evaluation
 
