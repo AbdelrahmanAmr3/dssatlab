@@ -101,16 +101,29 @@ def test_names_are_ignored(filex):
 
 
 @pytest.mark.parametrize("treatment,event_level,event_number", [
-    (1, 1, 9), (1, 2, 1), (3, 2, 1),
+    (1, 1, 9), (3, 2, 1),
 ])
-def test_irrigation_events_follow_control_block(filex, treatment, event_level, event_number):
-    entry = dl.read_experiment(filex, treatment)
+def test_mismatched_irrigation_event_numbers_are_rejected(filex, treatment, event_level, event_number):
     text = filex.read_text(encoding="utf-8")
     event = f" {event_level} 82063 IR001    13"
     assert event in text
     filex.write_text(text.replace(event, f" {event_number} 82063 IR001    13"),
                      encoding="utf-8")
-    assert dl.read_experiment(filex, treatment) == entry
+    before = filex.read_bytes()
+    with pytest.raises(dl.DSSATCheckError) as error:
+        dl.read_experiment(filex, treatment)
+    message = str(error.value)
+    assert all(part in message for part in (
+        str(filex), f"level {event_level}", "column I", str(event_number), "DSSAT", "Supply"))
+    assert filex.read_bytes() == before
+
+
+def test_unselected_irrigation_block_is_not_read(filex):
+    entry = dl.read_experiment(filex)
+    text = filex.read_text(encoding="utf-8")
+    filex.write_text(text.replace(" 2 82063 IR001    13", " 1 82063 IR001    13"),
+                     encoding="utf-8")
+    assert dl.read_experiment(filex) == entry
 
 
 @pytest.mark.parametrize("section,column,value", [
@@ -188,6 +201,35 @@ def test_day_timing_reads_selected_sm_and_efficiency(filex):
     _factor(filex, "SM", 2)
     assert dl.read_experiment(filex)["irrigation"] == dict(
         efficiency=.75, events=[dict(days_after_planting=0, method="IR001", amount=13)])
+
+
+@pytest.mark.parametrize("sm", [1, 2])
+@pytest.mark.parametrize("code", ["R", "D"])
+def test_fertilizer_dates_use_selected_sm_timing(filex, sm, code):
+    text = filex.read_text(encoding="utf-8")
+    for old, new in zip(("82097", "82102", "82137"), ("00030", "00040", "00060")):
+        text = text.replace(f" 1 {old} FE001", f" 1 {new} FE001")
+    if sm == 2:
+        # The unselected level uses the opposite timing mode.
+        text += "\n@N MANAGEMENT  PLANT IRRIG FERTI RESID HARVS\n"
+        text += " 2 MA              R     R     R     N     M\n"
+    filex.write_text(text, encoding="utf-8")
+    if sm == 2:
+        _change(filex, "SIMULATION CONTROLS", "FERTI", "D" if code == "R" else "R")
+    _factor(filex, "SM", sm)
+    _change(filex, "SIMULATION CONTROLS", "FERTI", code, level=sm)
+    before = filex.read_bytes()
+    if code == "D":
+        with pytest.raises(dl.DSSATCheckError) as error:
+            dl.read_experiment(filex)
+        message = str(error.value)
+        assert all(part in message for part in (
+            str(filex), "FERTILIZERS level 1", "FDATE", "FERTI D",
+            f"SM level {sm}", "days after planting", "Use"))
+    else:
+        assert [event["date"] for event in dl.read_experiment(filex)["fertilizer"]] == [
+            "2000-01-30", "2000-02-09", "2000-02-29"]
+    assert filex.read_bytes() == before
 
 
 @pytest.mark.parametrize("code", list("AFNX"))

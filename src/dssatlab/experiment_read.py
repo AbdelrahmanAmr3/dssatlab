@@ -33,6 +33,14 @@ def _level_rows(text, section, key, level):
             if section != "IRRIGATION AND WATER MANAGEMENT" or "EFIR" in columns:
                 selected = number == level
             if selected:
+                if number != level:
+                    # IPIRR stops reading events when LN > LNIR; do not guess
+                    # how a mismatched block should be rewritten by the writer.
+                    raise ValueError(f"{where} column I: event number {number} differs "
+                                     "from the control level. DSSAT stops the schedule "
+                                     "when an event number exceeds that level. Supply "
+                                     "matching event numbers or keep this section in "
+                                     "the FileX without reading it.")
                 row = {name: line[max(start, 3) if name != key else start:end].strip()
                        for name, (start, end) in columns.items()}
                 row[key] = str(number)
@@ -111,8 +119,25 @@ def _read_planting(text, level):
     return planting
 
 
-def _read_fertilizer(text, level):
+def _management_code(text, treatment_row, column, where):
+    try:
+        sm = int(treatment_row["SM"])
+    except ValueError:
+        raise ValueError(f"{where}: TREATMENTS column SM {treatment_row['SM']!r} "
+                         "is not an integer level. Supply an existing simulation controls level.") from None
+    return _section_row(text, "SIMULATION CONTROLS", "N", sm,
+                        ("MANAGEMENT", column))[column]
+
+
+def _read_fertilizer(text, treatment_row, level):
     where = f"FERTILIZERS level {level}"
+    code = _management_code(text, treatment_row, "FERTI", where)
+    if code == "D":
+        raise ValueError(f"{where} column FDATE: FERTI D at TREATMENTS SM level "
+                         f"{treatment_row['SM']} means days after planting, which "
+                         "fertilizer experiment data cannot represent. Use FERTI R "
+                         "with calendar FDATE values or keep this section in the "
+                         "FileX without reading it.")
     fields = {"FMCD": "material", "FACD": "application", "FDEP": "depth",
               "FAMN": "n", "FAMP": "p", "FAMK": "k"}
     rows = _level_rows(text, "FERTILIZERS", "F", level)
@@ -145,13 +170,7 @@ def _read_irrigation(text, treatment_row, level):
     for row in rows:
         _check_columns(row, {"I", "EFIR", "IRNAME", "IDATE", "IROP", "IRVAL"}, where)
     efficiency = _number(controls[0]["EFIR"], "EFIR", where)
-    try:
-        sm = int(treatment_row["SM"])
-    except ValueError:
-        raise ValueError(f"{where}: TREATMENTS column SM {treatment_row['SM']!r} "
-                         "is not an integer level. Supply an existing simulation controls level.") from None
-    code = _section_row(text, "SIMULATION CONTROLS", "N", sm,
-                        ("MANAGEMENT", "IRRIG"))["IRRIG"]
+    code = _management_code(text, treatment_row, "IRRIG", where)
     events = []
     for row in rows:
         if "EFIR" in row:
@@ -235,7 +254,7 @@ def read_experiment(filex: str | Path, treatment: int | str = 1) -> dict:
                 if section == "planting":
                     entry[section] = _read_planting(text, level)
                 elif section == "fertilizer":
-                    entry[section] = _read_fertilizer(text, level)
+                    entry[section] = _read_fertilizer(text, row, level)
                 else:
                     entry[section] = _read_irrigation(text, row, level)
         return entry
