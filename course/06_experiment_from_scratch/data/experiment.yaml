@@ -1,0 +1,17 @@
+treatments:
+  1:
+    controls:
+      water: "N"
+      nitrogen: "N"
+  2:
+    planting:
+      date: "1982-02-26"
+      method: "S"
+      distribution: "R"
+      population: 8
+      emergence_population: 8
+      row_spacing: 61
+      depth: 7
+    controls:
+      water: "N"
+      nitrogen: "N"
