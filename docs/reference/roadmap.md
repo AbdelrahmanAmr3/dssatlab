@@ -41,7 +41,8 @@ What each version added, and what is deliberately not built yet. The full histor
 | 0.21.0 | Generated weather from a supplied `.CLI` climate file through `weather=`, and experiment data controls `weather_source`, `replicates` and `random_seed` (ADR 0032). See [generated weather](../guide/generated-weather.md). |
 | 0.21.1 | `net_returns()` from a DSSAT `.PRI` price file, in `summarize_seasons` and `to_dataframe()` (ADR 0033). See [seasonal economics](../guide/seasonal.md). |
 | 0.21.2 | A climate file as a FileX template field's weather source, including rotation templates (ADR 0034). See [generated weather](../guide/generated-weather.md#use-a-climate-file-in-a-filex-template). |
-| 0.22.0 (current) | Yield forecast: a `Simulation` runs one treatment of a copied `.FCX` in DSSAT mode Y with your measured weather, with `controls.forecast_date` and `controls.years` (ADR 0035). See the [simulation guide](../guide/simulation.md). |
+| 0.22.0 | Yield forecast: a `Simulation` runs one treatment of a copied `.FCX` in DSSAT mode Y with your measured weather, with `controls.forecast_date` and `controls.years` (ADR 0035). See the [simulation guide](../guide/simulation.md). |
+| 0.23.0 (current) | Course fixes: `evaluate()` lists observations outside the simulated days, `run_sweep(base=False)`, `read_experiment()`, `directory=` for run and simulation folders, `RunResult.warnings`, crop codes in `list_cultivars()`, labelled plots, and stock weather checked for structure and coverage only. See the [course](../course.md). |
 
 ## Deliberately not built yet
 
