@@ -16,6 +16,13 @@ No blocking friction was found. The lesson uses only public dssatlab API, unchan
 - **Suggested change:** Offer an `include_par` option or an example template that visibly documents the optional daily PAR column and its units.
 - **Classification:** **non-blocking**; the mapping table includes PAR in mol/m2 per day and the course-written CSV preserves every stock PAR value. The lesson does not claim that omitting PAR would change this case's yield.
 
+## 3. Full-year and short-span statistics use two nested layouts - non-blocking
+
+- **What the student must do:** Learn `["years"][0]["srad_mean"]` for the full-year table and `["variables"]["srad"]["mean"]` for a short-span summary.
+- **Why it is awkward:** `summarize_weather()` exposes statistics in two different shapes: flat per-year names and nested per-variable statistics. Both layouts are returned for a full year and a short span; the return shape itself does not change with the date range, but students must learn two access patterns used in examples.
+- **Suggested change:** Use the same variable layout for overall and per-year statistics, or document one consistent access pattern for single-span summaries.
+- **Classification:** **non-blocking**; the lesson retains the annual table and drops the month exercise to make room for a model-based warming exercise.
+
 ## Validation
 
 The inputs are stock `Maize/UFGA8201.MZX`, `Soil/SOIL.SOL` and `Weather/UFGA8201.WTH`, matching lesson 01 byte-for-byte, plus `station_weather.csv` written for the course.
@@ -28,9 +35,12 @@ The annual summary covers 1982-01-01 through 1982-12-31: 365 days, mean solar ra
 
 The intentionally broken first data row has tmax 14.6 below tmin 15.6 degrees C; `Simulation.run()` raises `DSSATCheckError` before DSSAT runs.
 Restoring tmax to its measured 24.4 degrees C makes `sim.check(verbose=False)` return `[]`.
-The self-contained exercise defaults to June: 30 days, mean solar radiation 21.09 MJ/m2/day, mean maximum/minimum temperatures 32.58/20.66 degrees C and rainfall 222.00 mm.
+The self-contained exercise adds 2 degrees C to every daily tmax and tmin, runs treatment 1 with unchanged station weather and warmed weather, and compares HWAM and maturity dates.
+Unchanged station weather gives HWAM 2,293 kg/ha and maturity 1982-07-04; warmed weather gives 1,718 kg/ha and maturity 1982-06-24, a yield change of -575 kg/ha and maturity 10 days earlier.
+The stock management remains unchanged, including its one 13 mm irrigation.
 
 The exercise also passed in a fresh kernel with only LESSON, SETUP_CELL and the tools cell before it.
+Changing warming to 0 in that kernel gave HWAM 2,293 kg/ha and the same maturity date for both runs.
 The two final consecutive `python course/execute.py 04_own_weather` executions both printed `04_own_weather: ok`.
 `python -m pytest -q tests/test_course.py --basetemp=<system-temp-folder> -p no:cacheprovider` passed all 15 tests; no pytest temp directories were created in the worktree.
 
@@ -39,4 +49,6 @@ Process-local LOCALAPPDATA, IPYTHONDIR and JUPYTER_RUNTIME_DIR point under syste
 The inline plot was visually checked, and the notebook's source and textual outputs contain none of the encoding corruption patterns `??`, `m?` or ` ? `.
 
 Both successful runs retain the stock warnings about zero soil saturated hydraulic conductivity, SLPF 0.92 and SRAD 0.80 MJ/m2/day on day 98 of 1982, also recorded by lesson 01; none is a missing-weather warning.
-The optional NASA POWER extension was omitted because network access is blocked; all required cells run offline against the local installation.
+The optional NASA POWER cell requests Gainesville (29.63 N, 82.37 W) daily AG-community CSV data for 1982, then passes the downloaded file to `dl.import_nasa_power()`.
+Network errors are caught without exposing exception paths; both executions printed exactly `NASA POWER skipped: no network`.
+The online import branch was not exercised against the remote service because network access is blocked; all required cells run offline against the local installation.
