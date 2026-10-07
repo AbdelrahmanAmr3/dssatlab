@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .errors import DSSATCheckError
 from .management_file import _load_management
+from .runner import _resolve_directory
 from .scenarios import _select_treatments, combine_summaries, run_treatments
 
 
@@ -46,7 +47,7 @@ def run_sweep(filex=None, weather=None, factors=None, treatments=None, soil=None
         factors={"cultivar": {p1: {"crop": "MZ", "code": "IB0035",
                  "coefficients": {"P1": p1}} for p1 in (200, 259, 320)}}
     """
-    directory = Path(directory).resolve() if directory is not None else None
+    directory = _resolve_directory(directory)
     experiment, problems = _load_management(management)
     if management is None:
         experiment = {"treatments": {}}

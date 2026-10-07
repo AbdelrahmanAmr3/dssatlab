@@ -18,7 +18,7 @@ from .experiment import _overrides_section
 from .operations import _check_harvest
 from .management_file import _load_management
 from .rotation_data import _write_rotation_data
-from .runner import RunResult, _check_missing_weather, _create_dated_folder, run
+from .runner import RunResult, _check_missing_weather, _create_dated_folder, _resolve_directory, run
 from .sequence import (_check_sequence, _rotation_components, _run_sequence,
                        _sequence_coverage, _sequence_experiment_data,
                        _parse_sdate, _simulation_start, _simulation_start_date)
@@ -73,7 +73,7 @@ class Simulation:
         self.management = management
         self.executable = executable
         self.name = name
-        self.directory = Path(directory).resolve() if directory is not None else None
+        self.directory = _resolve_directory(directory)
 
     def check(self, verbose: bool | None = None) -> list[str]:
         """Return all input problems without writing files or running DSSAT.

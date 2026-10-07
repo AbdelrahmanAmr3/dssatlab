@@ -67,13 +67,27 @@ class RunResult:
         return plot_plant_growth(self.run_dir, variable)
 
 
+def _resolve_directory(directory) -> Path | None:
+    """Resolve directory= at the call, naming unusable paths and their remedy."""
+    if directory is None:
+        return None
+    try:
+        return Path(directory).resolve()
+    except (OSError, ValueError) as error:
+        raise DSSATRunError(
+            f"Cannot resolve directory {directory}: "
+            f"tried to resolve it against the current directory ({error}). "
+            "Pass directory= with a valid writable folder path instead."
+        ) from error
+
+
 def _create_dated_folder(parent: Path, prefix: str, label: str, *, directory=None) -> Path:
     """Create a fresh dated folder, adding a suffix for each existing name."""
     if directory is not None:
         parent = Path(directory)
         try:
             parent.mkdir(parents=True, exist_ok=True)
-        except OSError as error:
+        except (OSError, ValueError) as error:
             raise DSSATRunError(
                 f"Cannot create {label} inside directory {parent}: "
                 f"checked or tried to create its parents ({error}). "
@@ -89,7 +103,7 @@ def _create_dated_folder(parent: Path, prefix: str, label: str, *, directory=Non
         except FileExistsError:
             folder = parent / f"{directory_name}-{suffix}"
             suffix += 1
-        except OSError as error:
+        except (OSError, ValueError) as error:
             if directory is not None:
                 raise DSSATRunError(
                     f"Cannot create {label} {folder}: directory {parent} "
@@ -176,7 +190,7 @@ def run(
             the DSSAT executable cannot be executed, DSSAT exits with a non-zero code,
             or ERROR.OUT is generated during the run.
     """
-    directory = Path(directory).resolve() if directory is not None else None
+    directory = _resolve_directory(directory)
     filex = Path(filex).resolve()
     if not filex.is_file():
         raise DSSATRunError(

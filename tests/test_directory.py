@@ -103,7 +103,9 @@ def test_batches_use_one_directory_for_every_simulation(
 
 
 @pytest.mark.parametrize("api", ["run", "simulation", "treatments", "sweep"])
-@pytest.mark.parametrize("failure", ["file", "parent-file", "permission", "dated-folder"])
+@pytest.mark.parametrize("failure", ["file", "parent-file", "permission", "dated-folder",
+                                     "null", "resolve-oserror", "resolve-valueerror",
+                                     "mkdir-valueerror", "dated-folder-valueerror"])
 def test_unusable_directory_names_path_and_remedy(
         inputs, fake_dssat, tmp_path, monkeypatch, api, failure):
     parent = tmp_path / "chosen"
@@ -112,6 +114,19 @@ def test_unusable_directory_names_path_and_remedy(
     elif failure == "parent-file":
         parent.write_text("keep me", encoding="utf-8")
         parent = parent / "nested"
+    elif failure == "null":
+        parent = "bad\0path"
+    elif failure in ("resolve-oserror", "resolve-valueerror"):
+        resolve = Path.resolve
+
+        def invalid(path, *args, **kwargs):
+            if path == parent:
+                if failure == "resolve-oserror":
+                    raise OSError("cannot resolve path")
+                raise ValueError("invalid path")
+            return resolve(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "resolve", invalid)
     else:
         mkdir = Path.mkdir
 
@@ -120,6 +135,10 @@ def test_unusable_directory_names_path_and_remedy(
                 raise PermissionError("access denied")
             if failure == "dated-folder" and path.parent == parent:
                 raise PermissionError("access denied")
+            if failure == "mkdir-valueerror" and path == parent:
+                raise ValueError("invalid path")
+            if failure == "dated-folder-valueerror" and path.parent == parent:
+                raise ValueError("invalid path")
             return mkdir(path, *args, **kwargs)
 
         monkeypatch.setattr(Path, "mkdir", denied)

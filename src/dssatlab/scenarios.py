@@ -8,7 +8,7 @@ from .filex import read_treatment_numbers
 from .filex_template import _load_filex_template, _template_treatment_names
 from .management_file import _load_yaml
 from .outputs import read_summary
-from .runner import RunResult
+from .runner import RunResult, _resolve_directory
 from .simulation import Simulation
 from .climate import _select_batch_weather
 
@@ -109,7 +109,7 @@ def run_treatments(filex=None, weather=None, treatments=None, soil=None, managem
     The first DSSATRunError stops the batch and names earlier kept run
     directories. ``executable`` selects the DSSAT executable as for Simulation.
     """
-    directory = Path(directory).resolve() if directory is not None else None
+    directory = _resolve_directory(directory)
     treatments = _select_treatments(filex, filex_template, treatments)
 
     base = dict(weather=weather, soil=soil, management=management)
