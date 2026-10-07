@@ -68,10 +68,16 @@ def test_weather_summary_spans_new_year(weather):
             "rain": {"min": 0, "mean": 0.75, "max": 2}},
         "rain_total": 3.02,
         "years": [
-            {"year": 2020, "days": 2, "srad_mean": 15, "tmax_mean": 21,
-             "tmin_mean": 1, "rain_total": 0.01},
-            {"year": 2021, "days": 2, "srad_mean": 35, "tmax_mean": 25,
-             "tmin_mean": 5, "rain_total": 3.01}]}
+            {"year": 2020, "days": 2, "variables": {
+                "srad": {"min": 10, "mean": 15, "max": 20},
+                "tmax": {"min": 20, "mean": 21, "max": 22},
+                "tmin": {"min": 0, "mean": 1, "max": 2},
+                "rain": {"min": 0, "mean": 0, "max": 0}}, "rain_total": 0.01},
+            {"year": 2021, "days": 2, "variables": {
+                "srad": {"min": 30, "mean": 35, "max": 40},
+                "tmax": {"min": 24, "mean": 25, "max": 26},
+                "tmin": {"min": 4, "mean": 5, "max": 6},
+                "rain": {"min": 1, "mean": 1.5, "max": 2}}, "rain_total": 3.01}]}
     assert weather == before
 
 
@@ -108,13 +114,15 @@ def test_weather_summary_par_present(weather):
         row["par"] = par
     summary = dssatlab.summarize_weather(weather)
     assert summary["variables"]["par"] == {"min": 10, "mean": 25, "max": 40}
-    assert [year["par_mean"] for year in summary["years"]] == [15, 35]
+    assert [year["variables"]["par"] for year in summary["years"]] == [
+        {"min": 10, "mean": 15, "max": 20},
+        {"min": 30, "mean": 35, "max": 40}]
 
 
 def test_weather_summary_par_absent(weather):
     summary = dssatlab.summarize_weather(weather)
     assert "par" not in summary["variables"]
-    assert all("par_mean" not in year for year in summary["years"])
+    assert all("par" not in year["variables"] for year in summary["years"])
 
 
 def test_weather_summary_explicit_missing_elevation(weather):

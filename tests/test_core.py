@@ -237,8 +237,14 @@ def test_linux_consent_installs_without_double_save(tmp_path, monkeypatch):
 @pytest.mark.parametrize("system", ["Windows", "Darwin"])
 def test_install_rejects_non_linux(monkeypatch, system):
     monkeypatch.setattr(platform, "system", lambda: system)
-    with pytest.raises(DSSATInstallError, match="Linux/Colab.*v0.1"):
+    with pytest.raises(DSSATInstallError) as caught:
         core.install()
+    message = str(caught.value)
+    for text in ("Linux/Colab", "Checked", system, "Windows", "DSSAT 4.8",
+                 "dssat.net", "connect(path=...)"):
+        assert text in message
+    assert "v0.1" not in message
+    assert not config.config_file().exists()
 
 
 @pytest.mark.parametrize("cached", [False, True])

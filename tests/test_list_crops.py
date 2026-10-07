@@ -145,14 +145,43 @@ def test_list_cultivars_both_header_spellings_order_and_duplicates(fake_dssat_en
     ]
 
 
+@pytest.mark.parametrize("crop", ["soybean", "SOYBEAN", "SoyBean", "SB", "sb", "sB"])
+@pytest.mark.parametrize("explicit", [False, True])
+def test_list_cultivars_accepts_crop_name_or_code(fake_dssat_env, crop, explicit):
+    executable, _ = fake_dssat_env
+    options = {"executable": executable} if explicit else {}
+    assert list_cultivars(crop, **options) == [
+        {"code": "990011", "name": "M GROUP 000"},
+        {"code": "990012", "name": "M GROUP  00"},
+    ]
+
+
+@pytest.mark.parametrize("crop,code,prefix", [
+    ("maize", "MZ", "MZCER048"), ("wheat", "WH", "WHCER048"),
+    ("rice", "RI", "RICER048"), ("soybean", "SB", "SBGRO048"),
+    ("potato", "PT", "PTSUB048"), ("sorghum", "SG", "SGCER048"),
+    ("pearl millet", "ML", "MLCER048"), ("barley", "BA", "BACER048"),
+    ("peanut", "PN", "PNGRO048"), ("dry bean", "BN", "BNGRO048"),
+])
+def test_list_cultivars_codes_select_the_crops_genotype(fake_dssat_env, crop, code, prefix):
+    _, genotype_dir = fake_dssat_env
+    (genotype_dir / f"{prefix}.CUL").write_text(
+        "@VAR#  VRNAME.......... EXPNO   ECO#\n"
+        f"TEST01 {crop:<16}     . TEST01\n", encoding="utf-8")
+    expected = [{"code": "TEST01", "name": crop}]
+    assert list_cultivars(code.lower()) == expected
+    assert list_cultivars(crop.upper()) == expected
+
+
 def test_list_cultivars_unsupported_crop(fake_dssat_env):
     with pytest.raises(DSSATCheckError) as exc_info:
         list_cultivars("cotton")
     message = str(exc_info.value)
     assert "is not a template crop" in message
     assert "cotton" in message
-    for crop in _CROPS:
-        assert crop in message
+    assert "Checked" in message
+    for crop, (code, *_rest) in _CROPS.items():
+        assert f"{crop} ({code})" in message
 
     # Non-string input
     with pytest.raises(DSSATCheckError):

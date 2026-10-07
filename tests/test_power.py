@@ -67,7 +67,7 @@ def test_real_daily_file_writes_template_and_passes_checks(tmp_path, power_text)
         "1984-01-01", "1984-01-02", "1984-01-03"]
     template = tmp_path / "example.csv"
     dssatlab.write_weather_template(template)
-    assert list(rows[0]) == list(read_template(template)[0])
+    assert list(rows[0]) == [name for name in read_template(template)[0] if name != "par"]
     parsed, problems = weather._parse_weather(path)
     assert problems == []
     assert parsed[-1]["date"] == date(1984, 1, 3)

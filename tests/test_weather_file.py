@@ -125,6 +125,7 @@ def test_template_to_weather_file(tmp_path):
     weather.write_weather_template(template)
     rows, problems = weather._parse_weather(template)
     assert problems == []
+    assert [row["par"] for row in rows] == [40] * 7
     path = tmp_path / "weather.WTH"
     weather.write_weather_file(rows, path)
     assert path.read_bytes() == (
@@ -132,14 +133,14 @@ def test_template_to_weather_file(tmp_path):
         b"\n"
         b"@ INSI      LAT     LONG  ELEV   TAV   AMP REFHT WNDHT\n"
         b"  DEMO   45.000 -100.000   200 -99.0 -99.0-99.00-99.00\n"
-        b"@DATE  SRAD  TMAX  TMIN  RAIN\n"
-        b"21060  20.0  25.0  10.0   0.0\n"
-        b"21061  20.0  25.0  10.0   0.0\n"
-        b"21062  20.0  25.0  10.0   0.0\n"
-        b"21063  20.0  25.0  10.0   0.0\n"
-        b"21064  20.0  25.0  10.0   0.0\n"
-        b"21065  20.0  25.0  10.0   0.0\n"
-        b"21066  20.0  25.0  10.0   0.0\n"
+        b"@DATE  SRAD  TMAX  TMIN  RAIN   PAR\n"
+        b"21060  20.0  25.0  10.0   0.0  40.0\n"
+        b"21061  20.0  25.0  10.0   0.0  40.0\n"
+        b"21062  20.0  25.0  10.0   0.0  40.0\n"
+        b"21063  20.0  25.0  10.0   0.0  40.0\n"
+        b"21064  20.0  25.0  10.0   0.0  40.0\n"
+        b"21065  20.0  25.0  10.0   0.0  40.0\n"
+        b"21066  20.0  25.0  10.0   0.0  40.0\n"
     )
 
 

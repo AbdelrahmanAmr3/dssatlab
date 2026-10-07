@@ -10,6 +10,10 @@ This page documents the public API exported by `dssatlab`. Only names explicitly
 
 ::: dssatlab.install
 
+`install()` requires Linux (including Colab). On non-Linux platforms it raises
+`DSSATInstallError` with the checked platform and next steps. Windows users
+install DSSAT 4.8 from [dssat.net](https://dssat.net), then call `connect(path=...)`.
+
 ::: dssatlab.run
 
 ### RunResult
@@ -52,7 +56,8 @@ coverage exemption. See [stock weather files](../guide/simulation.md#use-stock-w
 Weather template columns are `station`, `latitude`, `longitude`, `elevation`,
 `date`, `srad`, `tmax`, `tmin`, `rain`, and optional `tav`, `amp`, `refht`,
 `wndht`, `par`. Daily `par` is in mol/m2 per day, finite and from 0 to 100
-inclusive; fill every row or omit the column. The written example omits `par`.
+inclusive; fill every row or omit the column. The written example includes
+`par` with 40 mol/m2 per day on every row; replace it with your data or remove it.
 See [weather columns and checks](../guide/simulation.md#prepare-the-weather-template).
 
 ::: dssatlab.import_nasa_power
@@ -86,14 +91,18 @@ is needed. Returns a plain dict with these keys:
 | `days` | Number of daily rows |
 | `variables` | Dict keyed by `srad`, `tmax`, `tmin`, `rain`, and `par` when supplied; each value has `min`, `mean`, `max` |
 | `rain_total` | Total rainfall in mm over all rows |
-| `years` | List of dicts in calendar-year order; each has `year`, `days`, `srad_mean`, `tmax_mean`, `tmin_mean`, `rain_total`, and `par_mean` when PAR is supplied |
+| `years` | List of dicts in calendar-year order; each has `year`, `days`, `variables` (the same min/mean/max layout as above), and `rain_total` |
 
 SRAD uses MJ/m2 per day, temperatures use degrees C, rain uses mm, and PAR
 uses mol/m2 per day. Each year's `days` is its actual row count, including
-partial years. `par` and `par_mean` appear only when PAR is supplied on every row.
+partial years. Both overall and yearly `variables` include `par` only when PAR
+is supplied on every row. Each year's `variables` also includes rain statistics.
 Statistics and rain totals use unrounded data, then Python's `round(value, 2)`
 once on each result. Station coordinates and elevation are not rounded.
 Use `to_dataframe(summary["years"])` for a yearly table if pandas is installed.
+Yearly statistics are nested: `summary["years"][0]["variables"]["srad"]["mean"]`.
+This replaces the former yearly `srad_mean`, `tmax_mean`, `tmin_mean`, and
+`par_mean` keys (a breaking change before 1.0).
 
 Raises one `DSSATCheckError` with all weather template problems in
 `error.problems`, using the same source checks as `Simulation.check()`.
@@ -141,6 +150,11 @@ See [Summarise your weather and soil before a run](../guide/simulation.md#summar
 ::: dssatlab.list_crops
 
 ::: dssatlab.list_cultivars
+
+`crop` accepts a template crop name or DSSAT crop code, case-insensitively;
+`list_cultivars("SB")` and `list_cultivars("soybean")` select the same table.
+An unknown name or code raises `DSSATCheckError` listing all template crop names
+and codes. `list_crops()` is unchanged.
 
 ## Treatments, scenarios and sweeps
 

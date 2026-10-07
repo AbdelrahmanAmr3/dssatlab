@@ -294,12 +294,15 @@ for crop in crops:
 To list the cultivar codes and names available for a template crop:
 
 ```python
-cultivars = dl.list_cultivars("soybean")
+cultivars = dl.list_cultivars("SB")  # "soybean" also works.
 for cv in cultivars[:5]:
     print(cv["code"], cv["name"])
 ```
 
 `list_cultivars(crop)` returns rows of dictionaries with keys `"code"` and `"name"` in `.CUL` file order, listing the first occurrence of each distinct code.
+It accepts a template crop name or DSSAT crop code, case-insensitively:
+`"soybean"`, `"SOYBEAN"`, `"SB"`, and `"sb"` select the same table.
+An unknown crop raises `DSSATCheckError` listing all template crop names and codes.
 
 Both listings accept an optional `executable=` argument, never touch the network or write to saved configuration, and return plain dictionaries compatible with `dl.to_dataframe()`.
 
@@ -547,7 +550,8 @@ empty; they are written as `-99` (not given). Supplied values must be finite
 numbers. The weather file uses their values from the first row, so put station
 values there. The checks do not require these values to be identical across rows.
 
-The template writer's example omits `par`; add it when you have daily PAR.
+The template writer's example includes `par` with 40 mol/m² per day on each row.
+Replace it with your daily PAR data, or remove the column when PAR is unavailable.
 Unlike station values, `par` must be supplied on every row if present, including
 in a list of dicts. A partially or entirely empty PAR column fails the checks.
 Daily values may vary and must be finite and from 0 to 100 inclusive. The writer
@@ -639,15 +643,19 @@ For the unchanged examples from `write_weather_template()` and
 
 ```text
 2021-03-01 2021-03-07 7
-{'srad': {'min': 20.0, 'mean': 20.0, 'max': 20.0}, 'tmax': {'min': 25.0, 'mean': 25.0, 'max': 25.0}, 'tmin': {'min': 10.0, 'mean': 10.0, 'max': 10.0}, 'rain': {'min': 0.0, 'mean': 0.0, 'max': 0.0}}
-[{'year': 2021, 'days': 7, 'srad_mean': 20.0, 'tmax_mean': 25.0, 'tmin_mean': 10.0, 'rain_total': 0.0}]
+{'srad': {'min': 20.0, 'mean': 20.0, 'max': 20.0}, 'tmax': {'min': 25.0, 'mean': 25.0, 'max': 25.0}, 'tmin': {'min': 10.0, 'mean': 10.0, 'max': 10.0}, 'rain': {'min': 0.0, 'mean': 0.0, 'max': 0.0}, 'par': {'min': 40.0, 'mean': 40.0, 'max': 40.0}}
+[{'year': 2021, 'days': 7, 'variables': {'srad': {'min': 20.0, 'mean': 20.0, 'max': 20.0}, 'tmax': {'min': 25.0, 'mean': 25.0, 'max': 25.0}, 'tmin': {'min': 10.0, 'mean': 10.0, 'max': 10.0}, 'rain': {'min': 0.0, 'mean': 0.0, 'max': 0.0}, 'par': {'min': 40.0, 'mean': 40.0, 'max': 40.0}}, 'rain_total': 0.0}]
 {'soil_id': 'IBMZ910214', 'layers': 3, 'depth': 30.0, 'extractable_water': 42.0, 'salb': 0.13, 'slro': 60.0, 'sldr': 0.5, 'slpf': 1.0}
 ```
 
 The weather summary shows the actual day count for each calendar year.
 Seven days are a partial year, so its rain total covers only those days.
-When your weather data has daily `par`, `variables` also has `par` and each
-year has `par_mean`. The soil summary gives depth in cm and extractable water
+Each year has `year`, `days`, `variables`, and `rain_total`. Its `variables`
+uses the same min/mean/max layout as the overall summary, including rain and
+daily `par` when supplied. To read a yearly mean, use
+`weather_summary["years"][0]["variables"]["srad"]["mean"]`; the former
+`srad_mean`, `tmax_mean`, `tmin_mean`, and `par_mean` keys have been removed.
+The soil summary gives depth in cm and extractable water
 in mm. Statistics and soil values are rounded to two decimals.
 Replace the template examples with your own data before a run.
 
