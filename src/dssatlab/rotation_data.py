@@ -157,7 +157,7 @@ def _rotation_keys(rotation, components, where):
 
 
 def _check_component(entry, row, index, known, where, filex, text, treatment,
-                     start, weather_range, cultivar_path):
+                     start, weather_range, cultivar_path, executable=None):
     number = int(row['R'])
     where = f'{where}, rotation component {number}'
     if not isinstance(entry, dict):
@@ -186,7 +186,8 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
                         found.append(f"{where}, cultivar: {field} {verb} supported in a treatment's cultivar "
                                      f"section only, not per rotation component. Remove {field!r}.")
                 value = {key: item for key, item in value.items() if key not in excluded}
-            found.extend(_check_cultivar(value, where, filex, None, treatment, cultivar_path=cultivar_path))
+            found.extend(_check_cultivar(value, where, filex, None, treatment,
+                                         cultivar_path=cultivar_path, executable=executable))
             if isinstance(value, dict) and 'crop' in value and value['crop'] != row['CR']:
                 found.append(f"{where}, cultivar: crop {value['crop']!r} differs from the component's "
                              f"crop {row['CR']!r}. Keep the component's crop and choose one of its cultivars.")
@@ -233,7 +234,8 @@ def _check_component(entry, row, index, known, where, filex, text, treatment,
 
 
 def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
-                         template=None, data_dir=None, *, inherited_harvest_checked=False):
+                         template=None, data_dir=None, *, inherited_harvest_checked=False,
+                         executable=None):
     """Return ordinary sections, component problems and report; never write files."""
     if not isinstance(entry, dict):
         return entry, [], []
@@ -310,7 +312,7 @@ def _check_rotation_data(entry, treatment, filex, text, start, weather_range,
                 report.extend(f'      {p}' for p in found)
         if number in edits:
             found, lines, text = _check_component(edits[number], row, index, known, where, filex,
-                                                  text, treatment, start, weather_range, cultivar_path)
+                                                  text, treatment, start, weather_range, cultivar_path, executable)
             problems.extend(found)
             report.extend(lines)
     return ordinary, problems, report + notes

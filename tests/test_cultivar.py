@@ -27,6 +27,79 @@ def simulation(inputs, cultivar, treatment=1):
                       management={"treatments": {treatment: {"cultivar": cultivar}}})
 
 
+@pytest.fixture
+def installed_soybean(fake_dssat):
+    path = fake_dssat.executable.parent / "Genotype" / "SBGRO048.CUL"
+    path.parent.mkdir()
+    path.write_text("*SOYBEAN CULTIVARS\n"
+                    "@VAR#  VRNAME.......... EXPNO   ECO#    P1\n"
+                    "990005 Group 5             . SB0001 259.0\n")
+    path.with_suffix(".ECO").write_text("@ECO# ECONAME\nSB0001 Example\n")
+    return path
+
+
+@pytest.mark.parametrize("source", ["executable", "directory", "discovery"])
+def test_installed_cultivar_checks_and_runs_without_copying_genotype(
+        sim_inputs, fake_dssat, installed_soybean, monkeypatch, source):
+    from dssatlab import core
+
+    sim = simulation(sim_inputs, {"crop": "SB", "code": "990005"})
+    if source == "discovery":
+        monkeypatch.setattr(core, "detect", lambda: {"dssat_path": fake_dssat.executable})
+    else:
+        sim.executable = (fake_dssat.executable if source == "executable"
+                          else fake_dssat.executable.parent)
+    original = installed_soybean.read_bytes()
+    assert sim.check(False) == []
+    result = sim.run()
+    copied = result.run_dir.parent / sim_inputs[0].name
+    assert " 1 SB 990005" in copied.read_text()
+    assert not list(copied.parent.glob("*.CUL"))
+    assert installed_soybean.read_bytes() == original
+
+
+def test_sibling_cultivar_wins_over_installed_file(sim_inputs, fake_dssat, installed_soybean):
+    sibling = sim_inputs[0].parent / "SBGRO048.cUl"
+    sibling.write_text(installed_soybean.read_text().replace("990005", "990006"))
+    sim = simulation(sim_inputs, {"crop": "SB", "code": "990006"})
+    sim.executable = fake_dssat.executable
+    assert sim.check(False) == []
+    sim.management["treatments"][1]["cultivar"]["code"] = "990005"
+    assert any(str(sibling) in p and "missing from .CUL" in p for p in sim.check(False))
+
+
+def test_missing_cultivar_file_names_both_places(sim_inputs, fake_dssat, installed_soybean):
+    installed_soybean.unlink()
+    sim = simulation(sim_inputs, {"crop": "SB", "code": "990005"})
+    sim.executable = fake_dssat.executable
+    problems = sim.check(False)
+    assert any(str(sim_inputs[0].parent) in p and str(installed_soybean) in p
+               and "Checked" in p and "Copy" in p for p in problems)
+
+
+@pytest.mark.parametrize("cultivar", [
+    {"crop": "SB", "code": "NC0001", "ecotype": "SB0001", "coefficients": {"P1": 300}},
+    {"crop": "SB", "code": "990005", "coefficients": {"P1": 300}},
+])
+def test_cultivar_writes_still_require_sibling(
+        sim_inputs, fake_dssat, installed_soybean, cultivar):
+    from dssatlab.cultivar_coefficients import _changed_cultivar, _new_cultivar
+
+    sim = simulation(sim_inputs, cultivar)
+    sim.executable = fake_dssat.executable
+    original = installed_soybean.read_bytes()
+    problems = sim.check(False)
+    assert any("beside" in p and "Copy" in p and "Genotype/SBGRO048.CUL" in p
+               for p in problems)
+    with pytest.raises(DSSATCheckError):
+        sim.run()
+    writer = _new_cultivar if "ecotype" in cultivar else _changed_cultivar
+    with pytest.raises(ValueError, match="Genotype/SBGRO048.CUL"):
+        writer(sim_inputs[0], cultivar)
+    assert installed_soybean.read_bytes() == original
+    assert not list(sim_inputs[0].parent.glob("dssat_sim_*"))
+
+
 def test_copied_i3_cultivar_levels_allocate_12():
     from dssatlab.cultivar import _cultivar_text
     from dssatlab.filex import _section_row
