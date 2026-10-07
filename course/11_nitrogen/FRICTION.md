@@ -17,12 +17,12 @@ The lesson uses only the public API and unchanged stock input files; experiment 
 - **Suggested change:** Add a public treatment-management preview showing inherited irrigation and fertilizer schedules and their totals.
 - **Classification:** **non-blocking**; `irrigation: []` makes the maize comparison rainfall-only through the documented API, and the peanut table shows zero irrigation in both runs.
 
-## 3. Fractional fertilizer amounts and reported applied N differ — non-blocking
+## 3. Fractional fertilizer amounts are rounded in DSSAT inputs — non-blocking
 
-- **Student action:** Compare the requested rate with `NICM` instead of assuming that its label is the reported applied-N total.
-- **Why awkward:** The exercise requests 75 kg N/ha split into two 37.5 kg N/ha applications. dssatlab's generated FileX retains 37.5 for each event, but DSSAT's `MgmtEvent.OUT` reports 38 for each and `Summary.OUT` reports `NICM = 76`.
-- **Suggested change:** Document this DSSAT reporting behavior in the fertilizer guide, with a fractional-rate example and the `NICM` comparison.
-- **Classification:** **non-blocking**; the notebook shows both requested and reported N, explains the difference, and makes no edits to DSSAT files.
+- **Student action:** Compare the requested rate with `NICM` and document the simulated rate after DSSAT rounds each application.
+- **Why awkward:** The exercise requests 75 kg N/ha split into two 37.5 kg N/ha applications. dssatlab's generated FileX retains 37.5 for each event, but DSSAT rounds each to 38 while preparing `DSSAT48.INP`, so both simulations apply 76 kg N/ha; the nitrogen balance records 76.00 and `Summary.OUT` reports `NICM = 76`.
+- **Suggested change:** Document DSSAT's input rounding and its effect on simulated rates in the fertilizer guide, with a fractional-rate example and the `NICM` comparison. The rounding occurs during [DSSAT's internal input preparation](https://github.com/DSSAT/dssat-csm-os/blob/v4.8.5.0/InputModule/optempy2k.for#L385-L395).
+- **Classification:** **non-blocking**; the notebook shows requested and applied N, explains input rounding, and makes no edits to DSSAT files.
 
 ## Case and results
 
@@ -49,7 +49,7 @@ Only the symbiosis control differs between the two simulations.
 | Y, fixation on | 4423 | 326 | 307.3 |
 | N, fixation off | 462 | 26 | 0.0 |
 
-The editable 75 kg N/ha exercise yields 2119 kg/ha rainfed and 5823 kg/ha irrigated, gains of 1517 and 5203 kg/ha over their zero-N baselines; both report 76 kg N/ha applied.
+The editable 75 kg N/ha exercise yields 2119 kg/ha rainfed and 5823 kg/ha irrigated, gains of 1517 and 5203 kg/ha over their zero-N baselines; both simulations apply 76 kg N/ha after DSSAT rounds each application to 38 kg N/ha.
 
 ## Execution environment
 
