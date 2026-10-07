@@ -127,8 +127,10 @@ dssat = dl.install()
 
 Check that the full prefix still fits the limit and is writable. This assignment
 changes the environment of the current Python process. On Windows and other
-non-Linux platforms, `install()` raises `DSSATInstallError`; use `connect(path=...)`
-with an existing installation.
+non-Linux platforms, `install()` raises `DSSATInstallError` after checking the
+platform. Windows users install DSSAT 4.8 from [dssat.net](https://dssat.net),
+then call `connect(path=...)` with its executable or directory. On other
+non-Linux platforms, use `connect(path=...)` with an existing installation.
 
 Continue with [Run a FileX](run-filex.md), or consult
 [Troubleshooting](troubleshooting.md) if discovery or installation fails.

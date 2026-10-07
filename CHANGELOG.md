@@ -11,6 +11,13 @@ All notable changes to dssatlab. The format follows [Keep a Changelog](https://k
 ### Fixed
 - `evaluate()` lists observed rows before the first or after the last Plant growth day in `Evaluation.excluded`, with their scenario, treatment, YYYYDDD date and simulated boundary. Their measurements are not checked; pairs and statistics use only observations in the simulated range. Missing interior days and an evaluation with every row excluded still raise `DSSATCheckError` ([#370](https://github.com/AbdelrahmanAmr3/dssatlab/issues/370)).
 - Stock weather checks cover structure, DSSAT filename selection, century handling and required date coverage using the set of dates present, including cross-file gaps. Template value ranges, identical station values and duplicate-date checks no longer reject unchanged stock files such as MSKB; the missing-weather `WARNING.OUT` scan remains ([#378](https://github.com/AbdelrahmanAmr3/dssatlab/issues/378)).
+### Changed
+- `list_cultivars()` accepts template crop names and DSSAT crop codes case-insensitively (for example, `"soybean"` or `"SB"`); unknown crops list both names and codes. `list_crops()` is unchanged ([#376](https://github.com/AbdelrahmanAmr3/dssatlab/issues/376)).
+- **Breaking change (pre-1.0):** `summarize_weather()["years"]` entries now contain `year`, `days`, `variables`, and `rain_total`. Yearly `variables` has min/mean/max for the same variables as the overall summary, including rain and optional PAR. Replace yearly `srad_mean`, `tmax_mean`, `tmin_mean`, and `par_mean` access with `year["variables"][name]["mean"]`.
+- `write_weather_template()` includes an optional `par` column example (40 mol/m2 per day); replace it with your data or remove the column.
+
+### Fixed
+- The non-Linux `install()` error drops the obsolete v0.1 restriction, reports the checked platform, and tells Windows users to install DSSAT 4.8 from dssat.net and call `connect(path=...)`.
 - Cultivar checks for a copied FileX use the installed DSSAT Genotype `.CUL` when no sibling file exists, matching `list_cultivars()`. Sibling files still take precedence; new cultivars and coefficient changes require a sibling `.CUL` and explain which stock file to copy ([#353](https://github.com/AbdelrahmanAmr3/dssatlab/issues/353)).
 
 ## [0.22.0] - 2026-10-05

@@ -25,7 +25,8 @@ def write_weather_template(path: str | Path) -> None:
     Units: srad in MJ/m2 per day; tmax, tmin, tav and amp in degrees C;
     rain in mm; latitude/longitude in degrees; elevation/refht/wndht in m.
     Optional station values default to -99 (not given). Nothing is converted.
-    Add optional par in mol/m2 per day (0 to 100), filled on every row, or omit it.
+    The example includes optional par in mol/m2 per day (0 to 100).
+    Fill it on every row with your data, or remove the column.
     An existing path raises DSSATError, preserving the user's data.
 
     Args:
@@ -41,10 +42,10 @@ def write_weather_template(path: str | Path) -> None:
     try:
         with path.open("x", encoding="utf-8", newline="") as stream:
             writer = csv.writer(stream)
-            writer.writerow(REQUIRED + tuple(name for name in OPTIONAL if name != "par"))
+            writer.writerow(REQUIRED + OPTIONAL)
             for day in range(1, 8):
                 writer.writerow(("DEMO", 45, -100, 200, f"2021-03-{day:02}",
-                                 20, 25, 10, 0, -99, -99, -99, -99))
+                                 20, 25, 10, 0, -99, -99, -99, -99, 40))
     except FileExistsError as error:
         raise DSSATError(exists_message) from error
 

@@ -270,7 +270,7 @@ def test_write_weather_template_passes_and_never_overwrites(tmp_path):
     assert len(example) == 7
     assert set(example[0]) == {"station", "latitude", "longitude", "elevation",
                                "date", "srad", "tmax", "tmin", "rain",
-                               "tav", "amp", "refht", "wndht"}
+                               "tav", "amp", "refht", "wndht", "par"}
     with pytest.raises(dssatlab.DSSATError, match="exists.*another path"):
         dssatlab.write_weather_template(str(path))
     assert path.read_bytes() == original

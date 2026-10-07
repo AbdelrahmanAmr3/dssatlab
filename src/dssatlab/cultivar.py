@@ -208,7 +208,8 @@ def list_cultivars(crop: str, executable: str | Path | None = None) -> list[dict
     """List cultivar codes and names for a template crop in file order.
 
     Parameters:
-        crop: Template crop name (e.g. "maize", "wheat", "rice").
+        crop: Template crop name or DSSAT crop code (e.g. "soybean" or "SB"),
+            case-insensitive.
         executable: Optional path to the DSSAT executable or its directory.
             If None, discovery finds DSSAT without prompting or saving config.
 
@@ -228,12 +229,17 @@ def list_cultivars(crop: str, executable: str | Path | None = None) -> list[dict
         >>> cultivars[0]["code"]
         '999991'
     """
-    if not isinstance(crop, str) or crop not in _CROPS:
+    crop_name = next((name for name, (code, *_rest) in _CROPS.items()
+                      if isinstance(crop, str) and crop.lower() in (name, code.lower())), None)
+    if crop_name is None:
         raise DSSATCheckError([
             f"{_show_value(crop)} is not a template crop. "
-            f"Use one of the template crops: {', '.join(_CROPS)}."
+            "Checked template crop names and DSSAT crop codes, case-insensitively. "
+            "Use one of the template crops: "
+            + ", ".join(f"{name} ({values[0]})" for name, values in _CROPS.items()) + "."
         ])
 
+    crop = crop_name
     prefix = _CROPS[crop][2]
     cul_path = _listing_data_dir(executable) / "Genotype" / f"{prefix}.CUL"
     if not cul_path.is_file():

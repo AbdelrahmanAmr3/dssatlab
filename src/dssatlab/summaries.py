@@ -28,6 +28,8 @@ def summarize_weather(source) -> dict:
     Accept a CSV path, plain row dicts or a DataFrame. Dates are datetime.date
     values; years are in calendar order, with the actual day count of each.
     Variables use DSSAT's units, including PAR only when supplied on the rows.
+    Each year has year, days, variables (min/mean/max per variable) and rain_total,
+    using the same nested variables layout as the overall summary.
     Statistics and rain totals are rounded once to two decimals.
     Raise DSSATCheckError with all template problems, or for stock file sources.
     """
@@ -48,12 +50,13 @@ def summarize_weather(source) -> dict:
         by_year.setdefault(row["date"].year, []).append(row)
     years = []
     for year, days in sorted(by_year.items()):
-        entry = {"year": year, "days": len(days)}
-        for name in ("srad", "tmax", "tmin"):
-            entry[f"{name}_mean"] = round(sum(row[name] for row in days) / len(days), 2)
+        entry = {"year": year, "days": len(days), "variables": {}}
+        for name in names:
+            values = [row[name] for row in days]
+            entry["variables"][name] = {"min": round(min(values), 2),
+                                        "mean": round(sum(values) / len(values), 2),
+                                        "max": round(max(values), 2)}
         entry["rain_total"] = round(sum(row["rain"] for row in days), 2)
-        if "par" in first:
-            entry["par_mean"] = round(sum(row["par"] for row in days) / len(days), 2)
         years.append(entry)
     return {
         "station": first["station"], "latitude": first["latitude"],

@@ -67,6 +67,7 @@ def install(version: str = "latest") -> Path:
     Clones and compiles the official DSSAT release using Git, CMake, and gfortran.
     Reuses cached managed builds if already present. Never prompts. Missing build
     tools are reported, never installed automatically.
+    On Windows, install DSSAT 4.8 from dssat.net, then call connect(path=...).
 
     Args:
         version: Version tag to build, or "latest" to resolve the latest stable
@@ -85,8 +86,11 @@ def install(version: str = "latest") -> Path:
     # Raise an error on non-Linux and MacOS platforms
     if platform.system() != "Linux":
         raise DSSATInstallError(
-            "DSSAT installation is only supported on Linux/Colab in v0.1. "
-            "Pass connect(path=...) to use an existing installation."
+            "DSSAT installation is only supported on Linux/Colab. "
+            f"Checked platform: {platform.system()}. "
+            "On Windows, install DSSAT 4.8 from https://dssat.net, then call "
+            "connect(path=...) with the DSSAT executable or directory. "
+            "On other non-Linux platforms, call connect(path=...) with an existing installation."
         )
 
     resolved = installer.resolve_version(version)
